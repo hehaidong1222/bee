@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/reminder_providers.dart';
 import '../utils/notification_factory.dart';
-import '../utils/notification_android.dart';
 import '../styles/colors.dart';
 import '../widgets/ui/ui.dart';
 

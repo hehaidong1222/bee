@@ -6,7 +6,7 @@ import 'notification_util.dart' as util;
 /// Android 特定的通知实现
 class AndroidNotificationUtil implements util.NotificationUtil {
   final FlutterLocalNotificationsPlugin _plugin;
-  final MethodChannel _channel = const MethodChannel('notification_channel');
+  final MethodChannel _channel = const MethodChannel('flutter_smart_notifications');
   bool _initialized = false;
 
   AndroidNotificationUtil(this._plugin);
@@ -86,30 +86,73 @@ class AndroidNotificationUtil implements util.NotificationUtil {
     const notificationDetails = NotificationDetails(android: androidDetails);
 
     try {
-      // 使用 exactAllowWhileIdle 确保休眠时也能触发
-      await _plugin.zonedSchedule(
-        id,
-        title,
-        body,
-        tzScheduledDate,
-        notificationDetails,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: DateTimeComponents.time, // 每天重复
-      );
+      // 检查是否是今天且还没到的时间
+      final now = DateTime.now();
+      final isToday = scheduledDate.year == now.year &&
+                      scheduledDate.month == now.month &&
+                      scheduledDate.day == now.day;
+
+      // 预先计算明天的日期（AlarmManager备份可能需要）
+      final tomorrowScheduledDate = scheduledDate.add(const Duration(days: 1));
+
+      if (isToday) {
+        // 如果是今天，先调度一次性通知（确保今天触发）
+        print('[Android] 🔔 今天的提醒，先调度一次性通知');
+        await _plugin.zonedSchedule(
+          id,
+          title,
+          body,
+          tzScheduledDate,
+          notificationDetails,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+        );
+
+        // 然后调度明天开始的每日重复通知（使用不同ID避免冲突）
+        final tzTomorrowScheduledDate = util.convertToTZDateTime(tomorrowScheduledDate);
+
+        await _plugin.zonedSchedule(
+          id + 10000, // 使用不同ID：原ID + 10000 作为每日重复通知的ID
+          title,
+          body,
+          tzTomorrowScheduledDate,
+          notificationDetails,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.time, // 每天重复
+        );
+
+        print('[Android] ✅ 今天一次性提醒设置成功: $hour:$minute');
+        print('[Android] ✅ 明天开始的每日重复提醒设置成功');
+      } else {
+        // 如果是明天或以后，直接设置每日重复通知
+        await _plugin.zonedSchedule(
+          id,
+          title,
+          body,
+          tzScheduledDate,
+          notificationDetails,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.time, // 每天重复
+        );
+      }
 
       print('[Android] ✅ 每日提醒设置成功: $hour:$minute');
       print('[Android] ✅ 下次提醒时间: $scheduledDate');
       print('[Android] ✅ 使用调度模式: exactAllowWhileIdle');
-      print('[Android] ✅ 每日重复: ${DateTimeComponents.time}');
 
       // 设置7天备用提醒（防止系统清理定时任务）
       print('[Android] 🔄 开始设置7天备用提醒...');
       await _scheduleBackupReminders(id, title, body, hour, minute);
 
       // 设置 AlarmManager 备用
-      await _scheduleAlarmManagerBackup(id, title, body, scheduledDate);
+      // 如果是今天，AlarmManager也应该从明天开始（避免与今天的一次性通知冲突）
+      final alarmManagerDate = isToday ? tomorrowScheduledDate : scheduledDate;
+      await _scheduleAlarmManagerBackup(id, title, body, alarmManagerDate);
     } catch (e) {
       print('[Android] Flutter 通知设置失败: $e');
       // 降级到 AlarmManager
