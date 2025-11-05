@@ -10,6 +10,7 @@ import 'pages/personalize_page.dart' show headerStyleProvider;
 import 'providers.dart';
 import 'utils/ui_scale_extensions.dart';
 import 'l10n/app_localizations.dart';
+import 'widgets/voice_input_dialog.dart';
 
 class BeeApp extends ConsumerStatefulWidget {
   const BeeApp({super.key});
@@ -136,26 +137,78 @@ class _BeeAppState extends ConsumerState<BeeApp> {
         floatingActionButton: Consumer(builder: (context, ref, _) {
           final style = ref.watch(headerStyleProvider);
           final color = Theme.of(context).colorScheme.primary;
-          return SizedBox(
-            width: 80.0.scaled(context, ref),
-            height: 80.0.scaled(context, ref),
-            child: FloatingActionButton(
-              heroTag: 'addFab',
-              elevation: 8,
-              shape: const CircleBorder(),
-              backgroundColor: style == 'primary' ? color : color,
-              onPressed: () async {
-                await Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const CategoryPickerPage(
-                      initialKind: 'expense',
-                      quickAdd: true,
-                    ),
-                  ),
-                );
-              },
-              child: Icon(Icons.add, color: Colors.white, size: 34.0.scaled(context, ref)),
-            ),
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 语音记账按钮
+              SizedBox(
+                width: 56.0.scaled(context, ref),
+                height: 56.0.scaled(context, ref),
+                child: FloatingActionButton(
+                  heroTag: 'voiceFab',
+                  elevation: 4,
+                  shape: const CircleBorder(),
+                  backgroundColor: Colors.white,
+                  onPressed: () async {
+                    final parsed = await showVoiceInputDialog(context);
+                    if (parsed != null && parsed.isValid && context.mounted) {
+                      // 跳转到记账页面，传入解析结果
+                      final db = ref.read(databaseProvider);
+
+                      // 查找匹配的分类
+                      int? categoryId;
+                      if (parsed.categoryName != null) {
+                        final categoryKind = parsed.type?.name ?? 'expense';
+                        final categories = await (db.select(db.categories)
+                              ..where((t) => t.kind.equals(categoryKind)))
+                            .get();
+                        final category = categories.where((c) => c.name == parsed.categoryName).firstOrNull;
+                        categoryId = category?.id;
+                      }
+
+                      // 跳转到记账页面
+                      if (context.mounted) {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => CategoryPickerPage(
+                              initialKind: parsed.type?.name ?? 'expense',
+                              quickAdd: true,
+                              initialAmount: parsed.amount,
+                              initialCategoryId: categoryId,
+                              initialNote: parsed.note,
+                            ),
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  child: Icon(Icons.mic, color: color, size: 24.0.scaled(context, ref)),
+                ),
+              ),
+              SizedBox(height: 12.0.scaled(context, ref)),
+              // 原有的添加按钮
+              SizedBox(
+                width: 80.0.scaled(context, ref),
+                height: 80.0.scaled(context, ref),
+                child: FloatingActionButton(
+                  heroTag: 'addFab',
+                  elevation: 8,
+                  shape: const CircleBorder(),
+                  backgroundColor: style == 'primary' ? color : color,
+                  onPressed: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const CategoryPickerPage(
+                          initialKind: 'expense',
+                          quickAdd: true,
+                        ),
+                      ),
+                    );
+                  },
+                  child: Icon(Icons.add, color: Colors.white, size: 34.0.scaled(context, ref)),
+                ),
+              ),
+            ],
           );
         }),
         floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
