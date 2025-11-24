@@ -349,6 +349,42 @@
   "mineAutoSyncTitle": "自动同步账本",
   "mineAutoSyncSubtitle": "记账后自动上传到云端",
   "mineAutoSyncNeedLogin": "需登录后可开启",
+  "multiDeviceSyncTitle": "多设备同步",
+  "multiDeviceSyncSubtitle": "开启后支持多设备协同编辑",
+  "multiDeviceSyncEnabled": "已开启，修改可实时同步到其他设备",
+  "multiDeviceSyncEnableTitle": "开启多设备同步",
+  "multiDeviceSyncEnableMessage": "开启后，您在任何设备上的修改、删除操作都会自动同步到其他设备。\n\n注意：开启后请确保所有设备都更新到最新版本。",
+  "multiDeviceSyncDisableTitle": "关闭多设备同步",
+  "multiDeviceSyncDisableMessage": "关闭后，各设备将独立存储数据，不再自动同步修改和删除操作。\n\n已有数据不会丢失，但可能出现设备间数据不一致的情况。",
+  "crdtSyncSectionTitle": "多设备同步",
+  "crdtSyncStatusTitle": "同步状态",
+  "crdtSyncInSync": "已同步",
+  "crdtSyncUnsyncedCount": "待同步 {count} 条操作",
+  "@crdtSyncUnsyncedCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "crdtSyncSyncing": "同步中...",
+  "crdtSyncButtonTitle": "立即同步",
+  "crdtSyncButtonSubtitle": "同步操作日志到云端",
+  "crdtSyncSuccess": "同步成功",
+  "crdtSyncSuccessMessage": "上传 {uploaded} 条，下载 {downloaded} 条",
+  "@crdtSyncSuccessMessage": {
+    "placeholders": {
+      "uploaded": {"type": "int"},
+      "downloaded": {"type": "int"}
+    }
+  },
+  "crdtLastSyncAt": "上次同步: {time}",
+  "@crdtLastSyncAt": {
+    "placeholders": {
+      "time": {"type": "String"}
+    }
+  },
+  "crdtSyncError": "同步失败",
+  "commonEnable": "开启",
+  "commonDisable": "关闭",
   "mineImportProgressTitle": "后台导入中…",
   "mineImportProgressSubtitle": "进度：{done}/{total}，成功 {ok}，失败 {fail}",
   "mineImportCompleteTitle": "导入完成",
@@ -1404,6 +1440,8 @@
       }
     }
   },
+  "ledgersConflictSkip": "暂不处理",
+  "ledgersConflictSkipHint": "跳过冲突解决，直接切换账本",
   "storageManagementTitle": "存储空间管理",
   "storageManagementSubtitle": "清理缓存释放空间",
   "storageAIModels": "AI模型",

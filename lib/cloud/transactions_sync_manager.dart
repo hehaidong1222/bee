@@ -8,6 +8,7 @@ import '../data/db.dart';
 import '../data/repository.dart';
 import '../models/ledger_display_item.dart';
 import '../services/logger_service.dart';
+import 'crdt/crdt_sync_trigger.dart';
 import 'sync_service.dart';
 import 'transactions_json.dart';
 
@@ -21,6 +22,7 @@ class TransactionsSyncManager implements SyncService {
 
   fcs.CloudSyncManager<int>? _syncManager;
   fcs.CloudProvider? _provider;
+  CRDTSyncTrigger? _crdtSyncTrigger;
   bool _isInitializing = false;
   bool _isInitialized = false;
 
@@ -82,6 +84,12 @@ class TransactionsSyncManager implements SyncService {
             break;
         }
       }),
+    );
+
+    // 初始化 CRDT 同步触发器
+    _crdtSyncTrigger = CRDTSyncTrigger(
+      db: db,
+      cloudProvider: _provider!,
     );
   }
 
@@ -156,6 +164,13 @@ class TransactionsSyncManager implements SyncService {
       _recentLocalChangeAt.remove(ledgerId);
 
       logger.info('CloudSync', '上传完成: $ledgerId');
+
+      // CRDT 多设备同步：上传后同步操作日志
+      try {
+        await _crdtSyncTrigger?.syncOperationLog(ledgerId);
+      } catch (e) {
+        logger.warning('CloudSync', 'CRDT 操作日志同步失败（忽略）: $e');
+      }
     } catch (e, stack) {
       logger.error('CloudSync', '上传失败: $ledgerId', e);
       logger.error('CloudSync', '堆栈', stack);
@@ -193,6 +208,13 @@ class TransactionsSyncManager implements SyncService {
       _statusCache.remove(ledgerId);
       _recentLocalChangeAt.remove(ledgerId);
       _recentUpload.remove(ledgerId);
+
+      // CRDT 多设备同步：下载后同步操作日志
+      try {
+        await _crdtSyncTrigger?.syncOperationLog(ledgerId);
+      } catch (e) {
+        logger.warning('CloudSync', 'CRDT 操作日志同步失败（忽略）: $e');
+      }
 
       return (
         inserted: result.inserted,
@@ -807,6 +829,35 @@ class TransactionsSyncManager implements SyncService {
       logger.error('CloudSync', '堆栈', stack);
       rethrow;
     }
+  }
+
+  /// 仅同步 CRDT 操作日志（不同步快照）
+  ///
+  /// 用于多设备同步模式下的增量同步
+  Future<({int uploaded, int downloaded})> syncOperationLogOnly({
+    required int ledgerId,
+  }) async {
+    await _ensureInitialized();
+
+    if (_crdtSyncTrigger == null) {
+      logger.warning('CloudSync', 'CRDT 同步触发器未初始化');
+      return (uploaded: 0, downloaded: 0);
+    }
+
+    logger.info('CloudSync', '开始单独同步操作日志: ledgerId=$ledgerId');
+
+    final result = await _crdtSyncTrigger!.syncOperationLog(ledgerId);
+
+    if (result != null) {
+      logger.info('CloudSync',
+          '操作日志同步完成: uploaded=${result.uploaded}, downloaded=${result.downloaded}');
+      return (
+        uploaded: result.uploaded,
+        downloaded: result.downloaded,
+      );
+    }
+
+    return (uploaded: 0, downloaded: 0);
   }
 }
 

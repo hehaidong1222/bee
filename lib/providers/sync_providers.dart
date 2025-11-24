@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_cloud_sync/flutter_cloud_sync.dart' hide SyncStatus;
 import '../cloud/sync_service.dart';
 import '../cloud/transactions_sync_manager.dart';
+import '../cloud/crdt/crdt_transaction_service.dart';
 import '../models/ledger_display_item.dart';
 import 'database_providers.dart';
 import 'ui_state_providers.dart';
@@ -242,4 +243,116 @@ final allLedgersProvider = FutureProvider<List<LedgerDisplayItem>>((ref) async {
   }
 
   return result;
+});
+
+// ====== CRDT 多设备同步相关 ======
+
+/// 多设备同步开关
+final multiDeviceSyncEnabledProvider = FutureProvider<bool>((ref) async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getBool('multi_device_sync_enabled') ?? false;
+});
+
+/// 多设备同步开关设置器
+class MultiDeviceSyncSetter {
+  MultiDeviceSyncSetter(this._ref);
+  final Ref _ref;
+
+  Future<void> setEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('multi_device_sync_enabled', enabled);
+    _ref.invalidate(multiDeviceSyncEnabledProvider);
+  }
+}
+
+final multiDeviceSyncSetterProvider = Provider<MultiDeviceSyncSetter>((ref) {
+  return MultiDeviceSyncSetter(ref);
+});
+
+/// 设备 ID Provider
+final deviceIdProvider = FutureProvider<String>((ref) async {
+  final prefs = await SharedPreferences.getInstance();
+  var deviceId = prefs.getString('crdt_device_id');
+
+  if (deviceId == null) {
+    // 生成新的设备 ID
+    deviceId = _generateDeviceId();
+    await prefs.setString('crdt_device_id', deviceId);
+  }
+
+  return deviceId;
+});
+
+String _generateDeviceId() {
+  final now = DateTime.now().millisecondsSinceEpoch;
+  final random = now % 1000000;
+  return 'device_${now}_$random';
+}
+
+/// CRDT 交易服务 Provider
+final crdtTransactionServiceProvider = FutureProvider<CRDTTransactionService?>((ref) async {
+  // 检查是否启用云服务
+  final activeAsync = ref.watch(activeCloudConfigProvider);
+  if (!activeAsync.hasValue) return null;
+
+  final config = activeAsync.value!;
+  if (!config.valid || config.type == CloudBackendType.local) return null;
+
+  // 创建服务实例
+  final db = ref.watch(databaseProvider);
+  final repo = ref.watch(repositoryProvider);
+
+  final service = await CRDTTransactionService.create(db: db, repo: repo);
+
+  // 监听多设备同步开关变化
+  final multiDeviceEnabled = await ref.watch(multiDeviceSyncEnabledProvider.future);
+  service.setMultiDeviceSyncEnabled(multiDeviceEnabled);
+
+  return service;
+});
+
+// ====== CRDT 同步状态 ======
+
+/// CRDT 同步状态模型
+class CRDTSyncStatus {
+  final int unsyncedCount;
+  final DateTime? lastSyncAt;
+  final bool isSyncing;
+  final String? error;
+
+  const CRDTSyncStatus({
+    this.unsyncedCount = 0,
+    this.lastSyncAt,
+    this.isSyncing = false,
+    this.error,
+  });
+
+  CRDTSyncStatus copyWith({
+    int? unsyncedCount,
+    DateTime? lastSyncAt,
+    bool? isSyncing,
+    String? error,
+  }) {
+    return CRDTSyncStatus(
+      unsyncedCount: unsyncedCount ?? this.unsyncedCount,
+      lastSyncAt: lastSyncAt ?? this.lastSyncAt,
+      isSyncing: isSyncing ?? this.isSyncing,
+      error: error,
+    );
+  }
+}
+
+/// CRDT 同步状态 Provider
+final crdtSyncStatusProvider = StateProvider.family<CRDTSyncStatus, int>(
+  (ref, ledgerId) => const CRDTSyncStatus(),
+);
+
+/// CRDT 同步状态刷新触发器
+final crdtSyncRefreshProvider = StateProvider<int>((ref) => 0);
+
+/// 获取未同步的操作数量
+final unsyncedOperationsCountProvider = FutureProvider.family<int, int>((ref, ledgerId) async {
+  ref.watch(crdtSyncRefreshProvider);
+  final db = ref.watch(databaseProvider);
+  return await db.getUnsyncedOperationsCount(ledgerId);
 });

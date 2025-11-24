@@ -1896,6 +1896,126 @@ abstract class AppLocalizations {
   /// **'Login required to enable'**
   String get mineAutoSyncNeedLogin;
 
+  /// No description provided for @multiDeviceSyncTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Multi-device Sync'**
+  String get multiDeviceSyncTitle;
+
+  /// No description provided for @multiDeviceSyncSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable multi-device collaborative editing'**
+  String get multiDeviceSyncSubtitle;
+
+  /// No description provided for @multiDeviceSyncEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled, changes sync to other devices in real-time'**
+  String get multiDeviceSyncEnabled;
+
+  /// No description provided for @multiDeviceSyncEnableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Multi-device Sync'**
+  String get multiDeviceSyncEnableTitle;
+
+  /// No description provided for @multiDeviceSyncEnableMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Once enabled, all your changes and deletions on any device will automatically sync to other devices.\n\nNote: Please ensure all devices are updated to the latest version.'**
+  String get multiDeviceSyncEnableMessage;
+
+  /// No description provided for @multiDeviceSyncDisableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable Multi-device Sync'**
+  String get multiDeviceSyncDisableTitle;
+
+  /// No description provided for @multiDeviceSyncDisableMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Once disabled, each device will store data independently without syncing changes and deletions.\n\nExisting data won\'t be lost, but data may become inconsistent across devices.'**
+  String get multiDeviceSyncDisableMessage;
+
+  /// No description provided for @crdtSyncSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Multi-device Sync'**
+  String get crdtSyncSectionTitle;
+
+  /// No description provided for @crdtSyncStatusTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync Status'**
+  String get crdtSyncStatusTitle;
+
+  /// No description provided for @crdtSyncInSync.
+  ///
+  /// In en, this message translates to:
+  /// **'In Sync'**
+  String get crdtSyncInSync;
+
+  /// No description provided for @crdtSyncUnsyncedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} operations pending sync'**
+  String crdtSyncUnsyncedCount(int count);
+
+  /// No description provided for @crdtSyncSyncing.
+  ///
+  /// In en, this message translates to:
+  /// **'Syncing...'**
+  String get crdtSyncSyncing;
+
+  /// No description provided for @crdtSyncButtonTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync Now'**
+  String get crdtSyncButtonTitle;
+
+  /// No description provided for @crdtSyncButtonSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync operation log to cloud'**
+  String get crdtSyncButtonSubtitle;
+
+  /// No description provided for @crdtSyncSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync Successful'**
+  String get crdtSyncSuccess;
+
+  /// No description provided for @crdtSyncSuccessMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploaded {uploaded}, Downloaded {downloaded}'**
+  String crdtSyncSuccessMessage(int uploaded, int downloaded);
+
+  /// No description provided for @crdtLastSyncAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Last sync: {time}'**
+  String crdtLastSyncAt(String time);
+
+  /// No description provided for @crdtSyncError.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync Failed'**
+  String get crdtSyncError;
+
+  /// No description provided for @commonEnable.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable'**
+  String get commonEnable;
+
+  /// No description provided for @commonDisable.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable'**
+  String get commonDisable;
+
   /// No description provided for @mineImportProgressTitle.
   ///
   /// In en, this message translates to:
@@ -6449,6 +6569,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Download successful, merged {inserted} transactions'**
   String ledgersConflictDownloadSuccess(int inserted);
+
+  /// No description provided for @ledgersConflictSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip for now'**
+  String get ledgersConflictSkip;
+
+  /// No description provided for @ledgersConflictSkipHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip conflict resolution and switch ledger'**
+  String get ledgersConflictSkipHint;
 
   /// No description provided for @storageManagementTitle.
   ///

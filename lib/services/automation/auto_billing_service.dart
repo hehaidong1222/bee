@@ -456,7 +456,8 @@ class AutoBillingService {
 
       // 使用共享的BillCreationService创建交易
       final db = _container.read(databaseProvider);
-      final billCreationService = BillCreationService(db);
+      final repo = _container.read(repositoryProvider);
+      final billCreationService = BillCreationService(db, repo);
 
       // 准备备注
       String? note;

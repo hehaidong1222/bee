@@ -397,6 +397,42 @@
   "mineAutoSyncTitle": "Auto sync ledger",
   "mineAutoSyncSubtitle": "Auto upload to cloud after recording",
   "mineAutoSyncNeedLogin": "Login required to enable",
+  "multiDeviceSyncTitle": "Multi-device Sync",
+  "multiDeviceSyncSubtitle": "Enable multi-device collaborative editing",
+  "multiDeviceSyncEnabled": "Enabled, changes sync to other devices in real-time",
+  "multiDeviceSyncEnableTitle": "Enable Multi-device Sync",
+  "multiDeviceSyncEnableMessage": "Once enabled, all your changes and deletions on any device will automatically sync to other devices.\n\nNote: Please ensure all devices are updated to the latest version.",
+  "multiDeviceSyncDisableTitle": "Disable Multi-device Sync",
+  "multiDeviceSyncDisableMessage": "Once disabled, each device will store data independently without syncing changes and deletions.\n\nExisting data won't be lost, but data may become inconsistent across devices.",
+  "crdtSyncSectionTitle": "Multi-device Sync",
+  "crdtSyncStatusTitle": "Sync Status",
+  "crdtSyncInSync": "In Sync",
+  "crdtSyncUnsyncedCount": "{count} operations pending sync",
+  "@crdtSyncUnsyncedCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "crdtSyncSyncing": "Syncing...",
+  "crdtSyncButtonTitle": "Sync Now",
+  "crdtSyncButtonSubtitle": "Sync operation log to cloud",
+  "crdtSyncSuccess": "Sync Successful",
+  "crdtSyncSuccessMessage": "Uploaded {uploaded}, Downloaded {downloaded}",
+  "@crdtSyncSuccessMessage": {
+    "placeholders": {
+      "uploaded": {"type": "int"},
+      "downloaded": {"type": "int"}
+    }
+  },
+  "crdtLastSyncAt": "Last sync: {time}",
+  "@crdtLastSyncAt": {
+    "placeholders": {
+      "time": {"type": "String"}
+    }
+  },
+  "crdtSyncError": "Sync Failed",
+  "commonEnable": "Enable",
+  "commonDisable": "Disable",
   "mineImportProgressTitle": "Importing in background...",
   "mineImportProgressSubtitle": "Progress: {done}/{total}, Success {ok}, Failed {fail}",
   "mineImportCompleteTitle": "Import complete",
@@ -1451,6 +1487,8 @@
       }
     }
   },
+  "ledgersConflictSkip": "Skip for now",
+  "ledgersConflictSkipHint": "Skip conflict resolution and switch ledger",
   "storageManagementTitle": "Storage Management",
   "storageManagementSubtitle": "Clear cache to free up space",
   "storageAIModels": "AI Models",

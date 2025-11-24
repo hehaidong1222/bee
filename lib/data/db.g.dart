@@ -1112,6 +1112,11 @@ class $TransactionsTable extends Transactions
   late final GeneratedColumn<int> recurringId = GeneratedColumn<int>(
       'recurring_id', aliasedName, true,
       type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _uuidMeta = const VerificationMeta('uuid');
+  @override
+  late final GeneratedColumn<String> uuid = GeneratedColumn<String>(
+      'uuid', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -1123,7 +1128,8 @@ class $TransactionsTable extends Transactions
         toAccountId,
         happenedAt,
         note,
-        recurringId
+        recurringId,
+        uuid
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1188,6 +1194,10 @@ class $TransactionsTable extends Transactions
           recurringId.isAcceptableOrUnknown(
               data['recurring_id']!, _recurringIdMeta));
     }
+    if (data.containsKey('uuid')) {
+      context.handle(
+          _uuidMeta, uuid.isAcceptableOrUnknown(data['uuid']!, _uuidMeta));
+    }
     return context;
   }
 
@@ -1217,6 +1227,8 @@ class $TransactionsTable extends Transactions
           .read(DriftSqlType.string, data['${effectivePrefix}note']),
       recurringId: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}recurring_id']),
+      uuid: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}uuid']),
     );
   }
 
@@ -1237,6 +1249,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
   final DateTime happenedAt;
   final String? note;
   final int? recurringId;
+  final String? uuid;
   const Transaction(
       {required this.id,
       required this.ledgerId,
@@ -1247,7 +1260,8 @@ class Transaction extends DataClass implements Insertable<Transaction> {
       this.toAccountId,
       required this.happenedAt,
       this.note,
-      this.recurringId});
+      this.recurringId,
+      this.uuid});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -1270,6 +1284,9 @@ class Transaction extends DataClass implements Insertable<Transaction> {
     }
     if (!nullToAbsent || recurringId != null) {
       map['recurring_id'] = Variable<int>(recurringId);
+    }
+    if (!nullToAbsent || uuid != null) {
+      map['uuid'] = Variable<String>(uuid);
     }
     return map;
   }
@@ -1294,6 +1311,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
       recurringId: recurringId == null && nullToAbsent
           ? const Value.absent()
           : Value(recurringId),
+      uuid: uuid == null && nullToAbsent ? const Value.absent() : Value(uuid),
     );
   }
 
@@ -1311,6 +1329,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
       happenedAt: serializer.fromJson<DateTime>(json['happenedAt']),
       note: serializer.fromJson<String?>(json['note']),
       recurringId: serializer.fromJson<int?>(json['recurringId']),
+      uuid: serializer.fromJson<String?>(json['uuid']),
     );
   }
   @override
@@ -1327,6 +1346,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
       'happenedAt': serializer.toJson<DateTime>(happenedAt),
       'note': serializer.toJson<String?>(note),
       'recurringId': serializer.toJson<int?>(recurringId),
+      'uuid': serializer.toJson<String?>(uuid),
     };
   }
 
@@ -1340,7 +1360,8 @@ class Transaction extends DataClass implements Insertable<Transaction> {
           Value<int?> toAccountId = const Value.absent(),
           DateTime? happenedAt,
           Value<String?> note = const Value.absent(),
-          Value<int?> recurringId = const Value.absent()}) =>
+          Value<int?> recurringId = const Value.absent(),
+          Value<String?> uuid = const Value.absent()}) =>
       Transaction(
         id: id ?? this.id,
         ledgerId: ledgerId ?? this.ledgerId,
@@ -1352,6 +1373,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
         happenedAt: happenedAt ?? this.happenedAt,
         note: note.present ? note.value : this.note,
         recurringId: recurringId.present ? recurringId.value : this.recurringId,
+        uuid: uuid.present ? uuid.value : this.uuid,
       );
   Transaction copyWithCompanion(TransactionsCompanion data) {
     return Transaction(
@@ -1369,6 +1391,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
       note: data.note.present ? data.note.value : this.note,
       recurringId:
           data.recurringId.present ? data.recurringId.value : this.recurringId,
+      uuid: data.uuid.present ? data.uuid.value : this.uuid,
     );
   }
 
@@ -1384,14 +1407,15 @@ class Transaction extends DataClass implements Insertable<Transaction> {
           ..write('toAccountId: $toAccountId, ')
           ..write('happenedAt: $happenedAt, ')
           ..write('note: $note, ')
-          ..write('recurringId: $recurringId')
+          ..write('recurringId: $recurringId, ')
+          ..write('uuid: $uuid')
           ..write(')'))
         .toString();
   }
 
   @override
   int get hashCode => Object.hash(id, ledgerId, type, amount, categoryId,
-      accountId, toAccountId, happenedAt, note, recurringId);
+      accountId, toAccountId, happenedAt, note, recurringId, uuid);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1405,7 +1429,8 @@ class Transaction extends DataClass implements Insertable<Transaction> {
           other.toAccountId == this.toAccountId &&
           other.happenedAt == this.happenedAt &&
           other.note == this.note &&
-          other.recurringId == this.recurringId);
+          other.recurringId == this.recurringId &&
+          other.uuid == this.uuid);
 }
 
 class TransactionsCompanion extends UpdateCompanion<Transaction> {
@@ -1419,6 +1444,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
   final Value<DateTime> happenedAt;
   final Value<String?> note;
   final Value<int?> recurringId;
+  final Value<String?> uuid;
   const TransactionsCompanion({
     this.id = const Value.absent(),
     this.ledgerId = const Value.absent(),
@@ -1430,6 +1456,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     this.happenedAt = const Value.absent(),
     this.note = const Value.absent(),
     this.recurringId = const Value.absent(),
+    this.uuid = const Value.absent(),
   });
   TransactionsCompanion.insert({
     this.id = const Value.absent(),
@@ -1442,6 +1469,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     this.happenedAt = const Value.absent(),
     this.note = const Value.absent(),
     this.recurringId = const Value.absent(),
+    this.uuid = const Value.absent(),
   })  : ledgerId = Value(ledgerId),
         type = Value(type),
         amount = Value(amount);
@@ -1456,6 +1484,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     Expression<DateTime>? happenedAt,
     Expression<String>? note,
     Expression<int>? recurringId,
+    Expression<String>? uuid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1468,6 +1497,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
       if (happenedAt != null) 'happened_at': happenedAt,
       if (note != null) 'note': note,
       if (recurringId != null) 'recurring_id': recurringId,
+      if (uuid != null) 'uuid': uuid,
     });
   }
 
@@ -1481,7 +1511,8 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
       Value<int?>? toAccountId,
       Value<DateTime>? happenedAt,
       Value<String?>? note,
-      Value<int?>? recurringId}) {
+      Value<int?>? recurringId,
+      Value<String?>? uuid}) {
     return TransactionsCompanion(
       id: id ?? this.id,
       ledgerId: ledgerId ?? this.ledgerId,
@@ -1493,6 +1524,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
       happenedAt: happenedAt ?? this.happenedAt,
       note: note ?? this.note,
       recurringId: recurringId ?? this.recurringId,
+      uuid: uuid ?? this.uuid,
     );
   }
 
@@ -1529,6 +1561,9 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     if (recurringId.present) {
       map['recurring_id'] = Variable<int>(recurringId.value);
     }
+    if (uuid.present) {
+      map['uuid'] = Variable<String>(uuid.value);
+    }
     return map;
   }
 
@@ -1544,7 +1579,8 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
           ..write('toAccountId: $toAccountId, ')
           ..write('happenedAt: $happenedAt, ')
           ..write('note: $note, ')
-          ..write('recurringId: $recurringId')
+          ..write('recurringId: $recurringId, ')
+          ..write('uuid: $uuid')
           ..write(')'))
         .toString();
   }
@@ -2431,6 +2467,1142 @@ class RecurringTransactionsCompanion
   }
 }
 
+class $CrdtOperationsTable extends CrdtOperations
+    with TableInfo<$CrdtOperationsTable, CrdtOperation> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CrdtOperationsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _opIdMeta = const VerificationMeta('opId');
+  @override
+  late final GeneratedColumn<String> opId = GeneratedColumn<String>(
+      'op_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _ledgerIdMeta =
+      const VerificationMeta('ledgerId');
+  @override
+  late final GeneratedColumn<int> ledgerId = GeneratedColumn<int>(
+      'ledger_id', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+      'type', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _targetIdMeta =
+      const VerificationMeta('targetId');
+  @override
+  late final GeneratedColumn<String> targetId = GeneratedColumn<String>(
+      'target_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _timestampMeta =
+      const VerificationMeta('timestamp');
+  @override
+  late final GeneratedColumn<int> timestamp = GeneratedColumn<int>(
+      'timestamp', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _deviceIdMeta =
+      const VerificationMeta('deviceId');
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+      'device_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _dataMeta = const VerificationMeta('data');
+  @override
+  late final GeneratedColumn<String> data = GeneratedColumn<String>(
+      'data', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _syncedMeta = const VerificationMeta('synced');
+  @override
+  late final GeneratedColumn<bool> synced = GeneratedColumn<bool>(
+      'synced', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("synced" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  @override
+  List<GeneratedColumn> get $columns => [
+        opId,
+        ledgerId,
+        type,
+        targetId,
+        timestamp,
+        deviceId,
+        data,
+        createdAt,
+        synced
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'crdt_operations';
+  @override
+  VerificationContext validateIntegrity(Insertable<CrdtOperation> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('op_id')) {
+      context.handle(
+          _opIdMeta, opId.isAcceptableOrUnknown(data['op_id']!, _opIdMeta));
+    } else if (isInserting) {
+      context.missing(_opIdMeta);
+    }
+    if (data.containsKey('ledger_id')) {
+      context.handle(_ledgerIdMeta,
+          ledgerId.isAcceptableOrUnknown(data['ledger_id']!, _ledgerIdMeta));
+    } else if (isInserting) {
+      context.missing(_ledgerIdMeta);
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+          _typeMeta, type.isAcceptableOrUnknown(data['type']!, _typeMeta));
+    } else if (isInserting) {
+      context.missing(_typeMeta);
+    }
+    if (data.containsKey('target_id')) {
+      context.handle(_targetIdMeta,
+          targetId.isAcceptableOrUnknown(data['target_id']!, _targetIdMeta));
+    } else if (isInserting) {
+      context.missing(_targetIdMeta);
+    }
+    if (data.containsKey('timestamp')) {
+      context.handle(_timestampMeta,
+          timestamp.isAcceptableOrUnknown(data['timestamp']!, _timestampMeta));
+    } else if (isInserting) {
+      context.missing(_timestampMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(_deviceIdMeta,
+          deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta));
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('data')) {
+      context.handle(
+          _dataMeta, this.data.isAcceptableOrUnknown(data['data']!, _dataMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('synced')) {
+      context.handle(_syncedMeta,
+          synced.isAcceptableOrUnknown(data['synced']!, _syncedMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {opId};
+  @override
+  CrdtOperation map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CrdtOperation(
+      opId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}op_id'])!,
+      ledgerId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}ledger_id'])!,
+      type: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}type'])!,
+      targetId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}target_id'])!,
+      timestamp: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}timestamp'])!,
+      deviceId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}device_id'])!,
+      data: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}data']),
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+      synced: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}synced'])!,
+    );
+  }
+
+  @override
+  $CrdtOperationsTable createAlias(String alias) {
+    return $CrdtOperationsTable(attachedDatabase, alias);
+  }
+}
+
+class CrdtOperation extends DataClass implements Insertable<CrdtOperation> {
+  /// 操作 ID（主键）: {timestamp}-{deviceId}-{seq}
+  final String opId;
+
+  /// 账本 ID
+  final int ledgerId;
+
+  /// 操作类型：insert, update, delete
+  final String type;
+
+  /// 目标记录的 UUID
+  final String targetId;
+
+  /// Lamport 时间戳
+  final int timestamp;
+
+  /// 设备 ID
+  final String deviceId;
+
+  /// 操作数据（JSON）
+  final String? data;
+
+  /// 创建时间
+  final DateTime createdAt;
+
+  /// 是否已同步到云端
+  final bool synced;
+  const CrdtOperation(
+      {required this.opId,
+      required this.ledgerId,
+      required this.type,
+      required this.targetId,
+      required this.timestamp,
+      required this.deviceId,
+      this.data,
+      required this.createdAt,
+      required this.synced});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['op_id'] = Variable<String>(opId);
+    map['ledger_id'] = Variable<int>(ledgerId);
+    map['type'] = Variable<String>(type);
+    map['target_id'] = Variable<String>(targetId);
+    map['timestamp'] = Variable<int>(timestamp);
+    map['device_id'] = Variable<String>(deviceId);
+    if (!nullToAbsent || data != null) {
+      map['data'] = Variable<String>(data);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['synced'] = Variable<bool>(synced);
+    return map;
+  }
+
+  CrdtOperationsCompanion toCompanion(bool nullToAbsent) {
+    return CrdtOperationsCompanion(
+      opId: Value(opId),
+      ledgerId: Value(ledgerId),
+      type: Value(type),
+      targetId: Value(targetId),
+      timestamp: Value(timestamp),
+      deviceId: Value(deviceId),
+      data: data == null && nullToAbsent ? const Value.absent() : Value(data),
+      createdAt: Value(createdAt),
+      synced: Value(synced),
+    );
+  }
+
+  factory CrdtOperation.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CrdtOperation(
+      opId: serializer.fromJson<String>(json['opId']),
+      ledgerId: serializer.fromJson<int>(json['ledgerId']),
+      type: serializer.fromJson<String>(json['type']),
+      targetId: serializer.fromJson<String>(json['targetId']),
+      timestamp: serializer.fromJson<int>(json['timestamp']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      data: serializer.fromJson<String?>(json['data']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      synced: serializer.fromJson<bool>(json['synced']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'opId': serializer.toJson<String>(opId),
+      'ledgerId': serializer.toJson<int>(ledgerId),
+      'type': serializer.toJson<String>(type),
+      'targetId': serializer.toJson<String>(targetId),
+      'timestamp': serializer.toJson<int>(timestamp),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'data': serializer.toJson<String?>(data),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'synced': serializer.toJson<bool>(synced),
+    };
+  }
+
+  CrdtOperation copyWith(
+          {String? opId,
+          int? ledgerId,
+          String? type,
+          String? targetId,
+          int? timestamp,
+          String? deviceId,
+          Value<String?> data = const Value.absent(),
+          DateTime? createdAt,
+          bool? synced}) =>
+      CrdtOperation(
+        opId: opId ?? this.opId,
+        ledgerId: ledgerId ?? this.ledgerId,
+        type: type ?? this.type,
+        targetId: targetId ?? this.targetId,
+        timestamp: timestamp ?? this.timestamp,
+        deviceId: deviceId ?? this.deviceId,
+        data: data.present ? data.value : this.data,
+        createdAt: createdAt ?? this.createdAt,
+        synced: synced ?? this.synced,
+      );
+  CrdtOperation copyWithCompanion(CrdtOperationsCompanion data) {
+    return CrdtOperation(
+      opId: data.opId.present ? data.opId.value : this.opId,
+      ledgerId: data.ledgerId.present ? data.ledgerId.value : this.ledgerId,
+      type: data.type.present ? data.type.value : this.type,
+      targetId: data.targetId.present ? data.targetId.value : this.targetId,
+      timestamp: data.timestamp.present ? data.timestamp.value : this.timestamp,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      data: data.data.present ? data.data.value : this.data,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      synced: data.synced.present ? data.synced.value : this.synced,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CrdtOperation(')
+          ..write('opId: $opId, ')
+          ..write('ledgerId: $ledgerId, ')
+          ..write('type: $type, ')
+          ..write('targetId: $targetId, ')
+          ..write('timestamp: $timestamp, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('data: $data, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('synced: $synced')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(opId, ledgerId, type, targetId, timestamp,
+      deviceId, data, createdAt, synced);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CrdtOperation &&
+          other.opId == this.opId &&
+          other.ledgerId == this.ledgerId &&
+          other.type == this.type &&
+          other.targetId == this.targetId &&
+          other.timestamp == this.timestamp &&
+          other.deviceId == this.deviceId &&
+          other.data == this.data &&
+          other.createdAt == this.createdAt &&
+          other.synced == this.synced);
+}
+
+class CrdtOperationsCompanion extends UpdateCompanion<CrdtOperation> {
+  final Value<String> opId;
+  final Value<int> ledgerId;
+  final Value<String> type;
+  final Value<String> targetId;
+  final Value<int> timestamp;
+  final Value<String> deviceId;
+  final Value<String?> data;
+  final Value<DateTime> createdAt;
+  final Value<bool> synced;
+  final Value<int> rowid;
+  const CrdtOperationsCompanion({
+    this.opId = const Value.absent(),
+    this.ledgerId = const Value.absent(),
+    this.type = const Value.absent(),
+    this.targetId = const Value.absent(),
+    this.timestamp = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.data = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.synced = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CrdtOperationsCompanion.insert({
+    required String opId,
+    required int ledgerId,
+    required String type,
+    required String targetId,
+    required int timestamp,
+    required String deviceId,
+    this.data = const Value.absent(),
+    required DateTime createdAt,
+    this.synced = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : opId = Value(opId),
+        ledgerId = Value(ledgerId),
+        type = Value(type),
+        targetId = Value(targetId),
+        timestamp = Value(timestamp),
+        deviceId = Value(deviceId),
+        createdAt = Value(createdAt);
+  static Insertable<CrdtOperation> custom({
+    Expression<String>? opId,
+    Expression<int>? ledgerId,
+    Expression<String>? type,
+    Expression<String>? targetId,
+    Expression<int>? timestamp,
+    Expression<String>? deviceId,
+    Expression<String>? data,
+    Expression<DateTime>? createdAt,
+    Expression<bool>? synced,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (opId != null) 'op_id': opId,
+      if (ledgerId != null) 'ledger_id': ledgerId,
+      if (type != null) 'type': type,
+      if (targetId != null) 'target_id': targetId,
+      if (timestamp != null) 'timestamp': timestamp,
+      if (deviceId != null) 'device_id': deviceId,
+      if (data != null) 'data': data,
+      if (createdAt != null) 'created_at': createdAt,
+      if (synced != null) 'synced': synced,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CrdtOperationsCompanion copyWith(
+      {Value<String>? opId,
+      Value<int>? ledgerId,
+      Value<String>? type,
+      Value<String>? targetId,
+      Value<int>? timestamp,
+      Value<String>? deviceId,
+      Value<String?>? data,
+      Value<DateTime>? createdAt,
+      Value<bool>? synced,
+      Value<int>? rowid}) {
+    return CrdtOperationsCompanion(
+      opId: opId ?? this.opId,
+      ledgerId: ledgerId ?? this.ledgerId,
+      type: type ?? this.type,
+      targetId: targetId ?? this.targetId,
+      timestamp: timestamp ?? this.timestamp,
+      deviceId: deviceId ?? this.deviceId,
+      data: data ?? this.data,
+      createdAt: createdAt ?? this.createdAt,
+      synced: synced ?? this.synced,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (opId.present) {
+      map['op_id'] = Variable<String>(opId.value);
+    }
+    if (ledgerId.present) {
+      map['ledger_id'] = Variable<int>(ledgerId.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (targetId.present) {
+      map['target_id'] = Variable<String>(targetId.value);
+    }
+    if (timestamp.present) {
+      map['timestamp'] = Variable<int>(timestamp.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (data.present) {
+      map['data'] = Variable<String>(data.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (synced.present) {
+      map['synced'] = Variable<bool>(synced.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CrdtOperationsCompanion(')
+          ..write('opId: $opId, ')
+          ..write('ledgerId: $ledgerId, ')
+          ..write('type: $type, ')
+          ..write('targetId: $targetId, ')
+          ..write('timestamp: $timestamp, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('data: $data, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('synced: $synced, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CrdtSyncStateTable extends CrdtSyncState
+    with TableInfo<$CrdtSyncStateTable, CrdtSyncStateData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CrdtSyncStateTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ledgerIdMeta =
+      const VerificationMeta('ledgerId');
+  @override
+  late final GeneratedColumn<int> ledgerId = GeneratedColumn<int>(
+      'ledger_id', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _localClockMeta =
+      const VerificationMeta('localClock');
+  @override
+  late final GeneratedColumn<int> localClock = GeneratedColumn<int>(
+      'local_clock', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _syncedSnapshotVersionMeta =
+      const VerificationMeta('syncedSnapshotVersion');
+  @override
+  late final GeneratedColumn<int> syncedSnapshotVersion = GeneratedColumn<int>(
+      'synced_snapshot_version', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _lastSyncAtMeta =
+      const VerificationMeta('lastSyncAt');
+  @override
+  late final GeneratedColumn<DateTime> lastSyncAt = GeneratedColumn<DateTime>(
+      'last_sync_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _deviceIdMeta =
+      const VerificationMeta('deviceId');
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+      'device_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [ledgerId, localClock, syncedSnapshotVersion, lastSyncAt, deviceId];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'crdt_sync_state';
+  @override
+  VerificationContext validateIntegrity(Insertable<CrdtSyncStateData> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('ledger_id')) {
+      context.handle(_ledgerIdMeta,
+          ledgerId.isAcceptableOrUnknown(data['ledger_id']!, _ledgerIdMeta));
+    }
+    if (data.containsKey('local_clock')) {
+      context.handle(
+          _localClockMeta,
+          localClock.isAcceptableOrUnknown(
+              data['local_clock']!, _localClockMeta));
+    }
+    if (data.containsKey('synced_snapshot_version')) {
+      context.handle(
+          _syncedSnapshotVersionMeta,
+          syncedSnapshotVersion.isAcceptableOrUnknown(
+              data['synced_snapshot_version']!, _syncedSnapshotVersionMeta));
+    }
+    if (data.containsKey('last_sync_at')) {
+      context.handle(
+          _lastSyncAtMeta,
+          lastSyncAt.isAcceptableOrUnknown(
+              data['last_sync_at']!, _lastSyncAtMeta));
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(_deviceIdMeta,
+          deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta));
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {ledgerId};
+  @override
+  CrdtSyncStateData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CrdtSyncStateData(
+      ledgerId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}ledger_id'])!,
+      localClock: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}local_clock'])!,
+      syncedSnapshotVersion: attachedDatabase.typeMapping.read(
+          DriftSqlType.int, data['${effectivePrefix}synced_snapshot_version'])!,
+      lastSyncAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}last_sync_at']),
+      deviceId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}device_id'])!,
+    );
+  }
+
+  @override
+  $CrdtSyncStateTable createAlias(String alias) {
+    return $CrdtSyncStateTable(attachedDatabase, alias);
+  }
+}
+
+class CrdtSyncStateData extends DataClass
+    implements Insertable<CrdtSyncStateData> {
+  /// 账本 ID（主键）
+  final int ledgerId;
+
+  /// 本地 Lamport 时钟值
+  final int localClock;
+
+  /// 已同步的快照版本
+  final int syncedSnapshotVersion;
+
+  /// 最后同步时间
+  final DateTime? lastSyncAt;
+
+  /// 本设备 ID
+  final String deviceId;
+  const CrdtSyncStateData(
+      {required this.ledgerId,
+      required this.localClock,
+      required this.syncedSnapshotVersion,
+      this.lastSyncAt,
+      required this.deviceId});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['ledger_id'] = Variable<int>(ledgerId);
+    map['local_clock'] = Variable<int>(localClock);
+    map['synced_snapshot_version'] = Variable<int>(syncedSnapshotVersion);
+    if (!nullToAbsent || lastSyncAt != null) {
+      map['last_sync_at'] = Variable<DateTime>(lastSyncAt);
+    }
+    map['device_id'] = Variable<String>(deviceId);
+    return map;
+  }
+
+  CrdtSyncStateCompanion toCompanion(bool nullToAbsent) {
+    return CrdtSyncStateCompanion(
+      ledgerId: Value(ledgerId),
+      localClock: Value(localClock),
+      syncedSnapshotVersion: Value(syncedSnapshotVersion),
+      lastSyncAt: lastSyncAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastSyncAt),
+      deviceId: Value(deviceId),
+    );
+  }
+
+  factory CrdtSyncStateData.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CrdtSyncStateData(
+      ledgerId: serializer.fromJson<int>(json['ledgerId']),
+      localClock: serializer.fromJson<int>(json['localClock']),
+      syncedSnapshotVersion:
+          serializer.fromJson<int>(json['syncedSnapshotVersion']),
+      lastSyncAt: serializer.fromJson<DateTime?>(json['lastSyncAt']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'ledgerId': serializer.toJson<int>(ledgerId),
+      'localClock': serializer.toJson<int>(localClock),
+      'syncedSnapshotVersion': serializer.toJson<int>(syncedSnapshotVersion),
+      'lastSyncAt': serializer.toJson<DateTime?>(lastSyncAt),
+      'deviceId': serializer.toJson<String>(deviceId),
+    };
+  }
+
+  CrdtSyncStateData copyWith(
+          {int? ledgerId,
+          int? localClock,
+          int? syncedSnapshotVersion,
+          Value<DateTime?> lastSyncAt = const Value.absent(),
+          String? deviceId}) =>
+      CrdtSyncStateData(
+        ledgerId: ledgerId ?? this.ledgerId,
+        localClock: localClock ?? this.localClock,
+        syncedSnapshotVersion:
+            syncedSnapshotVersion ?? this.syncedSnapshotVersion,
+        lastSyncAt: lastSyncAt.present ? lastSyncAt.value : this.lastSyncAt,
+        deviceId: deviceId ?? this.deviceId,
+      );
+  CrdtSyncStateData copyWithCompanion(CrdtSyncStateCompanion data) {
+    return CrdtSyncStateData(
+      ledgerId: data.ledgerId.present ? data.ledgerId.value : this.ledgerId,
+      localClock:
+          data.localClock.present ? data.localClock.value : this.localClock,
+      syncedSnapshotVersion: data.syncedSnapshotVersion.present
+          ? data.syncedSnapshotVersion.value
+          : this.syncedSnapshotVersion,
+      lastSyncAt:
+          data.lastSyncAt.present ? data.lastSyncAt.value : this.lastSyncAt,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CrdtSyncStateData(')
+          ..write('ledgerId: $ledgerId, ')
+          ..write('localClock: $localClock, ')
+          ..write('syncedSnapshotVersion: $syncedSnapshotVersion, ')
+          ..write('lastSyncAt: $lastSyncAt, ')
+          ..write('deviceId: $deviceId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      ledgerId, localClock, syncedSnapshotVersion, lastSyncAt, deviceId);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CrdtSyncStateData &&
+          other.ledgerId == this.ledgerId &&
+          other.localClock == this.localClock &&
+          other.syncedSnapshotVersion == this.syncedSnapshotVersion &&
+          other.lastSyncAt == this.lastSyncAt &&
+          other.deviceId == this.deviceId);
+}
+
+class CrdtSyncStateCompanion extends UpdateCompanion<CrdtSyncStateData> {
+  final Value<int> ledgerId;
+  final Value<int> localClock;
+  final Value<int> syncedSnapshotVersion;
+  final Value<DateTime?> lastSyncAt;
+  final Value<String> deviceId;
+  const CrdtSyncStateCompanion({
+    this.ledgerId = const Value.absent(),
+    this.localClock = const Value.absent(),
+    this.syncedSnapshotVersion = const Value.absent(),
+    this.lastSyncAt = const Value.absent(),
+    this.deviceId = const Value.absent(),
+  });
+  CrdtSyncStateCompanion.insert({
+    this.ledgerId = const Value.absent(),
+    this.localClock = const Value.absent(),
+    this.syncedSnapshotVersion = const Value.absent(),
+    this.lastSyncAt = const Value.absent(),
+    required String deviceId,
+  }) : deviceId = Value(deviceId);
+  static Insertable<CrdtSyncStateData> custom({
+    Expression<int>? ledgerId,
+    Expression<int>? localClock,
+    Expression<int>? syncedSnapshotVersion,
+    Expression<DateTime>? lastSyncAt,
+    Expression<String>? deviceId,
+  }) {
+    return RawValuesInsertable({
+      if (ledgerId != null) 'ledger_id': ledgerId,
+      if (localClock != null) 'local_clock': localClock,
+      if (syncedSnapshotVersion != null)
+        'synced_snapshot_version': syncedSnapshotVersion,
+      if (lastSyncAt != null) 'last_sync_at': lastSyncAt,
+      if (deviceId != null) 'device_id': deviceId,
+    });
+  }
+
+  CrdtSyncStateCompanion copyWith(
+      {Value<int>? ledgerId,
+      Value<int>? localClock,
+      Value<int>? syncedSnapshotVersion,
+      Value<DateTime?>? lastSyncAt,
+      Value<String>? deviceId}) {
+    return CrdtSyncStateCompanion(
+      ledgerId: ledgerId ?? this.ledgerId,
+      localClock: localClock ?? this.localClock,
+      syncedSnapshotVersion:
+          syncedSnapshotVersion ?? this.syncedSnapshotVersion,
+      lastSyncAt: lastSyncAt ?? this.lastSyncAt,
+      deviceId: deviceId ?? this.deviceId,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (ledgerId.present) {
+      map['ledger_id'] = Variable<int>(ledgerId.value);
+    }
+    if (localClock.present) {
+      map['local_clock'] = Variable<int>(localClock.value);
+    }
+    if (syncedSnapshotVersion.present) {
+      map['synced_snapshot_version'] =
+          Variable<int>(syncedSnapshotVersion.value);
+    }
+    if (lastSyncAt.present) {
+      map['last_sync_at'] = Variable<DateTime>(lastSyncAt.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CrdtSyncStateCompanion(')
+          ..write('ledgerId: $ledgerId, ')
+          ..write('localClock: $localClock, ')
+          ..write('syncedSnapshotVersion: $syncedSnapshotVersion, ')
+          ..write('lastSyncAt: $lastSyncAt, ')
+          ..write('deviceId: $deviceId')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CrdtDevicesTable extends CrdtDevices
+    with TableInfo<$CrdtDevicesTable, CrdtDevice> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CrdtDevicesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _deviceIdMeta =
+      const VerificationMeta('deviceId');
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+      'device_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _deviceNameMeta =
+      const VerificationMeta('deviceName');
+  @override
+  late final GeneratedColumn<String> deviceName = GeneratedColumn<String>(
+      'device_name', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _platformMeta =
+      const VerificationMeta('platform');
+  @override
+  late final GeneratedColumn<String> platform = GeneratedColumn<String>(
+      'platform', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _lastSeenAtMeta =
+      const VerificationMeta('lastSeenAt');
+  @override
+  late final GeneratedColumn<DateTime> lastSeenAt = GeneratedColumn<DateTime>(
+      'last_seen_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _isCurrentDeviceMeta =
+      const VerificationMeta('isCurrentDevice');
+  @override
+  late final GeneratedColumn<bool> isCurrentDevice = GeneratedColumn<bool>(
+      'is_current_device', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("is_current_device" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  @override
+  List<GeneratedColumn> get $columns =>
+      [deviceId, deviceName, platform, lastSeenAt, isCurrentDevice];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'crdt_devices';
+  @override
+  VerificationContext validateIntegrity(Insertable<CrdtDevice> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('device_id')) {
+      context.handle(_deviceIdMeta,
+          deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta));
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('device_name')) {
+      context.handle(
+          _deviceNameMeta,
+          deviceName.isAcceptableOrUnknown(
+              data['device_name']!, _deviceNameMeta));
+    } else if (isInserting) {
+      context.missing(_deviceNameMeta);
+    }
+    if (data.containsKey('platform')) {
+      context.handle(_platformMeta,
+          platform.isAcceptableOrUnknown(data['platform']!, _platformMeta));
+    } else if (isInserting) {
+      context.missing(_platformMeta);
+    }
+    if (data.containsKey('last_seen_at')) {
+      context.handle(
+          _lastSeenAtMeta,
+          lastSeenAt.isAcceptableOrUnknown(
+              data['last_seen_at']!, _lastSeenAtMeta));
+    } else if (isInserting) {
+      context.missing(_lastSeenAtMeta);
+    }
+    if (data.containsKey('is_current_device')) {
+      context.handle(
+          _isCurrentDeviceMeta,
+          isCurrentDevice.isAcceptableOrUnknown(
+              data['is_current_device']!, _isCurrentDeviceMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {deviceId};
+  @override
+  CrdtDevice map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CrdtDevice(
+      deviceId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}device_id'])!,
+      deviceName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}device_name'])!,
+      platform: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}platform'])!,
+      lastSeenAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}last_seen_at'])!,
+      isCurrentDevice: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}is_current_device'])!,
+    );
+  }
+
+  @override
+  $CrdtDevicesTable createAlias(String alias) {
+    return $CrdtDevicesTable(attachedDatabase, alias);
+  }
+}
+
+class CrdtDevice extends DataClass implements Insertable<CrdtDevice> {
+  /// 设备 ID（主键）
+  final String deviceId;
+
+  /// 设备名称
+  final String deviceName;
+
+  /// 平台：ios, android
+  final String platform;
+
+  /// 最后活跃时间
+  final DateTime lastSeenAt;
+
+  /// 是否是当前设备
+  final bool isCurrentDevice;
+  const CrdtDevice(
+      {required this.deviceId,
+      required this.deviceName,
+      required this.platform,
+      required this.lastSeenAt,
+      required this.isCurrentDevice});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['device_id'] = Variable<String>(deviceId);
+    map['device_name'] = Variable<String>(deviceName);
+    map['platform'] = Variable<String>(platform);
+    map['last_seen_at'] = Variable<DateTime>(lastSeenAt);
+    map['is_current_device'] = Variable<bool>(isCurrentDevice);
+    return map;
+  }
+
+  CrdtDevicesCompanion toCompanion(bool nullToAbsent) {
+    return CrdtDevicesCompanion(
+      deviceId: Value(deviceId),
+      deviceName: Value(deviceName),
+      platform: Value(platform),
+      lastSeenAt: Value(lastSeenAt),
+      isCurrentDevice: Value(isCurrentDevice),
+    );
+  }
+
+  factory CrdtDevice.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CrdtDevice(
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      deviceName: serializer.fromJson<String>(json['deviceName']),
+      platform: serializer.fromJson<String>(json['platform']),
+      lastSeenAt: serializer.fromJson<DateTime>(json['lastSeenAt']),
+      isCurrentDevice: serializer.fromJson<bool>(json['isCurrentDevice']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'deviceId': serializer.toJson<String>(deviceId),
+      'deviceName': serializer.toJson<String>(deviceName),
+      'platform': serializer.toJson<String>(platform),
+      'lastSeenAt': serializer.toJson<DateTime>(lastSeenAt),
+      'isCurrentDevice': serializer.toJson<bool>(isCurrentDevice),
+    };
+  }
+
+  CrdtDevice copyWith(
+          {String? deviceId,
+          String? deviceName,
+          String? platform,
+          DateTime? lastSeenAt,
+          bool? isCurrentDevice}) =>
+      CrdtDevice(
+        deviceId: deviceId ?? this.deviceId,
+        deviceName: deviceName ?? this.deviceName,
+        platform: platform ?? this.platform,
+        lastSeenAt: lastSeenAt ?? this.lastSeenAt,
+        isCurrentDevice: isCurrentDevice ?? this.isCurrentDevice,
+      );
+  CrdtDevice copyWithCompanion(CrdtDevicesCompanion data) {
+    return CrdtDevice(
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      deviceName:
+          data.deviceName.present ? data.deviceName.value : this.deviceName,
+      platform: data.platform.present ? data.platform.value : this.platform,
+      lastSeenAt:
+          data.lastSeenAt.present ? data.lastSeenAt.value : this.lastSeenAt,
+      isCurrentDevice: data.isCurrentDevice.present
+          ? data.isCurrentDevice.value
+          : this.isCurrentDevice,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CrdtDevice(')
+          ..write('deviceId: $deviceId, ')
+          ..write('deviceName: $deviceName, ')
+          ..write('platform: $platform, ')
+          ..write('lastSeenAt: $lastSeenAt, ')
+          ..write('isCurrentDevice: $isCurrentDevice')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(deviceId, deviceName, platform, lastSeenAt, isCurrentDevice);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CrdtDevice &&
+          other.deviceId == this.deviceId &&
+          other.deviceName == this.deviceName &&
+          other.platform == this.platform &&
+          other.lastSeenAt == this.lastSeenAt &&
+          other.isCurrentDevice == this.isCurrentDevice);
+}
+
+class CrdtDevicesCompanion extends UpdateCompanion<CrdtDevice> {
+  final Value<String> deviceId;
+  final Value<String> deviceName;
+  final Value<String> platform;
+  final Value<DateTime> lastSeenAt;
+  final Value<bool> isCurrentDevice;
+  final Value<int> rowid;
+  const CrdtDevicesCompanion({
+    this.deviceId = const Value.absent(),
+    this.deviceName = const Value.absent(),
+    this.platform = const Value.absent(),
+    this.lastSeenAt = const Value.absent(),
+    this.isCurrentDevice = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CrdtDevicesCompanion.insert({
+    required String deviceId,
+    required String deviceName,
+    required String platform,
+    required DateTime lastSeenAt,
+    this.isCurrentDevice = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : deviceId = Value(deviceId),
+        deviceName = Value(deviceName),
+        platform = Value(platform),
+        lastSeenAt = Value(lastSeenAt);
+  static Insertable<CrdtDevice> custom({
+    Expression<String>? deviceId,
+    Expression<String>? deviceName,
+    Expression<String>? platform,
+    Expression<DateTime>? lastSeenAt,
+    Expression<bool>? isCurrentDevice,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (deviceId != null) 'device_id': deviceId,
+      if (deviceName != null) 'device_name': deviceName,
+      if (platform != null) 'platform': platform,
+      if (lastSeenAt != null) 'last_seen_at': lastSeenAt,
+      if (isCurrentDevice != null) 'is_current_device': isCurrentDevice,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CrdtDevicesCompanion copyWith(
+      {Value<String>? deviceId,
+      Value<String>? deviceName,
+      Value<String>? platform,
+      Value<DateTime>? lastSeenAt,
+      Value<bool>? isCurrentDevice,
+      Value<int>? rowid}) {
+    return CrdtDevicesCompanion(
+      deviceId: deviceId ?? this.deviceId,
+      deviceName: deviceName ?? this.deviceName,
+      platform: platform ?? this.platform,
+      lastSeenAt: lastSeenAt ?? this.lastSeenAt,
+      isCurrentDevice: isCurrentDevice ?? this.isCurrentDevice,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (deviceName.present) {
+      map['device_name'] = Variable<String>(deviceName.value);
+    }
+    if (platform.present) {
+      map['platform'] = Variable<String>(platform.value);
+    }
+    if (lastSeenAt.present) {
+      map['last_seen_at'] = Variable<DateTime>(lastSeenAt.value);
+    }
+    if (isCurrentDevice.present) {
+      map['is_current_device'] = Variable<bool>(isCurrentDevice.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CrdtDevicesCompanion(')
+          ..write('deviceId: $deviceId, ')
+          ..write('deviceName: $deviceName, ')
+          ..write('platform: $platform, ')
+          ..write('lastSeenAt: $lastSeenAt, ')
+          ..write('isCurrentDevice: $isCurrentDevice, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$BeeDatabase extends GeneratedDatabase {
   _$BeeDatabase(QueryExecutor e) : super(e);
   $BeeDatabaseManager get managers => $BeeDatabaseManager(this);
@@ -2440,12 +3612,23 @@ abstract class _$BeeDatabase extends GeneratedDatabase {
   late final $TransactionsTable transactions = $TransactionsTable(this);
   late final $RecurringTransactionsTable recurringTransactions =
       $RecurringTransactionsTable(this);
+  late final $CrdtOperationsTable crdtOperations = $CrdtOperationsTable(this);
+  late final $CrdtSyncStateTable crdtSyncState = $CrdtSyncStateTable(this);
+  late final $CrdtDevicesTable crdtDevices = $CrdtDevicesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities =>
-      [ledgers, accounts, categories, transactions, recurringTransactions];
+  List<DatabaseSchemaEntity> get allSchemaEntities => [
+        ledgers,
+        accounts,
+        categories,
+        transactions,
+        recurringTransactions,
+        crdtOperations,
+        crdtSyncState,
+        crdtDevices
+      ];
 }
 
 typedef $$LedgersTableCreateCompanionBuilder = LedgersCompanion Function({
@@ -2999,6 +4182,7 @@ typedef $$TransactionsTableCreateCompanionBuilder = TransactionsCompanion
   Value<DateTime> happenedAt,
   Value<String?> note,
   Value<int?> recurringId,
+  Value<String?> uuid,
 });
 typedef $$TransactionsTableUpdateCompanionBuilder = TransactionsCompanion
     Function({
@@ -3012,6 +4196,7 @@ typedef $$TransactionsTableUpdateCompanionBuilder = TransactionsCompanion
   Value<DateTime> happenedAt,
   Value<String?> note,
   Value<int?> recurringId,
+  Value<String?> uuid,
 });
 
 class $$TransactionsTableFilterComposer
@@ -3052,6 +4237,9 @@ class $$TransactionsTableFilterComposer
 
   ColumnFilters<int> get recurringId => $composableBuilder(
       column: $table.recurringId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get uuid => $composableBuilder(
+      column: $table.uuid, builder: (column) => ColumnFilters(column));
 }
 
 class $$TransactionsTableOrderingComposer
@@ -3092,6 +4280,9 @@ class $$TransactionsTableOrderingComposer
 
   ColumnOrderings<int> get recurringId => $composableBuilder(
       column: $table.recurringId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get uuid => $composableBuilder(
+      column: $table.uuid, builder: (column) => ColumnOrderings(column));
 }
 
 class $$TransactionsTableAnnotationComposer
@@ -3132,6 +4323,9 @@ class $$TransactionsTableAnnotationComposer
 
   GeneratedColumn<int> get recurringId => $composableBuilder(
       column: $table.recurringId, builder: (column) => column);
+
+  GeneratedColumn<String> get uuid =>
+      $composableBuilder(column: $table.uuid, builder: (column) => column);
 }
 
 class $$TransactionsTableTableManager extends RootTableManager<
@@ -3170,6 +4364,7 @@ class $$TransactionsTableTableManager extends RootTableManager<
             Value<DateTime> happenedAt = const Value.absent(),
             Value<String?> note = const Value.absent(),
             Value<int?> recurringId = const Value.absent(),
+            Value<String?> uuid = const Value.absent(),
           }) =>
               TransactionsCompanion(
             id: id,
@@ -3182,6 +4377,7 @@ class $$TransactionsTableTableManager extends RootTableManager<
             happenedAt: happenedAt,
             note: note,
             recurringId: recurringId,
+            uuid: uuid,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -3194,6 +4390,7 @@ class $$TransactionsTableTableManager extends RootTableManager<
             Value<DateTime> happenedAt = const Value.absent(),
             Value<String?> note = const Value.absent(),
             Value<int?> recurringId = const Value.absent(),
+            Value<String?> uuid = const Value.absent(),
           }) =>
               TransactionsCompanion.insert(
             id: id,
@@ -3206,6 +4403,7 @@ class $$TransactionsTableTableManager extends RootTableManager<
             happenedAt: happenedAt,
             note: note,
             recurringId: recurringId,
+            uuid: uuid,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
@@ -3615,6 +4813,578 @@ typedef $$RecurringTransactionsTableProcessedTableManager
         ),
         RecurringTransaction,
         PrefetchHooks Function()>;
+typedef $$CrdtOperationsTableCreateCompanionBuilder = CrdtOperationsCompanion
+    Function({
+  required String opId,
+  required int ledgerId,
+  required String type,
+  required String targetId,
+  required int timestamp,
+  required String deviceId,
+  Value<String?> data,
+  required DateTime createdAt,
+  Value<bool> synced,
+  Value<int> rowid,
+});
+typedef $$CrdtOperationsTableUpdateCompanionBuilder = CrdtOperationsCompanion
+    Function({
+  Value<String> opId,
+  Value<int> ledgerId,
+  Value<String> type,
+  Value<String> targetId,
+  Value<int> timestamp,
+  Value<String> deviceId,
+  Value<String?> data,
+  Value<DateTime> createdAt,
+  Value<bool> synced,
+  Value<int> rowid,
+});
+
+class $$CrdtOperationsTableFilterComposer
+    extends Composer<_$BeeDatabase, $CrdtOperationsTable> {
+  $$CrdtOperationsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get opId => $composableBuilder(
+      column: $table.opId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get ledgerId => $composableBuilder(
+      column: $table.ledgerId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get type => $composableBuilder(
+      column: $table.type, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get targetId => $composableBuilder(
+      column: $table.targetId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get timestamp => $composableBuilder(
+      column: $table.timestamp, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get data => $composableBuilder(
+      column: $table.data, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get synced => $composableBuilder(
+      column: $table.synced, builder: (column) => ColumnFilters(column));
+}
+
+class $$CrdtOperationsTableOrderingComposer
+    extends Composer<_$BeeDatabase, $CrdtOperationsTable> {
+  $$CrdtOperationsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get opId => $composableBuilder(
+      column: $table.opId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get ledgerId => $composableBuilder(
+      column: $table.ledgerId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get type => $composableBuilder(
+      column: $table.type, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get targetId => $composableBuilder(
+      column: $table.targetId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get timestamp => $composableBuilder(
+      column: $table.timestamp, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get data => $composableBuilder(
+      column: $table.data, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get synced => $composableBuilder(
+      column: $table.synced, builder: (column) => ColumnOrderings(column));
+}
+
+class $$CrdtOperationsTableAnnotationComposer
+    extends Composer<_$BeeDatabase, $CrdtOperationsTable> {
+  $$CrdtOperationsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get opId =>
+      $composableBuilder(column: $table.opId, builder: (column) => column);
+
+  GeneratedColumn<int> get ledgerId =>
+      $composableBuilder(column: $table.ledgerId, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<String> get targetId =>
+      $composableBuilder(column: $table.targetId, builder: (column) => column);
+
+  GeneratedColumn<int> get timestamp =>
+      $composableBuilder(column: $table.timestamp, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumn<String> get data =>
+      $composableBuilder(column: $table.data, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get synced =>
+      $composableBuilder(column: $table.synced, builder: (column) => column);
+}
+
+class $$CrdtOperationsTableTableManager extends RootTableManager<
+    _$BeeDatabase,
+    $CrdtOperationsTable,
+    CrdtOperation,
+    $$CrdtOperationsTableFilterComposer,
+    $$CrdtOperationsTableOrderingComposer,
+    $$CrdtOperationsTableAnnotationComposer,
+    $$CrdtOperationsTableCreateCompanionBuilder,
+    $$CrdtOperationsTableUpdateCompanionBuilder,
+    (
+      CrdtOperation,
+      BaseReferences<_$BeeDatabase, $CrdtOperationsTable, CrdtOperation>
+    ),
+    CrdtOperation,
+    PrefetchHooks Function()> {
+  $$CrdtOperationsTableTableManager(
+      _$BeeDatabase db, $CrdtOperationsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CrdtOperationsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CrdtOperationsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CrdtOperationsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> opId = const Value.absent(),
+            Value<int> ledgerId = const Value.absent(),
+            Value<String> type = const Value.absent(),
+            Value<String> targetId = const Value.absent(),
+            Value<int> timestamp = const Value.absent(),
+            Value<String> deviceId = const Value.absent(),
+            Value<String?> data = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<bool> synced = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CrdtOperationsCompanion(
+            opId: opId,
+            ledgerId: ledgerId,
+            type: type,
+            targetId: targetId,
+            timestamp: timestamp,
+            deviceId: deviceId,
+            data: data,
+            createdAt: createdAt,
+            synced: synced,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String opId,
+            required int ledgerId,
+            required String type,
+            required String targetId,
+            required int timestamp,
+            required String deviceId,
+            Value<String?> data = const Value.absent(),
+            required DateTime createdAt,
+            Value<bool> synced = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CrdtOperationsCompanion.insert(
+            opId: opId,
+            ledgerId: ledgerId,
+            type: type,
+            targetId: targetId,
+            timestamp: timestamp,
+            deviceId: deviceId,
+            data: data,
+            createdAt: createdAt,
+            synced: synced,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$CrdtOperationsTableProcessedTableManager = ProcessedTableManager<
+    _$BeeDatabase,
+    $CrdtOperationsTable,
+    CrdtOperation,
+    $$CrdtOperationsTableFilterComposer,
+    $$CrdtOperationsTableOrderingComposer,
+    $$CrdtOperationsTableAnnotationComposer,
+    $$CrdtOperationsTableCreateCompanionBuilder,
+    $$CrdtOperationsTableUpdateCompanionBuilder,
+    (
+      CrdtOperation,
+      BaseReferences<_$BeeDatabase, $CrdtOperationsTable, CrdtOperation>
+    ),
+    CrdtOperation,
+    PrefetchHooks Function()>;
+typedef $$CrdtSyncStateTableCreateCompanionBuilder = CrdtSyncStateCompanion
+    Function({
+  Value<int> ledgerId,
+  Value<int> localClock,
+  Value<int> syncedSnapshotVersion,
+  Value<DateTime?> lastSyncAt,
+  required String deviceId,
+});
+typedef $$CrdtSyncStateTableUpdateCompanionBuilder = CrdtSyncStateCompanion
+    Function({
+  Value<int> ledgerId,
+  Value<int> localClock,
+  Value<int> syncedSnapshotVersion,
+  Value<DateTime?> lastSyncAt,
+  Value<String> deviceId,
+});
+
+class $$CrdtSyncStateTableFilterComposer
+    extends Composer<_$BeeDatabase, $CrdtSyncStateTable> {
+  $$CrdtSyncStateTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get ledgerId => $composableBuilder(
+      column: $table.ledgerId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get localClock => $composableBuilder(
+      column: $table.localClock, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get syncedSnapshotVersion => $composableBuilder(
+      column: $table.syncedSnapshotVersion,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get lastSyncAt => $composableBuilder(
+      column: $table.lastSyncAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnFilters(column));
+}
+
+class $$CrdtSyncStateTableOrderingComposer
+    extends Composer<_$BeeDatabase, $CrdtSyncStateTable> {
+  $$CrdtSyncStateTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get ledgerId => $composableBuilder(
+      column: $table.ledgerId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get localClock => $composableBuilder(
+      column: $table.localClock, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get syncedSnapshotVersion => $composableBuilder(
+      column: $table.syncedSnapshotVersion,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get lastSyncAt => $composableBuilder(
+      column: $table.lastSyncAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnOrderings(column));
+}
+
+class $$CrdtSyncStateTableAnnotationComposer
+    extends Composer<_$BeeDatabase, $CrdtSyncStateTable> {
+  $$CrdtSyncStateTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get ledgerId =>
+      $composableBuilder(column: $table.ledgerId, builder: (column) => column);
+
+  GeneratedColumn<int> get localClock => $composableBuilder(
+      column: $table.localClock, builder: (column) => column);
+
+  GeneratedColumn<int> get syncedSnapshotVersion => $composableBuilder(
+      column: $table.syncedSnapshotVersion, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastSyncAt => $composableBuilder(
+      column: $table.lastSyncAt, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+}
+
+class $$CrdtSyncStateTableTableManager extends RootTableManager<
+    _$BeeDatabase,
+    $CrdtSyncStateTable,
+    CrdtSyncStateData,
+    $$CrdtSyncStateTableFilterComposer,
+    $$CrdtSyncStateTableOrderingComposer,
+    $$CrdtSyncStateTableAnnotationComposer,
+    $$CrdtSyncStateTableCreateCompanionBuilder,
+    $$CrdtSyncStateTableUpdateCompanionBuilder,
+    (
+      CrdtSyncStateData,
+      BaseReferences<_$BeeDatabase, $CrdtSyncStateTable, CrdtSyncStateData>
+    ),
+    CrdtSyncStateData,
+    PrefetchHooks Function()> {
+  $$CrdtSyncStateTableTableManager(_$BeeDatabase db, $CrdtSyncStateTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CrdtSyncStateTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CrdtSyncStateTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CrdtSyncStateTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> ledgerId = const Value.absent(),
+            Value<int> localClock = const Value.absent(),
+            Value<int> syncedSnapshotVersion = const Value.absent(),
+            Value<DateTime?> lastSyncAt = const Value.absent(),
+            Value<String> deviceId = const Value.absent(),
+          }) =>
+              CrdtSyncStateCompanion(
+            ledgerId: ledgerId,
+            localClock: localClock,
+            syncedSnapshotVersion: syncedSnapshotVersion,
+            lastSyncAt: lastSyncAt,
+            deviceId: deviceId,
+          ),
+          createCompanionCallback: ({
+            Value<int> ledgerId = const Value.absent(),
+            Value<int> localClock = const Value.absent(),
+            Value<int> syncedSnapshotVersion = const Value.absent(),
+            Value<DateTime?> lastSyncAt = const Value.absent(),
+            required String deviceId,
+          }) =>
+              CrdtSyncStateCompanion.insert(
+            ledgerId: ledgerId,
+            localClock: localClock,
+            syncedSnapshotVersion: syncedSnapshotVersion,
+            lastSyncAt: lastSyncAt,
+            deviceId: deviceId,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$CrdtSyncStateTableProcessedTableManager = ProcessedTableManager<
+    _$BeeDatabase,
+    $CrdtSyncStateTable,
+    CrdtSyncStateData,
+    $$CrdtSyncStateTableFilterComposer,
+    $$CrdtSyncStateTableOrderingComposer,
+    $$CrdtSyncStateTableAnnotationComposer,
+    $$CrdtSyncStateTableCreateCompanionBuilder,
+    $$CrdtSyncStateTableUpdateCompanionBuilder,
+    (
+      CrdtSyncStateData,
+      BaseReferences<_$BeeDatabase, $CrdtSyncStateTable, CrdtSyncStateData>
+    ),
+    CrdtSyncStateData,
+    PrefetchHooks Function()>;
+typedef $$CrdtDevicesTableCreateCompanionBuilder = CrdtDevicesCompanion
+    Function({
+  required String deviceId,
+  required String deviceName,
+  required String platform,
+  required DateTime lastSeenAt,
+  Value<bool> isCurrentDevice,
+  Value<int> rowid,
+});
+typedef $$CrdtDevicesTableUpdateCompanionBuilder = CrdtDevicesCompanion
+    Function({
+  Value<String> deviceId,
+  Value<String> deviceName,
+  Value<String> platform,
+  Value<DateTime> lastSeenAt,
+  Value<bool> isCurrentDevice,
+  Value<int> rowid,
+});
+
+class $$CrdtDevicesTableFilterComposer
+    extends Composer<_$BeeDatabase, $CrdtDevicesTable> {
+  $$CrdtDevicesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get deviceName => $composableBuilder(
+      column: $table.deviceName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get platform => $composableBuilder(
+      column: $table.platform, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get lastSeenAt => $composableBuilder(
+      column: $table.lastSeenAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isCurrentDevice => $composableBuilder(
+      column: $table.isCurrentDevice,
+      builder: (column) => ColumnFilters(column));
+}
+
+class $$CrdtDevicesTableOrderingComposer
+    extends Composer<_$BeeDatabase, $CrdtDevicesTable> {
+  $$CrdtDevicesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get deviceName => $composableBuilder(
+      column: $table.deviceName, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get platform => $composableBuilder(
+      column: $table.platform, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get lastSeenAt => $composableBuilder(
+      column: $table.lastSeenAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isCurrentDevice => $composableBuilder(
+      column: $table.isCurrentDevice,
+      builder: (column) => ColumnOrderings(column));
+}
+
+class $$CrdtDevicesTableAnnotationComposer
+    extends Composer<_$BeeDatabase, $CrdtDevicesTable> {
+  $$CrdtDevicesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceName => $composableBuilder(
+      column: $table.deviceName, builder: (column) => column);
+
+  GeneratedColumn<String> get platform =>
+      $composableBuilder(column: $table.platform, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastSeenAt => $composableBuilder(
+      column: $table.lastSeenAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get isCurrentDevice => $composableBuilder(
+      column: $table.isCurrentDevice, builder: (column) => column);
+}
+
+class $$CrdtDevicesTableTableManager extends RootTableManager<
+    _$BeeDatabase,
+    $CrdtDevicesTable,
+    CrdtDevice,
+    $$CrdtDevicesTableFilterComposer,
+    $$CrdtDevicesTableOrderingComposer,
+    $$CrdtDevicesTableAnnotationComposer,
+    $$CrdtDevicesTableCreateCompanionBuilder,
+    $$CrdtDevicesTableUpdateCompanionBuilder,
+    (CrdtDevice, BaseReferences<_$BeeDatabase, $CrdtDevicesTable, CrdtDevice>),
+    CrdtDevice,
+    PrefetchHooks Function()> {
+  $$CrdtDevicesTableTableManager(_$BeeDatabase db, $CrdtDevicesTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CrdtDevicesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CrdtDevicesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CrdtDevicesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> deviceId = const Value.absent(),
+            Value<String> deviceName = const Value.absent(),
+            Value<String> platform = const Value.absent(),
+            Value<DateTime> lastSeenAt = const Value.absent(),
+            Value<bool> isCurrentDevice = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CrdtDevicesCompanion(
+            deviceId: deviceId,
+            deviceName: deviceName,
+            platform: platform,
+            lastSeenAt: lastSeenAt,
+            isCurrentDevice: isCurrentDevice,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String deviceId,
+            required String deviceName,
+            required String platform,
+            required DateTime lastSeenAt,
+            Value<bool> isCurrentDevice = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CrdtDevicesCompanion.insert(
+            deviceId: deviceId,
+            deviceName: deviceName,
+            platform: platform,
+            lastSeenAt: lastSeenAt,
+            isCurrentDevice: isCurrentDevice,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$CrdtDevicesTableProcessedTableManager = ProcessedTableManager<
+    _$BeeDatabase,
+    $CrdtDevicesTable,
+    CrdtDevice,
+    $$CrdtDevicesTableFilterComposer,
+    $$CrdtDevicesTableOrderingComposer,
+    $$CrdtDevicesTableAnnotationComposer,
+    $$CrdtDevicesTableCreateCompanionBuilder,
+    $$CrdtDevicesTableUpdateCompanionBuilder,
+    (CrdtDevice, BaseReferences<_$BeeDatabase, $CrdtDevicesTable, CrdtDevice>),
+    CrdtDevice,
+    PrefetchHooks Function()>;
 
 class $BeeDatabaseManager {
   final _$BeeDatabase _db;
@@ -3629,4 +5399,10 @@ class $BeeDatabaseManager {
       $$TransactionsTableTableManager(_db, _db.transactions);
   $$RecurringTransactionsTableTableManager get recurringTransactions =>
       $$RecurringTransactionsTableTableManager(_db, _db.recurringTransactions);
+  $$CrdtOperationsTableTableManager get crdtOperations =>
+      $$CrdtOperationsTableTableManager(_db, _db.crdtOperations);
+  $$CrdtSyncStateTableTableManager get crdtSyncState =>
+      $$CrdtSyncStateTableTableManager(_db, _db.crdtSyncState);
+  $$CrdtDevicesTableTableManager get crdtDevices =>
+      $$CrdtDevicesTableTableManager(_db, _db.crdtDevices);
 }

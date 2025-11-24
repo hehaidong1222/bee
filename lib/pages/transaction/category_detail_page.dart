@@ -383,6 +383,7 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
                 final ledgerId = ref.read(currentLedgerIdProvider);
 
                 try {
+                  // Repository 自动处理 CRDT 操作日志
                   await repo.deleteTransaction(transaction.id);
 
                   // 统一处理：自动/手动同步与状态刷新（后台静默）
@@ -461,6 +462,7 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
                 final ledgerId = ref.read(currentLedgerIdProvider);
 
                 try {
+                  // Repository 自动处理 CRDT 操作日志
                   await repo.deleteTransaction(transaction.id);
 
                   // 统一处理：自动/手动同步与状态刷新（后台静默）

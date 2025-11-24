@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' show Locale;
 
@@ -6,6 +7,7 @@ import '../l10n/app_localizations.dart';
 import '../services/category_service.dart';
 import '../services/seed_service.dart';
 import '../services/logger_service.dart';
+import '../cloud/crdt/operation.dart';
 import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
@@ -57,6 +59,86 @@ class Transactions extends Table {
   DateTimeColumn get happenedAt => dateTime().withDefault(currentDateAndTime)();
   TextColumn get note => text().nullable()();
   IntColumn get recurringId => integer().nullable()(); // 关联到重复交易模板
+  TextColumn get uuid => text().nullable()(); // v8: CRDT 同步用的唯一标识
+}
+
+// --- CRDT 多设备同步相关表 ---
+
+/// 操作日志表：记录所有 CRUD 操作
+class CrdtOperations extends Table {
+  /// 操作 ID（主键）: {timestamp}-{deviceId}-{seq}
+  TextColumn get opId => text()();
+
+  /// 账本 ID
+  IntColumn get ledgerId => integer()();
+
+  /// 操作类型：insert, update, delete
+  TextColumn get type => text()();
+
+  /// 目标记录的 UUID
+  TextColumn get targetId => text()();
+
+  /// Lamport 时间戳
+  IntColumn get timestamp => integer()();
+
+  /// 设备 ID
+  TextColumn get deviceId => text()();
+
+  /// 操作数据（JSON）
+  TextColumn get data => text().nullable()();
+
+  /// 创建时间
+  DateTimeColumn get createdAt => dateTime()();
+
+  /// 是否已同步到云端
+  BoolColumn get synced => boolean().withDefault(const Constant(false))();
+
+  @override
+  Set<Column> get primaryKey => {opId};
+}
+
+/// 同步状态表：记录每个账本的同步状态
+class CrdtSyncState extends Table {
+  /// 账本 ID（主键）
+  IntColumn get ledgerId => integer()();
+
+  /// 本地 Lamport 时钟值
+  IntColumn get localClock => integer().withDefault(const Constant(0))();
+
+  /// 已同步的快照版本
+  IntColumn get syncedSnapshotVersion =>
+      integer().withDefault(const Constant(0))();
+
+  /// 最后同步时间
+  DateTimeColumn get lastSyncAt => dateTime().nullable()();
+
+  /// 本设备 ID
+  TextColumn get deviceId => text()();
+
+  @override
+  Set<Column> get primaryKey => {ledgerId};
+}
+
+/// 设备表：记录登录过的设备信息
+class CrdtDevices extends Table {
+  /// 设备 ID（主键）
+  TextColumn get deviceId => text()();
+
+  /// 设备名称
+  TextColumn get deviceName => text()();
+
+  /// 平台：ios, android
+  TextColumn get platform => text()();
+
+  /// 最后活跃时间
+  DateTimeColumn get lastSeenAt => dateTime()();
+
+  /// 是否是当前设备
+  BoolColumn get isCurrentDevice =>
+      boolean().withDefault(const Constant(false))();
+
+  @override
+  Set<Column> get primaryKey => {deviceId};
 }
 
 class RecurringTransactions extends Table {
@@ -95,13 +177,16 @@ class RecurringTransactions extends Table {
   Accounts,
   Categories,
   Transactions,
-  RecurringTransactions
+  RecurringTransactions,
+  CrdtOperations,
+  CrdtSyncState,
+  CrdtDevices,
 ])
 class BeeDatabase extends _$BeeDatabase {
   BeeDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 7; // v7: 周期账单支持转账（添加toAccountId字段，categoryId改为可空）
+  int get schemaVersion => 8; // v8: CRDT 多设备同步支持
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -249,8 +334,136 @@ class BeeDatabase extends _$BeeDatabase {
             await customStatement('ALTER TABLE recurring_transactions_new RENAME TO recurring_transactions;');
             print('[DB Migration] v7 迁移完成');
           }
+          if (from < 8) {
+            print('[DB Migration] 开始迁移到 v8: CRDT 多设备同步');
+
+            // 1. 为 transactions 表添加 uuid 字段
+            final txTableInfo =
+                await customSelect('PRAGMA table_info(transactions)').get();
+            final hasUuid =
+                txTableInfo.any((row) => row.data['name'] == 'uuid');
+            if (!hasUuid) {
+              print('[DB Migration] 步骤1: 添加 uuid 字段');
+              await customStatement(
+                  'ALTER TABLE transactions ADD COLUMN uuid TEXT;');
+            }
+
+            // 2. 创建 CRDT 操作日志表
+            print('[DB Migration] 步骤2: 创建 crdt_operations 表');
+            await customStatement('''
+              CREATE TABLE IF NOT EXISTS crdt_operations (
+                op_id TEXT NOT NULL PRIMARY KEY,
+                ledger_id INTEGER NOT NULL,
+                type TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                timestamp INTEGER NOT NULL,
+                device_id TEXT NOT NULL,
+                data TEXT,
+                created_at INTEGER NOT NULL,
+                synced INTEGER NOT NULL DEFAULT 0
+              );
+            ''');
+
+            // 3. 创建 CRDT 同步状态表
+            print('[DB Migration] 步骤3: 创建 crdt_sync_state 表');
+            await customStatement('''
+              CREATE TABLE IF NOT EXISTS crdt_sync_state (
+                ledger_id INTEGER NOT NULL PRIMARY KEY,
+                local_clock INTEGER NOT NULL DEFAULT 0,
+                synced_snapshot_version INTEGER NOT NULL DEFAULT 0,
+                last_sync_at INTEGER,
+                device_id TEXT NOT NULL
+              );
+            ''');
+
+            // 4. 创建 CRDT 设备表
+            print('[DB Migration] 步骤4: 创建 crdt_devices 表');
+            await customStatement('''
+              CREATE TABLE IF NOT EXISTS crdt_devices (
+                device_id TEXT NOT NULL PRIMARY KEY,
+                device_name TEXT NOT NULL,
+                platform TEXT NOT NULL,
+                last_seen_at INTEGER NOT NULL,
+                is_current_device INTEGER NOT NULL DEFAULT 0
+              );
+            ''');
+
+            // 5. 为 crdt_operations 创建索引
+            print('[DB Migration] 步骤5: 创建索引');
+            await customStatement('''
+              CREATE INDEX IF NOT EXISTS idx_crdt_operations_ledger_synced
+              ON crdt_operations(ledger_id, synced);
+            ''');
+            await customStatement('''
+              CREATE INDEX IF NOT EXISTS idx_crdt_operations_target
+              ON crdt_operations(target_id);
+            ''');
+
+            print('[DB Migration] v8 迁移完成');
+          }
         },
       );
+
+  // CRDT 操作日志方法
+
+  /// 获取指定账本的未同步操作数量
+  Future<int> getUnsyncedOperationsCount(int ledgerId) async {
+    final result = await (select(crdtOperations)
+          ..where((op) => op.ledgerId.equals(ledgerId) & op.synced.equals(false)))
+        .get();
+    return result.length;
+  }
+
+  /// 获取指定账本的未同步操作
+  Future<List<Operation>> getUnsyncedOperations(int ledgerId) async {
+    final dbOps = await (select(crdtOperations)
+          ..where((op) => op.ledgerId.equals(ledgerId) & op.synced.equals(false))
+          ..orderBy([(o) => OrderingTerm.asc(o.timestamp)]))
+        .get();
+
+    return dbOps.map((dbOp) => Operation(
+      opId: dbOp.opId,
+      type: OperationType.values.byName(dbOp.type),
+      targetId: dbOp.targetId,
+      timestamp: dbOp.timestamp,
+      deviceId: dbOp.deviceId,
+      data: dbOp.data != null ? jsonDecode(dbOp.data!) as Map<String, dynamic> : null,
+      createdAt: dbOp.createdAt,
+    )).toList();
+  }
+
+  /// 标记操作为已同步
+  Future<void> markOperationsSynced(List<String> opIds) async {
+    if (opIds.isEmpty) return;
+    await (update(crdtOperations)..where((op) => op.opId.isIn(opIds)))
+        .write(const CrdtOperationsCompanion(synced: Value(true)));
+  }
+
+  /// 获取同步状态
+  Future<CrdtSyncStateData?> getSyncState(int ledgerId) async {
+    return await (select(crdtSyncState)
+          ..where((s) => s.ledgerId.equals(ledgerId)))
+        .getSingleOrNull();
+  }
+
+  /// 更新同步状态
+  Future<void> updateSyncState({
+    required int ledgerId,
+    required String deviceId,
+    required int localClock,
+    required int syncedSnapshotVersion,
+    required DateTime lastSyncAt,
+  }) async {
+    await into(crdtSyncState).insertOnConflictUpdate(
+      CrdtSyncStateCompanion(
+        ledgerId: Value(ledgerId),
+        deviceId: Value(deviceId),
+        localClock: Value(localClock),
+        syncedSnapshotVersion: Value(syncedSnapshotVersion),
+        lastSyncAt: Value(lastSyncAt),
+      ),
+    );
+  }
 
   // Seed minimal data
   /// [l10n] 国际化对象，如果为null则使用英文作为默认语言

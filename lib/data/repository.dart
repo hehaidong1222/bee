@@ -2,11 +2,36 @@ import 'package:drift/drift.dart' as d;
 
 import 'db.dart';
 import 'category_node.dart';
+import '../cloud/crdt/crdt_repository.dart';
+import '../cloud/crdt/operation_generator.dart';
 import '../services/logger_service.dart';
 
 class BeeRepository {
   final BeeDatabase db;
+
+  /// CRDT 操作生成器（可选）
+  /// 设置后，所有交易的增删改操作会自动生成 CRDT 操作日志
+  OperationGenerator? _opGenerator;
+
+  /// 是否启用多设备同步
+  bool _multiDeviceSyncEnabled = false;
+
   BeeRepository(this.db);
+
+  /// 设置 CRDT 操作生成器
+  void setCRDTOperationGenerator(OperationGenerator? generator, {bool enabled = false}) {
+    _opGenerator = generator;
+    _multiDeviceSyncEnabled = enabled;
+    logger.info('BeeRepository', 'CRDT 操作生成器: ${generator != null ? "已设置" : "未设置"}, 多设备同步: ${enabled ? "开启" : "关闭"}');
+  }
+
+  /// 更新多设备同步开关状态
+  void setMultiDeviceSyncEnabled(bool enabled) {
+    _multiDeviceSyncEnabled = enabled;
+  }
+
+  /// 是否已启用 CRDT 操作生成
+  bool get isCRDTEnabled => _opGenerator != null && _multiDeviceSyncEnabled;
 
   Stream<List<Transaction>> recentTransactions(
       {required int ledgerId, int limit = 20}) {
@@ -343,7 +368,13 @@ class BeeRepository {
     required DateTime happenedAt,
     String? note,
   }) async {
-    return db.into(db.transactions).insert(TransactionsCompanion.insert(
+    // 如果启用了 CRDT，生成 UUID 并记录操作
+    String? uuid;
+    if (isCRDTEnabled) {
+      uuid = _opGenerator!.generateUuid();
+    }
+
+    final id = await db.into(db.transactions).insert(TransactionsCompanion.insert(
           ledgerId: ledgerId,
           type: type,
           amount: amount,
@@ -352,7 +383,27 @@ class BeeRepository {
           toAccountId: d.Value(toAccountId),
           happenedAt: d.Value(happenedAt),
           note: d.Value(note),
+          uuid: d.Value(uuid),
         ));
+
+    // 生成 CRDT 操作日志
+    if (isCRDTEnabled && uuid != null) {
+      await _opGenerator!.generateInsert(
+        ledgerId: ledgerId,
+        targetId: uuid,
+        data: {
+          'type': type,
+          'amount': amount,
+          'categoryId': categoryId,
+          'accountId': accountId,
+          'toAccountId': toAccountId,
+          'happenedAt': happenedAt.toIso8601String(),
+          'note': note,
+        },
+      );
+    }
+
+    return id;
   }
 
   /// 批量新增交易，单事务内插入，返回插入条数
@@ -626,7 +677,26 @@ class BeeRepository {
     String? note,
     DateTime? happenedAt,
     d.Value<int?>? accountId,
+    d.Value<int?>? toAccountId,
   }) async {
+    // 如果启用了 CRDT，获取交易的 UUID 并生成操作日志
+    String? uuid;
+    int? ledgerId;
+    if (isCRDTEnabled) {
+      final tx = await (db.select(db.transactions)
+            ..where((t) => t.id.equals(id)))
+          .getSingleOrNull();
+      if (tx != null) {
+        ledgerId = tx.ledgerId;
+        uuid = tx.uuid;
+        // 如果没有 UUID，先生成一个
+        if (uuid == null) {
+          uuid = _opGenerator!.generateUuid();
+          await db.setTransactionUuid(id, uuid);
+        }
+      }
+    }
+
     await (db.update(db.transactions)..where((t) => t.id.equals(id))).write(
       TransactionsCompanion(
         type: d.Value(type),
@@ -636,13 +706,57 @@ class BeeRepository {
         happenedAt:
             happenedAt != null ? d.Value(happenedAt) : const d.Value.absent(),
         accountId: accountId ?? const d.Value.absent(),
+        toAccountId: toAccountId ?? const d.Value.absent(),
       ),
     );
+
+    // 生成 CRDT 操作日志
+    if (isCRDTEnabled && uuid != null && ledgerId != null) {
+      await _opGenerator!.generateUpdate(
+        ledgerId: ledgerId,
+        targetId: uuid,
+        data: {
+          'type': type,
+          'amount': amount,
+          'categoryId': categoryId,
+          'note': note,
+          if (happenedAt != null) 'happenedAt': happenedAt.toIso8601String(),
+          if (accountId != null && accountId.present) 'accountId': accountId.value,
+          if (toAccountId != null && toAccountId.present) 'toAccountId': toAccountId.value,
+        },
+      );
+    }
   }
 
   /// 删除交易记录
   Future<void> deleteTransaction(int id) async {
+    // 如果启用了 CRDT，获取交易的 UUID 并生成操作日志
+    String? uuid;
+    int? ledgerId;
+    if (isCRDTEnabled) {
+      final tx = await (db.select(db.transactions)
+            ..where((t) => t.id.equals(id)))
+          .getSingleOrNull();
+      if (tx != null) {
+        ledgerId = tx.ledgerId;
+        uuid = tx.uuid;
+        // 如果没有 UUID，先生成一个（用于记录删除操作）
+        if (uuid == null) {
+          uuid = _opGenerator!.generateUuid();
+          await db.setTransactionUuid(id, uuid);
+        }
+      }
+    }
+
     await (db.delete(db.transactions)..where((t) => t.id.equals(id))).go();
+
+    // 生成 CRDT 操作日志
+    if (isCRDTEnabled && uuid != null && ledgerId != null) {
+      await _opGenerator!.generateDelete(
+        ledgerId: ledgerId,
+        targetId: uuid,
+      );
+    }
   }
 
   // All transactions joined with category, ordered by date desc

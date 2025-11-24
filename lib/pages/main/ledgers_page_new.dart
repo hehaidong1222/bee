@@ -5,14 +5,10 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:drift/drift.dart' hide Column;
 
 import '../../providers.dart';
 import '../../models/ledger_display_item.dart';
 import '../../cloud/transactions_sync_manager.dart';
-import '../../cloud/sync_service.dart';
 import '../../widgets/ui/ui.dart';
 import '../../widgets/biz/biz.dart';
 import '../../utils/currencies.dart';
@@ -280,20 +276,8 @@ class _LedgersPageNewState extends ConsumerState<LedgersPageNew> {
     );
   }
 
-  /// 处理本地账本点击 - 切换账本或显示冲突对话框
-  Future<void> _handleLocalLedgerTap(LedgerDisplayItem ledger) async {
-    // 获取同步状态
-    final syncStatusAsync = ref.read(syncStatusProvider(ledger.id));
-    final syncStatus = syncStatusAsync.valueOrNull;
-
-    // 检查是否有冲突
-    if (syncStatus?.diff == SyncDiff.different) {
-      // 显示冲突解决对话框
-      await _showConflictResolutionDialog(context, ledger);
-      return;
-    }
-
-    // 正常切换账本
+  /// 处理本地账本点击 - 切换账本
+  void _handleLocalLedgerTap(LedgerDisplayItem ledger) {
     ref.read(currentLedgerIdProvider.notifier).state = ledger.id;
     showToast(context, AppLocalizations.of(context).ledgersSwitched(translateLedgerName(context, ledger.name)));
   }
@@ -908,216 +892,6 @@ class _LedgersPageNewState extends ConsumerState<LedgersPageNew> {
     );
   }
 
-  /// 显示冲突解决对话框
-  Future<void> _showConflictResolutionDialog(BuildContext context, LedgerDisplayItem ledger) async {
-    
-
-    final l10n = AppLocalizations.of(context);
-    final syncService = ref.read(syncServiceProvider);
-
-    // 获取同步状态详情
-    final syncStatus = await syncService.getStatus(ledgerId: ledger.id);
-
-    if (!mounted) return;
-
-    final DateFormat dateFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
-
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (stateContext, setState) {
-            bool isProcessing = false;
-
-            return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: Row(
-                children: [
-                  const Icon(Icons.warning, color: Colors.red, size: 28),
-                  const SizedBox(width: 12),
-                  Text(l10n.ledgersConflictTitle),
-                ],
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.ledgersConflictMessage,
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // 本地信息
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.blue[50],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            l10n.ledgersConflictLocalInfo(syncStatus.localCount),
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            l10n.ledgersConflictLocalFingerprint(
-                              syncStatus.localFingerprint.substring(0, 8),
-                            ),
-                            style: const TextStyle(fontSize: 12, color: Colors.black54),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    // 云端信息
-                    if (syncStatus.cloudFingerprint != null && syncStatus.cloudExportedAt != null)
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.orange[50],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              l10n.ledgersConflictRemoteInfo(syncStatus.cloudCount ?? 0),
-                              style: const TextStyle(fontWeight: FontWeight.w600),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              l10n.ledgersConflictRemoteUpdated(
-                                dateFormat.format(syncStatus.cloudExportedAt!.toLocal()),
-                              ),
-                              style: const TextStyle(fontSize: 12, color: Colors.black54),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              l10n.ledgersConflictRemoteFingerprint(
-                                syncStatus.cloudFingerprint!.substring(0, 8),
-                              ),
-                              style: const TextStyle(fontSize: 12, color: Colors.black54),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              actions: [
-                if (isProcessing)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
-                else ...[
-                  TextButton(
-                    onPressed: () => Navigator.pop(dialogContext),
-                    child: Text(l10n.commonCancel),
-                  ),
-                  TextButton(
-                    onPressed: () async {
-                      setState(() => isProcessing = true);
-                      try {
-                        showToast(context, l10n.ledgersConflictDownloading);
-                        final result = await syncService.downloadAndRestoreToCurrentLedger(
-                          ledgerId: ledger.id,
-                        );
-
-                        if (stateContext.mounted) {
-                          Navigator.pop(dialogContext);
-                        }
-
-                        if (!mounted) return;
-
-                        // 下载完成后，触发刷新状态和账本列表
-                        await handleLocalChange(ref, ledgerId: ledger.id, background: true);
-
-                        // 刷新统计
-                        ref.read(statsRefreshProvider.notifier).state++;
-
-                        showToast(
-                          context,
-                          l10n.ledgersConflictDownloadSuccess(result.inserted),
-                        );
-                      } catch (e) {
-                        setState(() => isProcessing = false);
-                        if (stateContext.mounted) {
-                          await AppDialog.error(
-                            stateContext,
-                            title: l10n.commonFailed,
-                            message: '$e',
-                          );
-                        }
-                      }
-                    },
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.download, size: 18),
-                        const SizedBox(width: 4),
-                        Text(l10n.ledgersConflictDownload),
-                      ],
-                    ),
-                  ),
-                  FilledButton(
-                    onPressed: () async {
-                      setState(() => isProcessing = true);
-                      try {
-                        showToast(context, l10n.ledgersConflictUploading);
-                        await syncService.uploadCurrentLedger(ledgerId: ledger.id);
-
-                        if (stateContext.mounted) {
-                          Navigator.pop(dialogContext);
-                        }
-
-                        if (!mounted) return;
-
-                        // 刷新列表和同步状态
-                        ref.read(ledgerListRefreshProvider.notifier).state++;
-                        ref.read(syncStatusRefreshProvider.notifier).state++;
-
-                        showToast(context, l10n.ledgersConflictUploadSuccess);
-                      } catch (e) {
-                        setState(() => isProcessing = false);
-                        if (stateContext.mounted) {
-                          await AppDialog.error(
-                            stateContext,
-                            title: l10n.commonFailed,
-                            message: '$e',
-                          );
-                        }
-                      }
-                    },
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.upload, size: 18),
-                        const SizedBox(width: 4),
-                        Text(l10n.ledgersConflictUpload),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
 }
 
 /// 区域标题

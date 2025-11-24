@@ -227,21 +227,19 @@ class _TransactionEditorPageState extends ConsumerState<TransactionEditorPage>
         onSubmit: (res) async {
           final repo = ref.read(repositoryProvider);
           if (widget.editingTransactionId != null) {
-            // 编辑模式：从转账切换到收入/支出时，清空转账相关字段
-            await (db.update(db.transactions)
-                  ..where((t) => t.id.equals(widget.editingTransactionId!)))
-                .write(
-              TransactionsCompanion(
-                type: drift.Value(kind),
-                amount: drift.Value(res.amount),
-                categoryId: drift.Value(c.id),
-                note: drift.Value(res.note),
-                happenedAt: drift.Value(res.date),
-                accountId: drift.Value(res.accountId),
-                toAccountId: drift.Value(null), // 清空转账目标账户
-              ),
+            // 编辑模式：Repository 自动处理 CRDT 操作日志
+            await repo.updateTransaction(
+              id: widget.editingTransactionId!,
+              type: kind,
+              amount: res.amount,
+              categoryId: c.id,
+              note: res.note,
+              happenedAt: res.date,
+              accountId: drift.Value(res.accountId),
+              toAccountId: drift.Value(null), // 清空转账目标账户
             );
           } else {
+            // 新增模式：Repository 自动处理 CRDT 操作日志
             await repo.addTransaction(
               ledgerId: ledgerId,
               type: kind,

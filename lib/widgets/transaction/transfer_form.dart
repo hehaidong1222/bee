@@ -116,20 +116,19 @@ class _TransferFormState extends ConsumerState<TransferForm> {
         showAccountPicker: false,
         onSubmit: (result) async {
           try {
+            final repo = ref.read(repositoryProvider);
+
             if (widget.editingTransactionId != null) {
-              // 编辑模式：更新现有转账记录
-              await (db.update(db.transactions)
-                    ..where((t) => t.id.equals(widget.editingTransactionId!)))
-                  .write(
-                TransactionsCompanion(
-                  type: drift.Value('transfer'),
-                  amount: drift.Value(result.amount),
-                  accountId: drift.Value(_fromAccountId),
-                  toAccountId: drift.Value(_toAccountId),
-                  categoryId: drift.Value(null), // 转账清空分类
-                  note: drift.Value(result.note),
-                  happenedAt: drift.Value(result.date),
-                ),
+              // 编辑模式：Repository 自动处理 CRDT 操作日志
+              await repo.updateTransaction(
+                id: widget.editingTransactionId!,
+                type: 'transfer',
+                amount: result.amount,
+                categoryId: null,
+                note: result.note,
+                happenedAt: result.date,
+                accountId: drift.Value(_fromAccountId),
+                toAccountId: drift.Value(_toAccountId),
               );
 
               if (!context.mounted) return;
@@ -137,8 +136,7 @@ class _TransferFormState extends ConsumerState<TransferForm> {
               showToast(context, l10n.transferUpdateSuccess);
               widget.onTransferComplete();
             } else {
-              // 创建模式：新建转账记录
-              final repo = ref.read(repositoryProvider);
+              // 创建模式：Repository 自动处理 CRDT 操作日志
               await repo.addTransaction(
                 ledgerId: ledgerId,
                 type: 'transfer',

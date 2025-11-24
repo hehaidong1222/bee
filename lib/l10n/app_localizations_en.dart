@@ -993,6 +993,72 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mineAutoSyncNeedLogin => 'Login required to enable';
 
   @override
+  String get multiDeviceSyncTitle => 'Multi-device Sync';
+
+  @override
+  String get multiDeviceSyncSubtitle => 'Enable multi-device collaborative editing';
+
+  @override
+  String get multiDeviceSyncEnabled => 'Enabled, changes sync to other devices in real-time';
+
+  @override
+  String get multiDeviceSyncEnableTitle => 'Enable Multi-device Sync';
+
+  @override
+  String get multiDeviceSyncEnableMessage => 'Once enabled, all your changes and deletions on any device will automatically sync to other devices.\n\nNote: Please ensure all devices are updated to the latest version.';
+
+  @override
+  String get multiDeviceSyncDisableTitle => 'Disable Multi-device Sync';
+
+  @override
+  String get multiDeviceSyncDisableMessage => 'Once disabled, each device will store data independently without syncing changes and deletions.\n\nExisting data won\'t be lost, but data may become inconsistent across devices.';
+
+  @override
+  String get crdtSyncSectionTitle => 'Multi-device Sync';
+
+  @override
+  String get crdtSyncStatusTitle => 'Sync Status';
+
+  @override
+  String get crdtSyncInSync => 'In Sync';
+
+  @override
+  String crdtSyncUnsyncedCount(int count) {
+    return '$count operations pending sync';
+  }
+
+  @override
+  String get crdtSyncSyncing => 'Syncing...';
+
+  @override
+  String get crdtSyncButtonTitle => 'Sync Now';
+
+  @override
+  String get crdtSyncButtonSubtitle => 'Sync operation log to cloud';
+
+  @override
+  String get crdtSyncSuccess => 'Sync Successful';
+
+  @override
+  String crdtSyncSuccessMessage(int uploaded, int downloaded) {
+    return 'Uploaded $uploaded, Downloaded $downloaded';
+  }
+
+  @override
+  String crdtLastSyncAt(String time) {
+    return 'Last sync: $time';
+  }
+
+  @override
+  String get crdtSyncError => 'Sync Failed';
+
+  @override
+  String get commonEnable => 'Enable';
+
+  @override
+  String get commonDisable => 'Disable';
+
+  @override
   String get mineImportProgressTitle => 'Importing in background...';
 
   @override
@@ -3390,6 +3456,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String ledgersConflictDownloadSuccess(int inserted) {
     return 'Download successful, merged $inserted transactions';
   }
+
+  @override
+  String get ledgersConflictSkip => 'Skip for now';
+
+  @override
+  String get ledgersConflictSkipHint => 'Skip conflict resolution and switch ledger';
 
   @override
   String get storageManagementTitle => 'Storage Management';

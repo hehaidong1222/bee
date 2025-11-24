@@ -11,9 +11,10 @@ import 'ocr_service.dart';
 /// 提供统一的账单创建接口，供OCR手动扫描和自动记账使用
 class BillCreationService {
   final BeeDatabase db;
+  final BeeRepository repo;
   static const _tag = 'BillCreation';
 
-  BillCreationService(this.db);
+  BillCreationService(this.db, this.repo);
 
   /// 匹配分类
   ///
@@ -87,8 +88,7 @@ class BillCreationService {
     }
 
     // 4. 查询与账本币种相同的所有账户
-    final repository = BeeRepository(db);
-    final allAccounts = await repository.getAllAccounts();
+    final allAccounts = await repo.getAllAccounts();
     final matchingAccounts = allAccounts
         .where((a) => a.currency == ledger.currency)
         .toList();
@@ -162,8 +162,7 @@ class BillCreationService {
       if (ledger == null) return null;
 
       // 3. 获取默认账户信息
-      final repository = BeeRepository(db);
-      final account = await repository.getAccount(defaultAccountId);
+      final account = await repo.getAccount(defaultAccountId);
       if (account == null) {
         logger.debug(_tag, '[默认账户] 账户不存在');
         return null;
@@ -239,16 +238,15 @@ class BillCreationService {
       final category = categories.where((c) => c.id == categoryId).firstOrNull;
       categoryName = category?.name;
     }
+
     if (accountId != null) {
-      final repository = BeeRepository(db);
-      final account = await repository.getAccount(accountId);
+      final account = await repo.getAccount(accountId);
       accountName = account?.name;
     }
-
-    // 8. 使用Repository创建交易
-    final repository = BeeRepository(db);
     final finalAmount = result.amount!.abs();
-    final transactionId = await repository.addTransaction(
+
+    // 8. 创建交易（Repository 自动处理 CRDT 操作日志）
+    final transactionId = await repo.addTransaction(
       ledgerId: ledgerId,
       type: transactionType,
       amount: finalAmount,

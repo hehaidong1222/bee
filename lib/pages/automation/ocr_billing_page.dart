@@ -76,7 +76,8 @@ class _OcrBillingPageState extends ConsumerState<OcrBillingPage> {
       );
 
       // 使用BillCreationService匹配分类
-      final billCreationService = BillCreationService(db);
+      final repo = ref.read(repositoryProvider);
+      final billCreationService = BillCreationService(db, repo);
 
       final categoryKind = (ocrResult.aiType == 'income') ? 'income' : 'expense';
       final categories = await billCreationService.getCategoriesByType(categoryKind);
@@ -169,7 +170,8 @@ class _OcrBillingPageState extends ConsumerState<OcrBillingPage> {
 
       // 使用BillCreationService创建交易
       final db = ref.read(databaseProvider);
-      final billCreationService = BillCreationService(db);
+      final repo = ref.read(repositoryProvider);
+      final billCreationService = BillCreationService(db, repo);
 
       final note = _ocrResult?.merchant ?? '';
       final transactionId = await billCreationService.createBillTransaction(

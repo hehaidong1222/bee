@@ -993,6 +993,72 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mineAutoSyncNeedLogin => '需登录后可开启';
 
   @override
+  String get multiDeviceSyncTitle => '多设备同步';
+
+  @override
+  String get multiDeviceSyncSubtitle => '开启后支持多设备协同编辑';
+
+  @override
+  String get multiDeviceSyncEnabled => '已开启，修改可实时同步到其他设备';
+
+  @override
+  String get multiDeviceSyncEnableTitle => '开启多设备同步';
+
+  @override
+  String get multiDeviceSyncEnableMessage => '开启后，您在任何设备上的修改、删除操作都会自动同步到其他设备。\n\n注意：开启后请确保所有设备都更新到最新版本。';
+
+  @override
+  String get multiDeviceSyncDisableTitle => '关闭多设备同步';
+
+  @override
+  String get multiDeviceSyncDisableMessage => '关闭后，各设备将独立存储数据，不再自动同步修改和删除操作。\n\n已有数据不会丢失，但可能出现设备间数据不一致的情况。';
+
+  @override
+  String get crdtSyncSectionTitle => '多设备同步';
+
+  @override
+  String get crdtSyncStatusTitle => '同步状态';
+
+  @override
+  String get crdtSyncInSync => '已同步';
+
+  @override
+  String crdtSyncUnsyncedCount(int count) {
+    return '待同步 $count 条操作';
+  }
+
+  @override
+  String get crdtSyncSyncing => '同步中...';
+
+  @override
+  String get crdtSyncButtonTitle => '立即同步';
+
+  @override
+  String get crdtSyncButtonSubtitle => '同步操作日志到云端';
+
+  @override
+  String get crdtSyncSuccess => '同步成功';
+
+  @override
+  String crdtSyncSuccessMessage(int uploaded, int downloaded) {
+    return '上传 $uploaded 条，下载 $downloaded 条';
+  }
+
+  @override
+  String crdtLastSyncAt(String time) {
+    return '上次同步: $time';
+  }
+
+  @override
+  String get crdtSyncError => '同步失败';
+
+  @override
+  String get commonEnable => '开启';
+
+  @override
+  String get commonDisable => '关闭';
+
+  @override
   String get mineImportProgressTitle => '后台导入中…';
 
   @override
@@ -3392,6 +3458,12 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get ledgersConflictSkip => '暂不处理';
+
+  @override
+  String get ledgersConflictSkipHint => '跳过冲突解决，直接切换账本';
+
+  @override
   String get storageManagementTitle => '存储空间管理';
 
   @override
@@ -4522,6 +4594,33 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get mineAutoSyncNeedLogin => '需登入後可開啟';
+
+  @override
+  String get multiDeviceSyncTitle => '多設備同步';
+
+  @override
+  String get multiDeviceSyncSubtitle => '開啟後支持多設備協同編輯';
+
+  @override
+  String get multiDeviceSyncEnabled => '已開啟，修改可即時同步到其他設備';
+
+  @override
+  String get multiDeviceSyncEnableTitle => '開啟多設備同步';
+
+  @override
+  String get multiDeviceSyncEnableMessage => '開啟後，您在任何設備上的修改、刪除操作都會自動同步到其他設備。\n\n注意：開啟後請確保所有設備都更新到最新版本。';
+
+  @override
+  String get multiDeviceSyncDisableTitle => '關閉多設備同步';
+
+  @override
+  String get multiDeviceSyncDisableMessage => '關閉後，各設備將獨立儲存資料，不再自動同步修改和刪除操作。\n\n已有資料不會丟失，但可能出現設備間資料不一致的情況。';
+
+  @override
+  String get commonEnable => '開啟';
+
+  @override
+  String get commonDisable => '關閉';
 
   @override
   String get mineImportProgressTitle => '後台匯入中…';

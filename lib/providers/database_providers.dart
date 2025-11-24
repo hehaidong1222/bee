@@ -3,6 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:drift/drift.dart';
 import '../data/db.dart';
 import '../data/repository.dart';
+import '../cloud/crdt/lamport_clock.dart';
+import '../cloud/crdt/operation_generator.dart';
 import 'sync_providers.dart';
 
 // 数据库Provider
@@ -12,10 +14,64 @@ final databaseProvider = Provider<BeeDatabase>((ref) {
   return db;
 });
 
-// 仓储Provider
+// 仓储Provider（带 CRDT 支持）
 final repositoryProvider = Provider<BeeRepository>((ref) {
   final db = ref.watch(databaseProvider);
-  return BeeRepository(db);
+  final repo = BeeRepository(db);
+
+  // 监听 CRDT 初始化 Provider，自动设置 OperationGenerator
+  // 使用 listen 而非 watch 避免重建 Repository
+  ref.listen(crdtInitializerProvider, (_, asyncValue) {
+    asyncValue.whenData((data) {
+      if (data != null) {
+        repo.setCRDTOperationGenerator(data.opGenerator, enabled: data.enabled);
+      } else {
+        repo.setCRDTOperationGenerator(null, enabled: false);
+      }
+    });
+  });
+
+  return repo;
+});
+
+/// CRDT 初始化数据
+class CRDTInitData {
+  final OperationGenerator opGenerator;
+  final bool enabled;
+
+  CRDTInitData({required this.opGenerator, required this.enabled});
+}
+
+/// CRDT 初始化 Provider
+/// 当多设备同步启用时，创建 OperationGenerator
+final crdtInitializerProvider = FutureProvider<CRDTInitData?>((ref) async {
+  // 监听多设备同步开关变化
+  final enabled = await ref.watch(multiDeviceSyncEnabledProvider.future);
+
+  if (!enabled) return null;
+
+  final db = ref.watch(databaseProvider);
+  final prefs = await SharedPreferences.getInstance();
+
+  // 获取或创建设备 ID
+  var deviceId = prefs.getString('crdt_device_id');
+  if (deviceId == null) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final random = now % 1000000;
+    deviceId = 'device_${now}_$random';
+    await prefs.setString('crdt_device_id', deviceId);
+  }
+
+  // 初始化 Lamport Clock（从数据库恢复）
+  final clock = LamportClock();
+  final allSyncStates = await db.select(db.crdtSyncState).get();
+  for (final state in allSyncStates) {
+    clock.update(state.localClock);
+  }
+
+  final opGenerator = OperationGenerator(db, clock, deviceId);
+
+  return CRDTInitData(opGenerator: opGenerator, enabled: true);
 });
 
 // 记住当前账本：启动时加载，切换时持久化

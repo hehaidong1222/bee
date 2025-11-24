@@ -164,7 +164,8 @@ class _BeeAppState extends ConsumerState<BeeApp> with WidgetsBindingObserver {
 
       // 使用BillCreationService创建交易
       final db = ref.read(databaseProvider);
-      final billCreationService = BillCreationService(db);
+      final repo = ref.read(repositoryProvider);
+      final billCreationService = BillCreationService(db, repo);
 
       final note = ocrResult.merchant ?? '';
       final transactionId = await billCreationService.createBillTransaction(

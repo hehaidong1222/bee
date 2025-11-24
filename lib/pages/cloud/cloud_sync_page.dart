@@ -11,6 +11,7 @@ import '../../l10n/app_localizations.dart';
 import '../../utils/ui_scale_extensions.dart';
 import '../../utils/sync_helpers.dart';
 import '../../cloud/sync_service.dart';
+import '../../cloud/transactions_sync_manager.dart';
 import '../auth/login_page.dart';
 
 /// 云同步与备份二级页面 - 包含所有同步操作
@@ -24,6 +25,7 @@ class CloudSyncPage extends ConsumerStatefulWidget {
 class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
   bool uploadBusy = false;
   bool downloadBusy = false;
+  bool crdtSyncBusy = false;
 
   @override
   Widget build(BuildContext context) {
@@ -534,6 +536,169 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
                         ],
                       ),
                     ),
+                    // 多设备同步 Section (仅非本地模式)
+                    if (!isLocalMode)
+                      Consumer(builder: (ctx, r, _) {
+                        final multiDeviceAsync = r.watch(multiDeviceSyncEnabledProvider);
+                        final setter = r.read(multiDeviceSyncSetterProvider);
+                        final multiDeviceEnabled = multiDeviceAsync.asData?.value ?? false;
+                        final can = canUseCloud;
+
+                        // 获取 CRDT 同步状态
+                        final crdtStatus = r.watch(crdtSyncStatusProvider(ledgerId));
+                        final unsyncedAsync = r.watch(unsyncedOperationsCountProvider(ledgerId));
+                        final unsyncedCount = unsyncedAsync.asData?.value ?? 0;
+
+                        return Padding(
+                          padding: EdgeInsets.only(top: 16.0.scaled(context, ref)),
+                          child: SectionCard(
+                            margin: EdgeInsets.zero,
+                            child: Column(
+                              children: [
+                                // 多设备同步开关
+                                SwitchListTile(
+                                  title: Text(AppLocalizations.of(context).crdtSyncSectionTitle),
+                                  subtitle: can
+                                      ? Text(multiDeviceEnabled
+                                          ? AppLocalizations.of(context).multiDeviceSyncEnabled
+                                          : AppLocalizations.of(context).multiDeviceSyncSubtitle)
+                                      : Text(AppLocalizations.of(context).mineAutoSyncNeedLogin),
+                                  value: can ? multiDeviceEnabled : false,
+                                  onChanged: can
+                                      ? (v) async {
+                                          if (v) {
+                                            final confirmed = await AppDialog.confirm<bool>(
+                                              context,
+                                              title: AppLocalizations.of(context).multiDeviceSyncEnableTitle,
+                                              message: AppLocalizations.of(context).multiDeviceSyncEnableMessage,
+                                              okLabel: AppLocalizations.of(context).commonEnable,
+                                              cancelLabel: AppLocalizations.of(context).commonCancel,
+                                            ) ?? false;
+                                            if (confirmed) {
+                                              await setter.setEnabled(true);
+                                            }
+                                          } else {
+                                            final confirmed = await AppDialog.confirm<bool>(
+                                              context,
+                                              title: AppLocalizations.of(context).multiDeviceSyncDisableTitle,
+                                              message: AppLocalizations.of(context).multiDeviceSyncDisableMessage,
+                                              okLabel: AppLocalizations.of(context).commonDisable,
+                                              cancelLabel: AppLocalizations.of(context).commonCancel,
+                                            ) ?? false;
+                                            if (confirmed) {
+                                              await setter.setEnabled(false);
+                                            }
+                                          }
+                                        }
+                                      : null,
+                                ),
+                                // 仅当多设备同步开启时显示同步状态和按钮
+                                if (multiDeviceEnabled && can) ...[
+                                  BeeTokens.cardDivider(context),
+                                  // CRDT 同步状态
+                                  AppListTile(
+                                    leading: crdtStatus.isSyncing
+                                        ? Icons.sync
+                                        : (unsyncedCount > 0
+                                            ? Icons.upload_outlined
+                                            : Icons.verified_outlined),
+                                    title: AppLocalizations.of(context).crdtSyncStatusTitle,
+                                    subtitle: crdtStatus.isSyncing
+                                        ? AppLocalizations.of(context).crdtSyncSyncing
+                                        : (unsyncedCount > 0
+                                            ? AppLocalizations.of(context).crdtSyncUnsyncedCount(unsyncedCount)
+                                            : AppLocalizations.of(context).crdtSyncInSync),
+                                    trailing: crdtStatus.isSyncing
+                                        ? const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(strokeWidth: 2))
+                                        : null,
+                                    onTap: crdtStatus.lastSyncAt != null
+                                        ? () async {
+                                            final lastSync = DateFormat('yyyy-MM-dd HH:mm:ss')
+                                                .format(crdtStatus.lastSyncAt!.toLocal());
+                                            await AppDialog.info(
+                                              context,
+                                              title: AppLocalizations.of(context).crdtSyncStatusTitle,
+                                              message: AppLocalizations.of(context).crdtLastSyncAt(lastSync),
+                                            );
+                                          }
+                                        : null,
+                                  ),
+                                  BeeTokens.cardDivider(context),
+                                  // CRDT 同步按钮
+                                  AppListTile(
+                                    leading: Icons.sync,
+                                    title: AppLocalizations.of(context).crdtSyncButtonTitle,
+                                    subtitle: AppLocalizations.of(context).crdtSyncButtonSubtitle,
+                                    enabled: !crdtSyncBusy && !crdtStatus.isSyncing,
+                                    trailing: crdtSyncBusy
+                                        ? const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(strokeWidth: 2))
+                                        : null,
+                                    onTap: () async {
+                                      setState(() => crdtSyncBusy = true);
+                                      // 提前获取 syncService，避免在 async 后使用 r.read
+                                      final syncService = r.read(syncServiceProvider);
+                                      // 更新 CRDT 同步状态为同步中
+                                      r.read(crdtSyncStatusProvider(ledgerId).notifier).state =
+                                          crdtStatus.copyWith(isSyncing: true);
+
+                                      try {
+                                        if (syncService is TransactionsSyncManager) {
+                                          final result = await syncService.syncOperationLogOnly(
+                                            ledgerId: ledgerId,
+                                          );
+
+                                          if (!mounted) return;
+
+                                          // 更新状态 - 使用 ref 而不是 r
+                                          ref.read(crdtSyncStatusProvider(ledgerId).notifier).state =
+                                              CRDTSyncStatus(
+                                            isSyncing: false,
+                                            lastSyncAt: DateTime.now(),
+                                            unsyncedCount: 0,
+                                          );
+
+                                          // 刷新未同步计数
+                                          ref.read(crdtSyncRefreshProvider.notifier).state++;
+
+                                          await AppDialog.info(
+                                            context,
+                                            title: AppLocalizations.of(context).crdtSyncSuccess,
+                                            message: AppLocalizations.of(context).crdtSyncSuccessMessage(
+                                              result.uploaded,
+                                              result.downloaded,
+                                            ),
+                                          );
+                                        }
+                                      } catch (e) {
+                                        if (!mounted) return;
+                                        // 更新状态为错误 - 使用 ref 而不是 r
+                                        ref.read(crdtSyncStatusProvider(ledgerId).notifier).state =
+                                            crdtStatus.copyWith(
+                                          isSyncing: false,
+                                          error: e.toString(),
+                                        );
+                                        await AppDialog.error(
+                                          context,
+                                          title: AppLocalizations.of(context).crdtSyncError,
+                                          message: '$e',
+                                        );
+                                      } finally {
+                                        if (mounted) setState(() => crdtSyncBusy = false);
+                                      }
+                                    },
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
                   ],
                 );
                 },
