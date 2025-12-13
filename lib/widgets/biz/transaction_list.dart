@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter_list_view/flutter_list_view.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 import '../../data/db.dart';
+import '../../data/models/transaction_display_item.dart';
 import '../../providers.dart';
 import '../../widgets/ui/ui.dart';
 import '../../widgets/biz/biz.dart';
@@ -21,8 +22,11 @@ import '../../services/attachment_service.dart';
 /// 可复用的交易列表组件
 /// 支持显示分组的交易列表，包含日期头部和交易项
 class TransactionList extends ConsumerStatefulWidget {
-  /// 交易数据
-  final List<({Transaction t, Category? category})> transactions;
+  /// 新版数据：包含完整详情（标签、附件数量）
+  final List<TransactionDisplayItem>? transactionItems;
+
+  /// 旧版数据（向后兼容）
+  final List<({Transaction t, Category? category})>? transactions;
 
   /// 是否隐藏金额
   final bool hideAmounts;
@@ -41,13 +45,15 @@ class TransactionList extends ConsumerStatefulWidget {
 
   const TransactionList({
     super.key,
-    required this.transactions,
+    this.transactionItems,
+    this.transactions,
     required this.hideAmounts,
     this.enableVisibilityTracking = false,
     this.onDateVisibilityChanged,
     this.emptyWidget,
     this.controller,
-  });
+  }) : assert(transactionItems != null || transactions != null,
+            'Either transactionItems or transactions must be provided');
 
   @override
   ConsumerState<TransactionList> createState() => TransactionListState();
@@ -58,31 +64,47 @@ class TransactionListState extends ConsumerState<TransactionList> {
   List<dynamic> _flatItems = []; // 扁平化的项目列表
   final Map<String, int> _dateIndexMap = {}; // 日期到列表索引的映射
 
-  // 缓存标签数据
+  // 缓存标签数据（旧版模式使用）
   Map<int, List<Tag>> _cachedTagsMap = {};
   List<int> _cachedTransactionIds = [];
   int _lastTagRefreshVersion = 0;
 
-  // 缓存附件数量
+  // 缓存附件数量（旧版模式使用）
   Map<int, int> _cachedAttachmentCounts = {};
   int _lastAttachmentRefreshVersion = 0;
+
+  /// 是否使用新版数据模式
+  bool get _useNewMode => widget.transactionItems != null;
+
+  /// 获取交易 ID 列表（统一接口）
+  List<int> get _transactionIds {
+    if (_useNewMode) {
+      return widget.transactionItems!.map((item) => item.id).toList();
+    }
+    return widget.transactions!.map((t) => t.t.id).toList();
+  }
 
   @override
   void initState() {
     super.initState();
     _controller = widget.controller ?? FlutterListViewController();
-    _loadTags();
-    _loadAttachmentCounts();
+    // 旧版模式需要异步加载标签和附件
+    if (!_useNewMode) {
+      _loadTags();
+      _loadAttachmentCounts();
+    }
   }
 
   @override
   void didUpdateWidget(covariant TransactionList oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // 检查交易列表是否变化
-    final newIds = widget.transactions.map((t) => t.t.id).toList();
-    if (!_listEquals(newIds, _cachedTransactionIds)) {
-      _loadTags();
-      _loadAttachmentCounts();
+    // 旧版模式：检查交易列表是否变化
+    if (!_useNewMode && widget.transactions != null) {
+      final newIds = widget.transactions!.map((t) => t.t.id).toList();
+      if (!_listEquals(newIds, _cachedTransactionIds)) {
+        _loadTags();
+        _loadAttachmentCounts();
+      }
     }
   }
 
@@ -95,7 +117,8 @@ class TransactionListState extends ConsumerState<TransactionList> {
   }
 
   Future<void> _loadTags() async {
-    final transactionIds = widget.transactions.map((t) => t.t.id).toList();
+    if (widget.transactions == null) return;
+    final transactionIds = widget.transactions!.map((t) => t.t.id).toList();
     if (transactionIds.isEmpty) {
       setState(() {
         _cachedTagsMap = {};
@@ -116,7 +139,8 @@ class TransactionListState extends ConsumerState<TransactionList> {
   }
 
   Future<void> _loadAttachmentCounts() async {
-    final transactionIds = widget.transactions.map((t) => t.t.id).toList();
+    if (widget.transactions == null) return;
+    final transactionIds = widget.transactions!.map((t) => t.t.id).toList();
     if (transactionIds.isEmpty) {
       setState(() {
         _cachedAttachmentCounts = {};
@@ -172,15 +196,29 @@ class TransactionListState extends ConsumerState<TransactionList> {
     return false; // 没有找到目标月份
   }
 
+  /// 获取统一格式的交易数据
+  List<TransactionDisplayItem> get _items {
+    if (_useNewMode) {
+      return widget.transactionItems!;
+    }
+    // 旧版模式：将数据转换为 TransactionDisplayItem
+    return widget.transactions!.map((item) => TransactionDisplayItem(
+      transaction: item.t,
+      category: item.category,
+      tags: _cachedTagsMap[item.t.id] ?? const [],
+      attachmentCount: _cachedAttachmentCounts[item.t.id] ?? 0,
+    )).toList();
+  }
+
   /// 构建扁平化的项目列表
   void _buildFlatItems() {
-    final transactions = widget.transactions;
+    final items = _items;
 
     // 按天分组
     final dateFmt = DateFormat('yyyy-MM-dd');
-    final groups = <String, List<({Transaction t, Category? category})>>{};
-    for (final item in transactions) {
-      final dt = item.t.happenedAt.toLocal();
+    final groups = <String, List<TransactionDisplayItem>>{};
+    for (final item in items) {
+      final dt = item.happenedAt.toLocal();
       final key = dateFmt.format(DateTime(dt.year, dt.month, dt.day));
       groups.putIfAbsent(key, () => []).add(item);
     }
@@ -205,19 +243,22 @@ class TransactionListState extends ConsumerState<TransactionList> {
 
   @override
   Widget build(BuildContext context) {
-    // 监听标签刷新信号，当标签变化时重新加载
-    final tagRefreshVersion = ref.watch(tagListRefreshProvider);
-    if (tagRefreshVersion != _lastTagRefreshVersion) {
-      _lastTagRefreshVersion = tagRefreshVersion;
-      // 延迟加载以避免在build中setState
-      Future.microtask(() => _loadTags());
+    // 旧版模式：监听标签刷新信号
+    if (!_useNewMode) {
+      final tagRefreshVersion = ref.watch(tagListRefreshProvider);
+      if (tagRefreshVersion != _lastTagRefreshVersion) {
+        _lastTagRefreshVersion = tagRefreshVersion;
+        Future.microtask(() => _loadTags());
+      }
     }
 
-    // 监听附件刷新信号，当附件变化时重新加载
-    final attachmentRefreshVersion = ref.watch(attachmentListRefreshProvider);
-    if (attachmentRefreshVersion != _lastAttachmentRefreshVersion) {
-      _lastAttachmentRefreshVersion = attachmentRefreshVersion;
-      Future.microtask(() => _loadAttachmentCounts());
+    // 旧版模式：监听附件刷新信号
+    if (!_useNewMode) {
+      final attachmentRefreshVersion = ref.watch(attachmentListRefreshProvider);
+      if (attachmentRefreshVersion != _lastAttachmentRefreshVersion) {
+        _lastAttachmentRefreshVersion = attachmentRefreshVersion;
+        Future.microtask(() => _loadAttachmentCounts());
+      }
     }
 
     _buildFlatItems();
@@ -243,15 +284,15 @@ class TransactionListState extends ConsumerState<TransactionList> {
           if (type == 'header') {
             // 渲染日期头部
             final dateKey = item.$2 as String;
-            final list = item.$3 as List<({Transaction t, Category? category})>;
+            final list = item.$3 as List<TransactionDisplayItem>;
             double dayIncome = 0, dayExpense = 0;
             for (final it in list) {
               // 转账不计入收支统计
-              if (it.t.type == 'income') {
-                dayIncome += it.t.amount;
+              if (it.type == 'income') {
+                dayIncome += it.amount;
               }
-              if (it.t.type == 'expense') {
-                dayExpense += it.t.amount;
+              if (it.type == 'expense') {
+                dayExpense += it.amount;
               }
             }
             final isFirst = index == 0;
@@ -287,38 +328,38 @@ class TransactionListState extends ConsumerState<TransactionList> {
             return header;
           } else {
             // 渲染交易项
-            final it = item.$2 as ({Transaction t, Category? category});
-            final allItemsInDay = item.$3 as List<({Transaction t, Category? category})>;
-            final isTransfer = it.t.type == 'transfer';
-            final isExpense = it.t.type == 'expense';
+            final it = item.$2 as TransactionDisplayItem;
+            final allItemsInDay = item.$3 as List<TransactionDisplayItem>;
+            final isTransfer = it.type == 'transfer';
+            final isExpense = it.type == 'expense';
 
             // 获取分类显示名称
             final categoryName = CategoryUtils.getDisplayName(it.category?.name, context);
 
-            final subtitle = it.t.note ?? '';
+            final subtitle = it.note ?? '';
 
             // 检查是否是当天最后一项
-            final isLastInGroup = allItemsInDay.last.t.id == it.t.id;
+            final isLastInGroup = allItemsInDay.last.id == it.id;
 
             // 获取账户名称（仅在账户功能启用且有账户ID时）
             final accountFeatureEnabled = ref.watch(accountFeatureEnabledProvider).value ?? false;
             String? accountName;
             String? toAccountName; // 转账目标账户名称
 
-            if (accountFeatureEnabled && it.t.accountId != null) {
+            if (accountFeatureEnabled && it.accountId != null) {
               // 通过 ref.watch 获取账户名称
-              final accountAsync = ref.watch(accountByIdProvider(it.t.accountId!));
+              final accountAsync = ref.watch(accountByIdProvider(it.accountId!));
               accountName = accountAsync.value?.name;
 
               // 如果是转账，获取目标账户名称
-              if (isTransfer && it.t.toAccountId != null) {
-                final toAccountAsync = ref.watch(accountByIdProvider(it.t.toAccountId!));
+              if (isTransfer && it.toAccountId != null) {
+                final toAccountAsync = ref.watch(accountByIdProvider(it.toAccountId!));
                 toAccountName = toAccountAsync.value?.name;
               }
             }
 
             return Dismissible(
-              key: Key('tx-${it.t.id}-$index'), // 添加索引避免key冲突
+              key: Key('tx-${it.id}-$index'), // 添加索引避免key冲突
               direction: DismissDirection.endToStart,
               background: Container(
                 alignment: Alignment.centerRight,
@@ -336,7 +377,7 @@ class TransactionListState extends ConsumerState<TransactionList> {
               },
               onDismissed: (direction) async {
                 final repo = ref.read(repositoryProvider);
-                await repo.deleteTransaction(it.t.id);
+                await repo.deleteTransaction(it.id);
 
                 if (!context.mounted) return;
                 final curLedger = ref.read(currentLedgerIdProvider);
@@ -352,9 +393,8 @@ class TransactionListState extends ConsumerState<TransactionList> {
                 children: [
                   Builder(
                     builder: (context) {
-                      // 获取该交易的标签（从缓存）
-                      final transactionTags = _cachedTagsMap[it.t.id] ?? [];
-                      final tagsList = transactionTags
+                      // 获取该交易的标签（新版直接从 item 中获取）
+                      final tagsList = it.tags
                           .map((t) => (id: t.id, name: t.name, color: t.color))
                           .toList();
 
@@ -363,8 +403,8 @@ class TransactionListState extends ConsumerState<TransactionList> {
                           ? '$accountName → $toAccountName'
                           : null;
 
-                      // 获取附件数量（从缓存）
-                      final attachmentCount = _cachedAttachmentCounts[it.t.id] ?? 0;
+                      // 获取附件数量（新版直接从 item 中获取）
+                      final attachmentCount = it.attachmentCount;
 
                       return TransactionListItem(
                         icon: isTransfer
@@ -376,10 +416,10 @@ class TransactionListState extends ConsumerState<TransactionList> {
                         categoryName: isTransfer
                           ? null  // 转账不显示第二行，保持布局一致
                           : (subtitle.isNotEmpty ? null : categoryName),
-                        amount: it.t.amount,
+                        amount: it.amount,
                         isExpense: isExpense,
                         hide: widget.hideAmounts,
-                        happenedAt: it.t.happenedAt,
+                        happenedAt: it.happenedAt,
                         accountName: isTransfer
                           ? transferAccountInfo  // 转账始终在第三行显示账户信息
                           : accountName,
@@ -390,7 +430,7 @@ class TransactionListState extends ConsumerState<TransactionList> {
                                 await Navigator.of(context).push(
                                   MaterialPageRoute(
                                     builder: (_) => AttachmentPreviewPage.fromTransaction(
-                                      transactionId: it.t.id,
+                                      transactionId: it.id,
                                     ),
                                   ),
                                 );
@@ -410,7 +450,7 @@ class TransactionListState extends ConsumerState<TransactionList> {
                           await TransactionEditUtils.editTransaction(
                             context,
                             ref,
-                            it.t,
+                            it.transaction,
                             it.category,
                           );
                         },

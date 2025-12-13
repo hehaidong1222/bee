@@ -4,6 +4,7 @@ import 'package:flutter_cloud_sync_supabase/flutter_cloud_sync_supabase.dart';
 import 'package:flutter_cloud_sync/flutter_cloud_sync.dart';
 
 import '../../db.dart';
+import '../../models/transaction_display_item.dart';
 import '../transaction_repository.dart';
 import '../../../services/system/logger_service.dart';
 
@@ -673,6 +674,11 @@ class CloudTransactionRepository implements TransactionRepository {
   }
 
   @override
+  Future<List<Transaction>> getRecentTransactionsByLedger(int ledgerId, {int limit = 20}) async {
+    throw UnimplementedError('云端获取最近交易列表暂不支持');
+  }
+
+  @override
   Future<List<Transaction>> getTransactionsByLedgerInRange({
     required int ledgerId,
     required DateTime start,
@@ -706,5 +712,28 @@ class CloudTransactionRepository implements TransactionRepository {
     required int ledgerId,
   }) async {
     throw UnimplementedError('云端更新交易账本暂不支持');
+  }
+
+  @override
+  Stream<List<TransactionDisplayItem>> watchTransactionsWithDetails({
+    required int ledgerId,
+  }) {
+    // 此方法需要访问 TagRepository 和 AttachmentRepository
+    // 在 CloudTransactionRepository 中无法实现，需要在 CloudRepository 中实现
+    throw UnimplementedError(
+      'watchTransactionsWithDetails should be called on CloudRepository, not CloudTransactionRepository',
+    );
+  }
+
+  @override
+  Future<List<TransactionDisplayItem>> getInitialTransactionsWithDetails({
+    required int ledgerId,
+    int minCount = 20,
+  }) {
+    // 此方法需要访问 TagRepository 和 AttachmentRepository
+    // 在 CloudTransactionRepository 中无法实现，需要在 CloudRepository 中实现
+    throw UnimplementedError(
+      'getInitialTransactionsWithDetails should be called on CloudRepository, not CloudTransactionRepository',
+    );
   }
 }

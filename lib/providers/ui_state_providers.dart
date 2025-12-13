@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'database_providers.dart';
@@ -8,6 +9,7 @@ import 'update_providers.dart';
 import 'cloud_mode_providers.dart';
 import 'supabase_providers.dart';
 import '../data/db.dart';
+import '../data/models/transaction_display_item.dart';
 import '../services/data/recurring_transaction_service.dart';
 import '../services/system/logger_service.dart';
 import '../services/ai/ai_constants.dart';
@@ -141,99 +143,210 @@ final accountFeatureSetterProvider = Provider<AccountFeatureSetter>((ref) {
   return AccountFeatureSetter();
 });
 
-// 缓存的交易数据Provider（用于首屏快速展示）
+// 缓存的交易数据Provider（用于首屏快速展示）- 旧版
 final cachedTransactionsWithCategoryProvider =
     StateProvider<List<({Transaction t, Category? category})>?>((ref) => null);
 
+// 缓存的首屏交易数据Provider（带完整详情：分类、标签、附件数量）
+// 用于启动时预加载当月数据（或最近20条），实现首屏快速展示
+final cachedInitialTransactionsProvider =
+    StateProvider<List<TransactionDisplayItem>?>((ref) => null);
+
+// 带完整详情的交易数据 Stream Provider（包含标签、附件数量等）
+// 用于监听所有交易数据的变化
+final transactionsWithDetailsProvider =
+    StreamProvider.family<List<TransactionDisplayItem>, int>((ref, ledgerId) {
+  final repo = ref.watch(repositoryProvider);
+  return repo.watchTransactionsWithDetails(ledgerId: ledgerId);
+});
+
+// 首页交易列表 Provider（组合缓存数据和流数据）
+// 策略：
+// 1. 首次展示使用缓存的初始数据（当月或最近20条，带完整详情）
+// 2. 同时订阅流数据，当流数据更新时自动切换为完整数据
+// 3. 如果流数据与缓存数据相同，不触发更新（避免UI闪烁）
+final homeTransactionsProvider =
+    StreamProvider.family<List<TransactionDisplayItem>, int>((ref, ledgerId) async* {
+  // 首先检查缓存，立即返回
+  final cached = ref.read(cachedInitialTransactionsProvider);
+  if (cached != null && cached.isNotEmpty) {
+    print('📋 [首页] 使用缓存数据 ${cached.length}条');
+    yield cached;
+  }
+
+  // 然后订阅流数据
+  final repo = ref.watch(repositoryProvider);
+  List<TransactionDisplayItem>? lastData = cached;
+
+  await for (final data in repo.watchTransactionsWithDetails(ledgerId: ledgerId)) {
+    // 检查数据是否真的变化了（比较ID列表和数量）
+    final bool hasChanged = lastData == null ||
+        data.length != lastData.length ||
+        !_isSameTransactionList(data, lastData);
+
+    if (hasChanged) {
+      print('📋 [首页] 流数据更新 ${data.length}条 (变化: $hasChanged)');
+      lastData = data;
+      yield data;
+    } else {
+      print('📋 [首页] 流数据相同，跳过更新 ${data.length}条');
+    }
+  }
+});
+
+/// 比较两个交易列表是否相同（只比较ID和顺序）
+bool _isSameTransactionList(List<TransactionDisplayItem> a, List<TransactionDisplayItem> b) {
+  if (a.length != b.length) return false;
+  for (int i = 0; i < a.length; i++) {
+    if (a[i].id != b[i].id) return false;
+  }
+  return true;
+}
+
+/// 计时包装函数，用于诊断各个 Provider 的耗时
+Future<String> _timedFuture<T>(String name, Future<T> future) async {
+  final sw = Stopwatch()..start();
+  await future;
+  return '$name: ${sw.elapsedMilliseconds}ms';
+}
+
+/// 一次性加载所有偏好设置（优化启动性能）
+/// 使用已获取的 SharedPreferences 实例，避免多次 getInstance() 调用
+void _loadAllPreferences(Ref ref, SharedPreferences prefs) {
+  // 1. 主题色
+  final savedColor = prefs.getInt('primaryColor');
+  if (savedColor != null) {
+    ref.read(primaryColorProvider.notifier).state = Color(savedColor);
+  }
+
+  // 2. 主题模式
+  final savedThemeMode = prefs.getString('themeMode');
+  if (savedThemeMode != null) {
+    switch (savedThemeMode) {
+      case 'light':
+        ref.read(themeModeProvider.notifier).state = ThemeMode.light;
+        break;
+      case 'dark':
+        ref.read(themeModeProvider.notifier).state = ThemeMode.dark;
+        break;
+      default:
+        ref.read(themeModeProvider.notifier).state = ThemeMode.system;
+    }
+  }
+
+  // 3. 暗黑模式图案样式
+  final savedPatternStyle = prefs.getString('darkModePatternStyle');
+  if (savedPatternStyle != null) {
+    ref.read(darkModePatternStyleProvider.notifier).state = savedPatternStyle;
+  }
+
+  // 4. 字体缩放档位
+  final savedFontLevel = prefs.getInt('fontScaleLevel');
+  if (savedFontLevel != null) {
+    ref.read(fontScaleLevelProvider.notifier).state = savedFontLevel.clamp(-3, 4);
+  }
+  final savedCustomScale = prefs.getDouble('customFontScale');
+  if (savedCustomScale != null) {
+    ref.read(customFontScaleProvider.notifier).state = savedCustomScale.clamp(0.7, 1.5);
+  }
+
+  // 5. 隐藏金额
+  final savedHideAmounts = prefs.getBool('hideAmounts');
+  if (savedHideAmounts != null) {
+    ref.read(hideAmountsProvider.notifier).state = savedHideAmounts;
+  }
+
+  // 6. 简洁金额显示
+  final savedCompactAmount = prefs.getBool('compactAmount');
+  if (savedCompactAmount != null) {
+    ref.read(compactAmountProvider.notifier).state = savedCompactAmount;
+  }
+
+  // 7. 显示交易时间
+  final savedShowTime = prefs.getBool('showTransactionTime');
+  if (savedShowTime != null) {
+    ref.read(showTransactionTimeProvider.notifier).state = savedShowTime;
+  }
+
+  // 8. 当前账本ID
+  final savedLedgerId = prefs.getInt('current_ledger_id');
+  if (savedLedgerId != null) {
+    ref.read(currentLedgerIdProvider.notifier).state = savedLedgerId;
+  }
+}
+
+// 首页交易列表数据（同步获取，优先使用缓存）
+// 用于在 StreamProvider 还在 loading 时提供数据
+final homeTransactionsCachedProvider =
+    Provider.family<List<TransactionDisplayItem>?, int>((ref, ledgerId) {
+  // 优先返回流数据
+  final streamData = ref.watch(homeTransactionsProvider(ledgerId));
+  if (streamData.hasValue) {
+    return streamData.value;
+  }
+  // 流数据未就绪时返回缓存
+  return ref.watch(cachedInitialTransactionsProvider);
+});
+
 // 应用初始化Provider - 管理数据预加载
 final appSplashInitProvider = FutureProvider<void>((ref) async {
-  print('🚀 开始启屏页预加载');
-  final startTime = DateTime.now();
+  final stopwatch = Stopwatch()..start();
+  print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  print('🚀 [启动] 开始预加载 t=0ms');
 
   try {
-    // 确保基础providers已初始化
-    print('📱 初始化基础配置...');
-    await Future.wait([
-      // 等待主题色初始化
-      ref.watch(primaryColorInitProvider.future),
-      // 等待主题模式初始化
-      ref.watch(themeModeInitProvider.future),
-      // 等待暗黑模式图案样式初始化
-      ref.watch(darkModePatternStyleInitProvider.future),
-      // 等待应用配置初始化
-      ref.watch(appInitProvider.future),
-      // 等待字体缩放初始化
-      ref.watch(fontScaleInitProvider.future),
-      // 等待隐私模式初始化
-      ref.watch(hideAmountsInitProvider.future),
-      // 等待金额显示格式初始化
-      ref.watch(compactAmountInitProvider.future),
-      // 等待交易时间显示初始化
-      ref.watch(showTransactionTimeInitProvider.future),
-    ]);
-    print('✅ 基础配置初始化完成');
+    // 第一阶段：一次性获取 SharedPreferences 并读取所有配置
+    // 优化：避免每个 Provider 独立调用 getInstance()
+    final prefs = await SharedPreferences.getInstance();
+    print('📦 [启动] SharedPreferences 就绪 t=${stopwatch.elapsedMilliseconds}ms');
 
-    // 获取 repository（会自动根据模式初始化）
+    // 同步读取并设置所有配置项（SharedPreferences 读取是同步的）
+    _loadAllPreferences(ref, prefs);
+    print('📱 [启动] 基础配置完成 t=${stopwatch.elapsedMilliseconds}ms');
+
+    // 获取 repository 和基础参数
     final repo = ref.read(repositoryProvider);
-    print('🗄️ Repository 初始化完成');
-
-    // 预加载当前账本的关键数据
     final ledgerId = ref.read(currentLedgerIdProvider);
     final now = DateTime.now();
     final currentMonth = DateTime(now.year, now.month, 1);
-    print('📊 开始预加载账本数据, ledgerId=$ledgerId');
-
-    // 预加载本月统计数据
     final monthlyParams = (ledgerId: ledgerId, month: currentMonth);
-    final monthlyResult =
-        await ref.read(monthlyTotalsProvider(monthlyParams).future);
-    ref.read(lastMonthlyTotalsProvider(monthlyParams).notifier).state =
-        monthlyResult;
-    print('💰 月度统计预加载完成: $monthlyResult');
+    print('🗄️ [启动] Repository就绪 t=${stopwatch.elapsedMilliseconds}ms');
 
-    // 预加载账本总数统计
-    final countsResult =
-        await ref.read(countsForLedgerProvider(ledgerId).future);
-    print('🔢 账本统计预加载完成: $countsResult');
+    // 第二阶段：并行加载首屏需要的所有数据
+    final results = await Future.wait([
+      // 1. 首屏交易数据（最重要）
+      repo.getInitialTransactionsWithDetails(ledgerId: ledgerId, minCount: 20),
+      // 2. 月度统计
+      ref.read(monthlyTotalsProvider(monthlyParams).future),
+      // 3. 账本统计
+      ref.read(countsForLedgerProvider(ledgerId).future),
+    ]);
+    print('📦 [启动] 并行数据加载完成 t=${stopwatch.elapsedMilliseconds}ms');
 
-    // 预加载首屏交易数据（包含分类信息）
-    final recentTransactionsWithCategory =
-        await repo.transactionsWithCategoryAll(ledgerId: ledgerId).first;
-    ref.read(cachedTransactionsWithCategoryProvider.notifier).state =
-        recentTransactionsWithCategory;
-    print('💳 交易列表预加载完成: ${recentTransactionsWithCategory.length}条记录');
+    // 保存结果
+    final initialTransactions = results[0] as List<TransactionDisplayItem>;
+    final monthlyResult = results[1] as (double, double);
 
-    // 生成待处理的周期交易
-    print('🔄 开始生成待处理的周期交易...');
-    try {
-      await RecurringTransactionService.generatePendingTransactionsStatic(
-        repository: repo,
-        verbose: true,
-      );
-      print('✅ 周期交易生成完成');
-    } catch (e, stackTrace) {
-      print('❌ 周期交易生成失败: $e');
-      print('堆栈: $stackTrace');
-    }
+    ref.read(cachedInitialTransactionsProvider.notifier).state = initialTransactions;
+    ref.read(lastMonthlyTotalsProvider(monthlyParams).notifier).state = monthlyResult;
+
+    print('💳 [启动] 首屏数据: ${initialTransactions.length}条');
+
+    // 生成待处理的周期交易（后台执行，不阻塞）
+    RecurringTransactionService.generatePendingTransactionsStatic(
+      repository: repo,
+      verbose: false,
+    ).then((_) {
+      print('🔄 [后台] 周期交易生成完成');
+    }).catchError((e) {
+      print('❌ [后台] 周期交易生成失败: $e');
+    });
   } catch (e) {
-    print('❌ 预加载数据失败: $e');
+    print('❌ [启动] 预加载失败: $e');
   }
 
-  // 计算数据预加载耗时
-  final dataLoadTime = DateTime.now().difference(startTime);
-  print('⏱️ 数据预加载耗时: ${dataLoadTime.inMilliseconds}ms');
-
-  // 确保启屏页展示时间至少2秒
-  const minDisplayDuration = Duration(seconds: 2);
-  final remainingTime = minDisplayDuration - dataLoadTime;
-
-  if (remainingTime.inMilliseconds > 0) {
-    print('⏱️ 启屏页还需展示${remainingTime.inMilliseconds}ms以满足最小展示时间...');
-    await Future.delayed(remainingTime);
-  }
-
-  // 标记初始化完成
-  print('🎉 预加载完成，切换到主应用');
+  print('🎉 [启动] 进入首页 t=${stopwatch.elapsedMilliseconds}ms');
+  print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   ref.read(appInitStateProvider.notifier).state = AppInitState.ready;
 });
 

@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import '../../db.dart';
+import '../../models/transaction_display_item.dart';
 import '../base_repository.dart';
 import '../budget_repository.dart';
 import 'local_ledger_repository.dart';
@@ -241,6 +244,10 @@ class LocalRepository extends BaseRepository {
       _transactionRepo.getTransactionsByLedger(ledgerId);
 
   @override
+  Future<List<Transaction>> getRecentTransactionsByLedger(int ledgerId, {int limit = 20}) =>
+      _transactionRepo.getRecentTransactionsByLedger(ledgerId, limit: limit);
+
+  @override
   Future<List<Transaction>> getTransactionsByLedgerInRange({
     required int ledgerId,
     required DateTime start,
@@ -275,6 +282,117 @@ class LocalRepository extends BaseRepository {
   @override
   Future<void> updateTransactionLedger({required int id, required int ledgerId}) =>
       _transactionRepo.updateTransactionLedger(id: id, ledgerId: ledgerId);
+
+  @override
+  Stream<List<TransactionDisplayItem>> watchTransactionsWithDetails({
+    required int ledgerId,
+  }) async* {
+    // 监听交易数据流
+    await for (final transactions in watchTransactionsWithCategoryAll(ledgerId: ledgerId)) {
+      if (transactions.isEmpty) {
+        yield [];
+        continue;
+      }
+
+      final ids = transactions.map((t) => t.t.id).toList();
+
+      // 第一阶段：立即返回基础数据（标签/附件标记为加载中）
+      yield transactions.map((item) => TransactionDisplayItem(
+        transaction: item.t,
+        category: item.category,
+        tags: const [],
+        attachmentCount: 0,
+        isDetailLoading: true,
+      )).toList();
+
+      // 第二阶段：并行加载标签和附件数量
+      final results = await Future.wait([
+        _tagRepo.getTagsForTransactions(ids),
+        _attachmentRepo.getAttachmentCountsForTransactions(ids),
+      ]);
+
+      final tagsMap = results[0] as Map<int, List<Tag>>;
+      final attachmentCounts = results[1] as Map<int, int>;
+
+      // 第三阶段：返回完整数据
+      yield transactions.map((item) => TransactionDisplayItem(
+        transaction: item.t,
+        category: item.category,
+        tags: tagsMap[item.t.id] ?? const [],
+        attachmentCount: attachmentCounts[item.t.id] ?? 0,
+        isDetailLoading: false,
+      )).toList();
+    }
+  }
+
+  @override
+  Future<List<TransactionDisplayItem>> getInitialTransactionsWithDetails({
+    required int ledgerId,
+    int minCount = 20,
+  }) async {
+    // 1. 获取当月的时间范围
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month, 1);
+    final monthEnd = DateTime(now.year, now.month + 1, 1);
+
+    // 2. 先获取当月交易
+    final monthlyTransactions = await _transactionRepo.getTransactionsByLedgerInRange(
+      ledgerId: ledgerId,
+      start: monthStart,
+      end: monthEnd,
+    );
+
+    List<Transaction> transactions;
+
+    // 3. 如果当月数据不足 minCount 条，获取最近 minCount 条
+    if (monthlyTransactions.length < minCount) {
+      // 使用带 LIMIT 的查询，避免获取所有交易（性能优化）
+      transactions = await _transactionRepo.getRecentTransactionsByLedger(
+        ledgerId,
+        limit: minCount,
+      );
+    } else {
+      // 当月数据足够，使用当月数据
+      transactions = monthlyTransactions;
+      // 按时间倒序排列
+      transactions.sort((a, b) => b.happenedAt.compareTo(a.happenedAt));
+    }
+
+    if (transactions.isEmpty) {
+      return [];
+    }
+
+    final ids = transactions.map((t) => t.id).toList();
+
+    // 4. 并行加载分类、标签和附件数量
+    final categoryIds = transactions
+        .where((t) => t.categoryId != null)
+        .map((t) => t.categoryId!)
+        .toSet()
+        .toList();
+
+    final results = await Future.wait([
+      // 批量获取分类 - 使用单次查询优化
+      _categoryRepo.getCategoriesByIds(categoryIds),
+      // 批量获取标签
+      _tagRepo.getTagsForTransactions(ids),
+      // 批量获取附件数量
+      _attachmentRepo.getAttachmentCountsForTransactions(ids),
+    ]);
+
+    final categoryMap = results[0] as Map<int, Category>;
+    final tagsMap = results[1] as Map<int, List<Tag>>;
+    final attachmentCounts = results[2] as Map<int, int>;
+
+    // 5. 组装完整的 TransactionDisplayItem 列表
+    return transactions.map((t) => TransactionDisplayItem(
+      transaction: t,
+      category: t.categoryId != null ? categoryMap[t.categoryId] : null,
+      tags: tagsMap[t.id] ?? const [],
+      attachmentCount: attachmentCounts[t.id] ?? 0,
+      isDetailLoading: false,
+    )).toList();
+  }
 
   // ============================================
   // CategoryRepository 接口实现 - 委托给 LocalCategoryRepository
@@ -314,6 +432,10 @@ class LocalRepository extends BaseRepository {
   @override
   Future<Category?> getCategoryById(int categoryId) =>
       _categoryRepo.getCategoryById(categoryId);
+
+  @override
+  Future<Map<int, Category>> getCategoriesByIds(List<int> categoryIds) =>
+      _categoryRepo.getCategoriesByIds(categoryIds);
 
   @override
   Future<List<Category>> getTopLevelCategories(String kind) =>

@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart' as d;
 
 import '../../db.dart';
+import '../../models/transaction_display_item.dart';
 import '../transaction_repository.dart';
 
 /// 本地交易Repository实现
@@ -281,6 +282,18 @@ class LocalTransactionRepository implements TransactionRepository {
   }
 
   @override
+  Future<List<Transaction>> getRecentTransactionsByLedger(int ledgerId, {int limit = 20}) async {
+    return await (db.select(db.transactions)
+          ..where((t) => t.ledgerId.equals(ledgerId))
+          ..orderBy([
+            (t) =>
+                d.OrderingTerm(expression: t.happenedAt, mode: d.OrderingMode.desc)
+          ])
+          ..limit(limit))
+        .get();
+  }
+
+  @override
   Future<List<Transaction>> getTransactionsByLedgerInRange({
     required int ledgerId,
     required DateTime start,
@@ -345,6 +358,29 @@ class LocalTransactionRepository implements TransactionRepository {
   }) async {
     await (db.update(db.transactions)..where((t) => t.id.equals(id))).write(
       TransactionsCompanion(ledgerId: d.Value(ledgerId)),
+    );
+  }
+
+  @override
+  Stream<List<TransactionDisplayItem>> watchTransactionsWithDetails({
+    required int ledgerId,
+  }) {
+    // 此方法需要访问 TagRepository 和 AttachmentRepository
+    // 在 LocalTransactionRepository 中无法实现，需要在 LocalRepository 中实现
+    throw UnimplementedError(
+      'watchTransactionsWithDetails should be called on LocalRepository, not LocalTransactionRepository',
+    );
+  }
+
+  @override
+  Future<List<TransactionDisplayItem>> getInitialTransactionsWithDetails({
+    required int ledgerId,
+    int minCount = 20,
+  }) {
+    // 此方法需要访问 TagRepository 和 AttachmentRepository
+    // 在 LocalTransactionRepository 中无法实现，需要在 LocalRepository 中实现
+    throw UnimplementedError(
+      'getInitialTransactionsWithDetails should be called on LocalRepository, not LocalTransactionRepository',
     );
   }
 }

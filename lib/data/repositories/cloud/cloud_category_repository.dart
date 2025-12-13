@@ -168,6 +168,20 @@ class CloudCategoryRepository implements CategoryRepository {
   }
 
   @override
+  Future<Map<int, Category>> getCategoriesByIds(List<int> categoryIds) async {
+    if (categoryIds.isEmpty) return {};
+    // 云端暂时用循环实现，后续可优化为批量查询
+    final Map<int, Category> result = {};
+    for (final id in categoryIds) {
+      final cat = await getCategoryById(id);
+      if (cat != null) {
+        result[id] = cat;
+      }
+    }
+    return result;
+  }
+
+  @override
   Future<List<Category>> getTopLevelCategories(String kind) async {
     final results = await supabase.databaseService!.query(
       table: 'categories',

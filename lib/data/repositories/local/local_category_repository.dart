@@ -90,6 +90,15 @@ class LocalCategoryRepository implements CategoryRepository {
   }
 
   @override
+  Future<Map<int, Category>> getCategoriesByIds(List<int> categoryIds) async {
+    if (categoryIds.isEmpty) return {};
+    final categories = await (db.select(db.categories)
+          ..where((c) => c.id.isIn(categoryIds)))
+        .get();
+    return {for (final cat in categories) cat.id: cat};
+  }
+
+  @override
   Future<List<Category>> getTopLevelCategories(String kind) async {
     return await (db.select(db.categories)
           ..where((c) => c.kind.equals(kind) & c.level.equals(1) & c.parentId.isNull())

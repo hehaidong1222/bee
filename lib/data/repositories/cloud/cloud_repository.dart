@@ -1,6 +1,7 @@
 import 'package:flutter_cloud_sync_supabase/flutter_cloud_sync_supabase.dart';
 
 import '../../db.dart';
+import '../../models/transaction_display_item.dart';
 import '../base_repository.dart';
 import '../budget_repository.dart';
 import 'cloud_ledger_repository.dart';
@@ -332,6 +333,10 @@ class CloudRepository extends BaseRepository {
   @override
   Future<Category?> getCategoryById(int categoryId) =>
       _category.getCategoryById(categoryId);
+
+  @override
+  Future<Map<int, Category>> getCategoriesByIds(List<int> categoryIds) =>
+      _category.getCategoriesByIds(categoryIds);
 
   @override
   Future<List<Category>> getAllCategories() async {
@@ -897,6 +902,10 @@ class CloudRepository extends BaseRepository {
       _transaction.getTransactionsByLedger(ledgerId);
 
   @override
+  Future<List<Transaction>> getRecentTransactionsByLedger(int ledgerId, {int limit = 20}) =>
+      _transaction.getRecentTransactionsByLedger(ledgerId, limit: limit);
+
+  @override
   Future<List<Transaction>> getTransactionsByLedgerInRange({
     required int ledgerId,
     required DateTime start,
@@ -1273,5 +1282,84 @@ class CloudRepository extends BaseRepository {
   @override
   Stream<int> watchAttachmentCountByTransaction(int transactionId) {
     throw UnimplementedError('附件功能在云端模式下暂不可用');
+  }
+
+  // ============================================
+  // TransactionDisplayItem 聚合查询
+  // ============================================
+
+  @override
+  Stream<List<TransactionDisplayItem>> watchTransactionsWithDetails({
+    required int ledgerId,
+  }) async* {
+    // 监听交易数据流
+    await for (final transactions in watchTransactionsWithCategoryAll(ledgerId: ledgerId)) {
+      if (transactions.isEmpty) {
+        yield [];
+        continue;
+      }
+
+      // 云端模式下，标签和附件暂不支持，直接返回基础数据
+      yield transactions.map((item) => TransactionDisplayItem(
+        transaction: item.t,
+        category: item.category,
+        tags: const [],
+        attachmentCount: 0,
+        isDetailLoading: false, // 云端暂不支持标签/附件，无需加载
+      )).toList();
+    }
+  }
+
+  @override
+  Future<List<TransactionDisplayItem>> getInitialTransactionsWithDetails({
+    required int ledgerId,
+    int minCount = 20,
+  }) async {
+    // 1. 获取当月时间范围
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month, 1);
+    final monthEnd = DateTime(now.year, now.month + 1, 1);
+
+    // 2. 获取当月交易
+    final monthlyTransactions = await _transaction.getTransactionsByLedgerInRange(
+      ledgerId: ledgerId,
+      start: monthStart,
+      end: monthEnd,
+    );
+
+    // 3. 如果当月数据不足 minCount 条，则获取最近的 minCount 条
+    List<Transaction> transactions;
+    if (monthlyTransactions.length < minCount) {
+      // 使用带 LIMIT 的查询，避免获取所有交易（性能优化）
+      transactions = await _transaction.getRecentTransactionsByLedger(
+        ledgerId,
+        limit: minCount,
+      );
+    } else {
+      transactions = monthlyTransactions;
+      transactions.sort((a, b) => b.happenedAt.compareTo(a.happenedAt));
+    }
+
+    if (transactions.isEmpty) {
+      return [];
+    }
+
+    // 4. 获取所有分类（云端模式下标签和附件暂不支持）
+    final categoryIds = transactions
+        .where((t) => t.categoryId != null)
+        .map((t) => t.categoryId!)
+        .toSet()
+        .toList();
+
+    final categoriesMap = await _category.getCategoriesByIds(categoryIds);
+
+    // 5. 组装结果（云端暂不支持标签和附件）
+    return transactions.map((t) => TransactionDisplayItem(
+      transaction: t,
+      category: t.categoryId != null ? categoriesMap[t.categoryId] : null,
+      tags: const [],
+      attachmentCount: 0,
+      isDetailLoading: false,
+    )).toList();
   }
 }

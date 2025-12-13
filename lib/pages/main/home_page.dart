@@ -5,7 +5,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:async';
 import '../../providers.dart';
 import '../settings/personalize_page.dart' show headerStyleProvider;
-import '../../data/db.dart';
 import '../../widgets/ui/ui.dart';
 import '../../widgets/biz/biz.dart';
 import '../../widgets/biz/bee_icon.dart';
@@ -33,8 +32,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   final Set<String> _visibleHeaders = {}; // 当前可见的日期头部
   Timer? _debounceTimer;
 
-  // StreamBuilder 刷新计数器
-  int _streamBuilderKey = 0;
+  // 账本切换追踪
   int? _lastLedgerId;
 
   @override
@@ -141,19 +139,15 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final repo = ref.watch(repositoryProvider);
-    final cachedData = ref.watch(cachedTransactionsWithCategoryProvider);
     final ledgerId = ref.watch(currentLedgerIdProvider);
     final month = ref.watch(selectedMonthProvider);
     final hide = ref.watch(hideAmountsProvider);
     final aiEnabledAsync = ref.watch(aiAssistantEnabledProvider);
     final aiEnabled = aiEnabledAsync.asData?.value ?? true; // 默认开启
 
-    // 检测账本切换，强制刷新 StreamBuilder
+    // 检测账本切换
     if (_lastLedgerId != null && _lastLedgerId != ledgerId) {
-      _streamBuilderKey++;
-      logger.info('HomePage',
-          '账本切换: $_lastLedgerId → $ledgerId, 刷新StreamBuilder (key=$_streamBuilderKey)');
+      logger.info('HomePage', '账本切换: $_lastLedgerId → $ledgerId');
     }
     _lastLedgerId = ledgerId;
 
@@ -356,18 +350,14 @@ class _HomePageState extends ConsumerState<HomePage> {
           }),
           const SizedBox(height: 0),
           Expanded(
-            child: StreamBuilder<List<({Transaction t, Category? category})>>(
-              key: ValueKey('transactions_$_streamBuilderKey'), // 使用递增key强制重建
-              stream: repo.transactionsWithCategoryAll(ledgerId: ledgerId),
-              builder: (context, snapshot) {
-                // 优先使用流数据，否则使用缓存数据，避免显示loading
-                final joined =
-                    snapshot.hasData ? snapshot.data! : (cachedData ?? []);
+            child: Builder(
+              builder: (context) {
+                // 使用同步 Provider，优先返回缓存数据，避免 loading 状态
+                final items = ref.watch(homeTransactionsCachedProvider(ledgerId)) ?? [];
 
-                // 使用新的可复用TransactionList组件
                 return TransactionList(
                   key: _transactionListKey,
-                  transactions: joined,
+                  transactionItems: items,
                   hideAmounts: hide,
                   enableVisibilityTracking: true,
                   onDateVisibilityChanged: _onHeaderVisibilityChanged,

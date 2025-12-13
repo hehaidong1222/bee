@@ -1,4 +1,5 @@
 import '../db.dart';
+import '../models/transaction_display_item.dart';
 
 /// 交易Repository接口
 /// 定义交易相关的所有数据操作
@@ -92,6 +93,9 @@ abstract class TransactionRepository {
   /// 获取账本的所有交易记录
   Future<List<Transaction>> getTransactionsByLedger(int ledgerId);
 
+  /// 获取账本的最近N条交易记录（带 LIMIT，用于预加载优化）
+  Future<List<Transaction>> getRecentTransactionsByLedger(int ledgerId, {int limit = 20});
+
   /// 获取账本在指定时间范围内的交易记录
   Future<List<Transaction>> getTransactionsByLedgerInRange({
     required int ledgerId,
@@ -116,5 +120,21 @@ abstract class TransactionRepository {
   Future<void> updateTransactionLedger({
     required int id,
     required int ledgerId,
+  });
+
+  /// 获取所有交易记录（带完整详情：分类、标签、附件数量）
+  /// 采用渐进式加载：
+  /// 1. 首次 yield 返回基础数据（isDetailLoading=true）
+  /// 2. 异步加载标签和附件后，再次 yield 完整数据（isDetailLoading=false）
+  Stream<List<TransactionDisplayItem>> watchTransactionsWithDetails({
+    required int ledgerId,
+  });
+
+  /// 获取首屏交易数据（带完整详情）
+  /// 用于启动预加载，返回当月数据，如果不足 minCount 条则返回最近 minCount 条
+  /// 一次性加载完整详情（分类、标签、附件），无需二次刷新
+  Future<List<TransactionDisplayItem>> getInitialTransactionsWithDetails({
+    required int ledgerId,
+    int minCount = 20,
   });
 }

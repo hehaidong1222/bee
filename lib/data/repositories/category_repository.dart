@@ -38,6 +38,9 @@ abstract class CategoryRepository {
   /// 根据ID获取分类
   Future<Category?> getCategoryById(int categoryId);
 
+  /// 批量根据ID获取分类（单次SQL查询，性能优化）
+  Future<Map<int, Category>> getCategoriesByIds(List<int> categoryIds);
+
   /// 获取所有分类
   Future<List<Category>> getAllCategories();
 
