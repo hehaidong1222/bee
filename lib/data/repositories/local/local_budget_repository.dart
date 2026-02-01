@@ -1,14 +1,19 @@
 import 'package:drift/drift.dart' as d;
+import 'package:uuid/uuid.dart';
 
 import '../../db.dart';
+import '../../../cloud/sync_backend.dart';
+import '../../../cloud/sync_notifier.dart';
 import '../budget_repository.dart';
 
 /// 本地预算Repository实现
 /// 基于 Drift 数据库实现
 class LocalBudgetRepository implements BudgetRepository {
   final BeeDatabase db;
+  final SyncNotifier? syncNotifier;
+  static const _uuid = Uuid();
 
-  LocalBudgetRepository(this.db);
+  LocalBudgetRepository(this.db, {this.syncNotifier});
 
   // ============================================
   // 基础 CRUD 操作
@@ -23,7 +28,8 @@ class LocalBudgetRepository implements BudgetRepository {
     String period = 'monthly',
     int startDay = 1,
   }) async {
-    return await db.into(db.budgets).insert(
+    final syncId = _uuid.v4();
+    final id = await db.into(db.budgets).insert(
       BudgetsCompanion.insert(
         ledgerId: ledgerId,
         type: d.Value(type),
@@ -31,8 +37,18 @@ class LocalBudgetRepository implements BudgetRepository {
         amount: amount,
         period: d.Value(period),
         startDay: d.Value(startDay),
+        syncId: d.Value(syncId),
       ),
     );
+    syncNotifier?.onRecordChanged('budgets', syncId, SyncOperation.upsert, {
+      'ledgerId': ledgerId,
+      'type': type,
+      'categoryId': categoryId,
+      'amount': amount,
+      'period': period,
+      'startDay': startDay,
+    });
+    return id;
   }
 
   @override
@@ -42,14 +58,32 @@ class LocalBudgetRepository implements BudgetRepository {
     int? startDay,
     bool? enabled,
   }) async {
+    final now = DateTime.now();
     await (db.update(db.budgets)..where((b) => b.id.equals(id))).write(
       BudgetsCompanion(
         amount: amount != null ? d.Value(amount) : const d.Value.absent(),
         startDay: startDay != null ? d.Value(startDay) : const d.Value.absent(),
         enabled: enabled != null ? d.Value(enabled) : const d.Value.absent(),
-        updatedAt: d.Value(DateTime.now()),
+        updatedAt: d.Value(now),
       ),
     );
+    if (syncNotifier != null) {
+      final record = await (db.select(db.budgets)
+            ..where((b) => b.id.equals(id)))
+          .getSingleOrNull();
+      if (record?.syncId != null) {
+        syncNotifier!.onRecordChanged('budgets', record!.syncId!, SyncOperation.upsert, {
+          'ledgerId': record.ledgerId,
+          'type': record.type,
+          'categoryId': record.categoryId,
+          'amount': record.amount,
+          'period': record.period,
+          'startDay': record.startDay,
+          'enabled': record.enabled,
+          'updatedAt': now.toIso8601String(),
+        });
+      }
+    }
   }
 
   @override
@@ -63,12 +97,26 @@ class LocalBudgetRepository implements BudgetRepository {
 
     if (budget.type == 'total') {
       // 删除总预算时，同时删除该账本的所有分类预算
+      // 获取所有相关预算的 syncId
+      if (syncNotifier != null) {
+        final allBudgets = await (db.select(db.budgets)
+              ..where((b) => b.ledgerId.equals(budget.ledgerId)))
+            .get();
+        for (final b in allBudgets) {
+          if (b.syncId != null) {
+            syncNotifier!.onRecordChanged('budgets', b.syncId!, SyncOperation.delete, null);
+          }
+        }
+      }
       await (db.delete(db.budgets)
             ..where((b) => b.ledgerId.equals(budget.ledgerId)))
           .go();
     } else {
       // 删除单个分类预算
       await (db.delete(db.budgets)..where((b) => b.id.equals(id))).go();
+      if (budget.syncId != null) {
+        syncNotifier?.onRecordChanged('budgets', budget.syncId!, SyncOperation.delete, null);
+      }
     }
   }
 

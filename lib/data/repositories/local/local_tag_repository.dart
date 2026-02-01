@@ -1,14 +1,19 @@
 import 'package:drift/drift.dart' as d;
+import 'package:uuid/uuid.dart';
 
 import '../../db.dart';
+import '../../../cloud/sync_backend.dart';
+import '../../../cloud/sync_notifier.dart';
 import '../tag_repository.dart';
 
 /// 本地标签Repository实现
 /// 基于 Drift 数据库实现
 class LocalTagRepository implements TagRepository {
   final BeeDatabase db;
+  final SyncNotifier? syncNotifier;
+  static const _uuid = Uuid();
 
-  LocalTagRepository(this.db);
+  LocalTagRepository(this.db, {this.syncNotifier});
 
   // ============================================
   // 基础 CRUD 操作
@@ -20,13 +25,24 @@ class LocalTagRepository implements TagRepository {
     String? color,
     int sortOrder = 0,
   }) async {
-    return await db.into(db.tags).insert(
+    final syncId = _uuid.v4();
+    final now = DateTime.now();
+    final id = await db.into(db.tags).insert(
       TagsCompanion.insert(
         name: name,
         color: d.Value(color),
         sortOrder: d.Value(sortOrder),
+        syncId: d.Value(syncId),
+        updatedAt: d.Value(now),
       ),
     );
+    syncNotifier?.onRecordChanged('tags', syncId, SyncOperation.upsert, {
+      'name': name,
+      'color': color,
+      'sortOrder': sortOrder,
+      'updatedAt': now.toIso8601String(),
+    });
+    return id;
   }
 
   @override
@@ -36,24 +52,43 @@ class LocalTagRepository implements TagRepository {
     String? color,
     int? sortOrder,
   }) async {
+    final now = DateTime.now();
     await (db.update(db.tags)..where((t) => t.id.equals(id))).write(
       TagsCompanion(
         name: name != null ? d.Value(name) : const d.Value.absent(),
         color: color != null ? d.Value(color) : const d.Value.absent(),
         sortOrder: sortOrder != null ? d.Value(sortOrder) : const d.Value.absent(),
+        updatedAt: d.Value(now),
       ),
     );
+    if (syncNotifier != null) {
+      final record = await getTagById(id);
+      if (record?.syncId != null) {
+        syncNotifier!.onRecordChanged('tags', record!.syncId!, SyncOperation.upsert, {
+          'name': record.name,
+          'color': record.color,
+          'sortOrder': record.sortOrder,
+          'updatedAt': now.toIso8601String(),
+        });
+      }
+    }
   }
 
   @override
   Future<void> deleteTag(int id) async {
+    String? syncId;
+    if (syncNotifier != null) {
+      final record = await getTagById(id);
+      syncId = record?.syncId;
+    }
     await db.transaction(() async {
-      // 先删除关联关系
       await (db.delete(db.transactionTags)
         ..where((t) => t.tagId.equals(id))).go();
-      // 再删除标签
       await (db.delete(db.tags)..where((t) => t.id.equals(id))).go();
     });
+    if (syncId != null) {
+      syncNotifier!.onRecordChanged('tags', syncId, SyncOperation.delete, null);
+    }
   }
 
   @override

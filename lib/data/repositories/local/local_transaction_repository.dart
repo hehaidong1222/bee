@@ -3,17 +3,22 @@ import 'dart:io';
 import 'package:drift/drift.dart' as d;
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
+import 'package:uuid/uuid.dart';
 
 import '../../db.dart';
 import '../transaction_repository.dart';
+import '../../../cloud/sync_backend.dart';
+import '../../../cloud/sync_notifier.dart';
 import '../../../services/system/logger_service.dart';
 
 /// 本地交易Repository实现
 /// 基于 Drift 数据库实现
 class LocalTransactionRepository implements TransactionRepository {
   final BeeDatabase db;
+  final SyncNotifier? syncNotifier;
+  static const _uuid = Uuid();
 
-  LocalTransactionRepository(this.db);
+  LocalTransactionRepository(this.db, {this.syncNotifier});
 
   @override
   Stream<List<Transaction>> watchRecentTransactions({
@@ -175,7 +180,9 @@ class LocalTransactionRepository implements TransactionRepository {
     required DateTime happenedAt,
     String? note,
   }) async {
-    return db.into(db.transactions).insert(TransactionsCompanion.insert(
+    final syncId = _uuid.v4();
+    final now = DateTime.now();
+    final id = await db.into(db.transactions).insert(TransactionsCompanion.insert(
           ledgerId: ledgerId,
           type: type,
           amount: amount,
@@ -184,7 +191,21 @@ class LocalTransactionRepository implements TransactionRepository {
           toAccountId: d.Value(toAccountId),
           happenedAt: d.Value(happenedAt),
           note: d.Value(note),
+          syncId: d.Value(syncId),
+          updatedAt: d.Value(now),
         ));
+    syncNotifier?.onRecordChanged('transactions', syncId, SyncOperation.upsert, {
+      'ledgerId': ledgerId,
+      'type': type,
+      'amount': amount,
+      'categoryId': categoryId,
+      'accountId': accountId,
+      'toAccountId': toAccountId,
+      'happenedAt': happenedAt.toIso8601String(),
+      'note': note,
+      'updatedAt': now.toIso8601String(),
+    });
+    return id;
   }
 
   @override
@@ -216,6 +237,7 @@ class LocalTransactionRepository implements TransactionRepository {
       accountIdValue = d.Value(accountId as int?);
     }
 
+    final now = DateTime.now();
     await (db.update(db.transactions)..where((t) => t.id.equals(id))).write(
       TransactionsCompanion(
         type: d.Value(type),
@@ -225,17 +247,46 @@ class LocalTransactionRepository implements TransactionRepository {
         happenedAt:
             happenedAt != null ? d.Value(happenedAt) : const d.Value.absent(),
         accountId: accountIdValue,
+        updatedAt: d.Value(now),
       ),
     );
+
+    if (syncNotifier != null) {
+      final record = await getTransactionById(id);
+      if (record?.syncId != null) {
+        syncNotifier!.onRecordChanged('transactions', record!.syncId!, SyncOperation.upsert, {
+          'ledgerId': record.ledgerId,
+          'type': record.type,
+          'amount': record.amount,
+          'categoryId': record.categoryId,
+          'accountId': record.accountId,
+          'toAccountId': record.toAccountId,
+          'happenedAt': record.happenedAt.toIso8601String(),
+          'note': record.note,
+          'updatedAt': now.toIso8601String(),
+        });
+      }
+    }
   }
 
   @override
   Future<void> deleteTransaction(int id) async {
-    // 先删除关联的附件
+    // 先获取 syncId 用于通知
+    String? syncId;
+    if (syncNotifier != null) {
+      final record = await getTransactionById(id);
+      syncId = record?.syncId;
+    }
+
+    // 删除关联的附件
     await _deleteAttachmentsForTransaction(id);
 
-    // 再删除交易记录
+    // 删除交易记录
     await (db.delete(db.transactions)..where((t) => t.id.equals(id))).go();
+
+    if (syncId != null) {
+      syncNotifier!.onRecordChanged('transactions', syncId, SyncOperation.delete, null);
+    }
   }
 
   /// 删除交易关联的所有附件（包括文件和数据库记录）

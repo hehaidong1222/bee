@@ -1,4 +1,5 @@
 import '../../db.dart';
+import '../../../cloud/sync_notifier.dart';
 import '../base_repository.dart';
 import '../budget_repository.dart';
 import 'local_ledger_repository.dart';
@@ -20,6 +21,9 @@ class LocalRepository extends BaseRepository {
   /// 仅供需要直接数据库访问的场景使用（如数据库初始化、导入导出）
   final BeeDatabase db;
 
+  /// 同步通知器（可选，启用同步时注入）
+  final SyncNotifier? syncNotifier;
+
   // 子 Repository 实例
   late final LocalLedgerRepository _ledgerRepo;
   late final LocalTransactionRepository _transactionRepo;
@@ -32,17 +36,17 @@ class LocalRepository extends BaseRepository {
   late final LocalBudgetRepository _budgetRepo;
   late final LocalAttachmentRepository _attachmentRepo;
 
-  LocalRepository(this.db) {
-    _ledgerRepo = LocalLedgerRepository(db);
-    _transactionRepo = LocalTransactionRepository(db);
-    _categoryRepo = LocalCategoryRepository(db);
-    _accountRepo = LocalAccountRepository(db);
+  LocalRepository(this.db, {this.syncNotifier}) {
+    _ledgerRepo = LocalLedgerRepository(db, syncNotifier: syncNotifier);
+    _transactionRepo = LocalTransactionRepository(db, syncNotifier: syncNotifier);
+    _categoryRepo = LocalCategoryRepository(db, syncNotifier: syncNotifier);
+    _accountRepo = LocalAccountRepository(db, syncNotifier: syncNotifier);
     _statisticsRepo = LocalStatisticsRepository(db);
-    _recurringTransactionRepo = LocalRecurringTransactionRepository(db);
+    _recurringTransactionRepo = LocalRecurringTransactionRepository(db, syncNotifier: syncNotifier);
     _aiRepo = LocalAIRepository(db);
-    _tagRepo = LocalTagRepository(db);
-    _budgetRepo = LocalBudgetRepository(db);
-    _attachmentRepo = LocalAttachmentRepository(db);
+    _tagRepo = LocalTagRepository(db, syncNotifier: syncNotifier);
+    _budgetRepo = LocalBudgetRepository(db, syncNotifier: syncNotifier);
+    _attachmentRepo = LocalAttachmentRepository(db, syncNotifier: syncNotifier);
   }
 
   // ============================================

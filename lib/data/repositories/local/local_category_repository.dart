@@ -1,7 +1,10 @@
 import 'package:drift/drift.dart' as d;
+import 'package:uuid/uuid.dart';
 
 import '../../db.dart';
 import '../../category_node.dart';
+import '../../../cloud/sync_backend.dart';
+import '../../../cloud/sync_notifier.dart';
 import '../../../services/system/logger_service.dart';
 import '../category_repository.dart';
 
@@ -9,8 +12,10 @@ import '../category_repository.dart';
 /// 基于 Drift 数据库实现
 class LocalCategoryRepository implements CategoryRepository {
   final BeeDatabase db;
+  final SyncNotifier? syncNotifier;
+  static const _uuid = Uuid();
 
-  LocalCategoryRepository(this.db);
+  LocalCategoryRepository(this.db, {this.syncNotifier});
 
   @override
   Future<int> createCategory({
@@ -19,14 +24,27 @@ class LocalCategoryRepository implements CategoryRepository {
     String? icon,
     int? sortOrder,
   }) async {
-    return await db.into(db.categories).insert(
+    final syncId = _uuid.v4();
+    final now = DateTime.now();
+    final id = await db.into(db.categories).insert(
       CategoriesCompanion.insert(
         name: name,
         kind: kind,
         icon: d.Value(icon),
         sortOrder: d.Value(sortOrder ?? 0),
+        syncId: d.Value(syncId),
+        updatedAt: d.Value(now),
       ),
     );
+    syncNotifier?.onRecordChanged('categories', syncId, SyncOperation.upsert, {
+      'name': name,
+      'kind': kind,
+      'icon': icon,
+      'sortOrder': sortOrder ?? 0,
+      'level': 1,
+      'updatedAt': now.toIso8601String(),
+    });
+    return id;
   }
 
   @override
@@ -37,7 +55,9 @@ class LocalCategoryRepository implements CategoryRepository {
     String? icon,
     int? sortOrder,
   }) async {
-    return await db.into(db.categories).insert(
+    final syncId = _uuid.v4();
+    final now = DateTime.now();
+    final id = await db.into(db.categories).insert(
       CategoriesCompanion.insert(
         name: name,
         kind: kind,
@@ -45,8 +65,20 @@ class LocalCategoryRepository implements CategoryRepository {
         parentId: d.Value(parentId),
         level: d.Value(2),
         sortOrder: d.Value(sortOrder ?? 0),
+        syncId: d.Value(syncId),
+        updatedAt: d.Value(now),
       ),
     );
+    syncNotifier?.onRecordChanged('categories', syncId, SyncOperation.upsert, {
+      'name': name,
+      'kind': kind,
+      'icon': icon,
+      'parentId': parentId,
+      'level': 2,
+      'sortOrder': sortOrder ?? 0,
+      'updatedAt': now.toIso8601String(),
+    });
+    return id;
   }
 
   @override
@@ -57,25 +89,51 @@ class LocalCategoryRepository implements CategoryRepository {
     int? parentId,
     int? level,
   }) async {
+    final now = DateTime.now();
     await (db.update(db.categories)..where((c) => c.id.equals(id))).write(
       CategoriesCompanion(
         name: name != null ? d.Value(name) : const d.Value.absent(),
         icon: icon != null ? d.Value(icon) : const d.Value.absent(),
-        // parentId: -1 表示清空父分类，其他值表示设置父分类
         parentId: parentId != null
             ? (parentId == -1 ? const d.Value(null) : d.Value(parentId))
             : const d.Value.absent(),
         level: level != null ? d.Value(level) : const d.Value.absent(),
+        updatedAt: d.Value(now),
       ),
     );
+    if (syncNotifier != null) {
+      final record = await getCategoryById(id);
+      if (record?.syncId != null) {
+        syncNotifier!.onRecordChanged('categories', record!.syncId!, SyncOperation.upsert, {
+          'name': record.name,
+          'kind': record.kind,
+          'icon': record.icon,
+          'parentId': record.parentId,
+          'level': record.level,
+          'sortOrder': record.sortOrder,
+          'updatedAt': now.toIso8601String(),
+        });
+      }
+    }
   }
 
   @override
   Future<void> deleteCategory(int id) async {
+    // 获取 syncId 用于通知
+    String? syncId;
+    if (syncNotifier != null) {
+      final record = await getCategoryById(id);
+      syncId = record?.syncId;
+    }
+
     // 先删除该分类下的所有子分类
     await (db.delete(db.categories)..where((c) => c.parentId.equals(id))).go();
     // 再删除该分类本身
     await (db.delete(db.categories)..where((c) => c.id.equals(id))).go();
+
+    if (syncId != null) {
+      syncNotifier!.onRecordChanged('categories', syncId, SyncOperation.delete, null);
+    }
   }
 
   @override

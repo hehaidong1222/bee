@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_cloud_sync/flutter_cloud_sync.dart' hide SyncStatus;
 import '../cloud/sync_service.dart';
+import '../cloud/sync_notifier.dart';
 import '../cloud/transactions_sync_manager.dart';
 import '../models/ledger_display_item.dart';
 import '../data/repositories/base_repository.dart';
@@ -10,6 +11,30 @@ import 'database_providers.dart';
 import 'ui_state_providers.dart';
 import 'statistics_providers.dart';
 import 'cloud_mode_providers.dart';
+
+// ====== 记录级同步 Providers ======
+
+/// 记录级同步通知器（当前默认为 null，启用同步后会返回 RecordSyncNotifier）
+///
+/// 返回 null 表示记录级同步未启用，写操作不会入队。
+/// 后续连接 SyncBackend 后，此 Provider 会返回 RecordSyncNotifier 实例。
+final recordSyncNotifierProvider = Provider<SyncNotifier?>((ref) {
+  // 目前默认不启用记录级同步
+  // TODO: 当用户配置了记录级同步后端时，返回 RecordSyncNotifier
+  // final db = ref.watch(databaseProvider);
+  // final fkResolver = SyncForeignKeyResolver(db);
+  // return RecordSyncNotifier(db: db, fkResolver: fkResolver);
+  return null;
+});
+
+/// 待同步变更数量（用于 UI 显示）
+final pendingSyncCountProvider = FutureProvider<int>((ref) async {
+  final notifier = ref.watch(recordSyncNotifierProvider);
+  if (notifier == null || notifier is! RecordSyncNotifier) return 0;
+  return notifier.getPendingCount();
+});
+
+// ====== 文件级同步（现有逻辑） ======
 
 // 同步状态（根据 ledgerId 与刷新 tick 缓存），避免因 UI 重建重复拉取
 final syncStatusProvider =

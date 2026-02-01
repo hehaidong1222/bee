@@ -1,14 +1,19 @@
 import 'package:drift/drift.dart' as d;
+import 'package:uuid/uuid.dart';
 
 import '../../db.dart';
+import '../../../cloud/sync_backend.dart';
+import '../../../cloud/sync_notifier.dart';
 import '../attachment_repository.dart';
 
 /// 本地附件Repository实现
 /// 基于 Drift 数据库实现
 class LocalAttachmentRepository implements AttachmentRepository {
   final BeeDatabase db;
+  final SyncNotifier? syncNotifier;
+  static const _uuid = Uuid();
 
-  LocalAttachmentRepository(this.db);
+  LocalAttachmentRepository(this.db, {this.syncNotifier});
 
   // ============================================
   // 基础 CRUD 操作
@@ -24,7 +29,8 @@ class LocalAttachmentRepository implements AttachmentRepository {
     int? height,
     int sortOrder = 0,
   }) async {
-    return await db.into(db.transactionAttachments).insert(
+    final syncId = _uuid.v4();
+    final id = await db.into(db.transactionAttachments).insert(
       TransactionAttachmentsCompanion.insert(
         transactionId: transactionId,
         fileName: fileName,
@@ -33,8 +39,19 @@ class LocalAttachmentRepository implements AttachmentRepository {
         width: d.Value(width),
         height: d.Value(height),
         sortOrder: d.Value(sortOrder),
+        syncId: d.Value(syncId),
       ),
     );
+    syncNotifier?.onRecordChanged('transaction_attachments', syncId, SyncOperation.upsert, {
+      'transactionId': transactionId,
+      'fileName': fileName,
+      'originalName': originalName,
+      'fileSize': fileSize,
+      'width': width,
+      'height': height,
+      'sortOrder': sortOrder,
+    });
+    return id;
   }
 
   @override
@@ -52,12 +69,28 @@ class LocalAttachmentRepository implements AttachmentRepository {
 
   @override
   Future<void> deleteAttachment(int id) async {
+    String? syncId;
+    if (syncNotifier != null) {
+      final record = await getAttachmentById(id);
+      syncId = record?.syncId;
+    }
     await (db.delete(db.transactionAttachments)
       ..where((t) => t.id.equals(id))).go();
+    if (syncId != null) {
+      syncNotifier!.onRecordChanged('transaction_attachments', syncId, SyncOperation.delete, null);
+    }
   }
 
   @override
   Future<void> deleteAttachmentsByTransaction(int transactionId) async {
+    if (syncNotifier != null) {
+      final attachments = await getAttachmentsByTransaction(transactionId);
+      for (final a in attachments) {
+        if (a.syncId != null) {
+          syncNotifier!.onRecordChanged('transaction_attachments', a.syncId!, SyncOperation.delete, null);
+        }
+      }
+    }
     await (db.delete(db.transactionAttachments)
       ..where((t) => t.transactionId.equals(transactionId))).go();
   }

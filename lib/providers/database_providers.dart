@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:drift/drift.dart';
 import '../data/db.dart';
 import '../data/repositories/local/local_repository.dart';
 import '../data/repositories/cloud/cloud_repository.dart';
@@ -23,28 +22,25 @@ final databaseProvider = Provider<BeeDatabase>((ref) {
 final repositoryProvider = Provider<BaseRepository>((ref) {
   final mode = ref.watch(appModeProvider);
   final db = ref.watch(databaseProvider);
+  final syncNotifier = ref.watch(recordSyncNotifierProvider);
 
   logger.info('RepositoryProvider', '当前模式: ${mode.label}');
 
   switch (mode) {
     case AppMode.local:
       // 本地优先模式：使用 LocalRepository（基于 Drift）
-      logger.info('RepositoryProvider', '✅ 使用 LocalRepository (本地模式)');
-      return LocalRepository(db);
+      return LocalRepository(db, syncNotifier: syncNotifier);
 
     case AppMode.cloud:
       // 仅云端模式：使用 CloudRepository（基于 Supabase）
       final supabaseAsync = ref.watch(supabaseInstanceProvider);
 
-      logger.info('RepositoryProvider', 'Supabase 状态: hasValue=${supabaseAsync.hasValue}, value=${supabaseAsync.value != null ? "已加载" : "null"}');
-
       // 如果 Supabase 未加载完成或为 null，回退到本地模式
       if (!supabaseAsync.hasValue || supabaseAsync.value == null) {
-        logger.warning('RepositoryProvider', '⚠️ Supabase 未就绪，回退到 LocalRepository');
-        return LocalRepository(db);
+        logger.warning('RepositoryProvider', 'Supabase 未就绪，回退到 LocalRepository');
+        return LocalRepository(db, syncNotifier: syncNotifier);
       }
 
-      logger.info('RepositoryProvider', '✅ 使用 CloudRepository (仅云端模式)');
       return CloudRepository(supabaseAsync.value!);
   }
 });

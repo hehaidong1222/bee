@@ -1,14 +1,19 @@
 import 'package:drift/drift.dart' as d;
+import 'package:uuid/uuid.dart';
 
 import '../../db.dart';
 import '../ledger_repository.dart';
+import '../../../cloud/sync_backend.dart';
+import '../../../cloud/sync_notifier.dart';
 
 /// 本地账本Repository实现
 /// 基于 Drift 数据库实现
 class LocalLedgerRepository implements LedgerRepository {
   final BeeDatabase db;
+  final SyncNotifier? syncNotifier;
+  static const _uuid = Uuid();
 
-  LocalLedgerRepository(this.db);
+  LocalLedgerRepository(this.db, {this.syncNotifier});
 
   @override
   Stream<List<Ledger>> watchLedgers() => db.select(db.ledgers).watch();
@@ -130,15 +135,39 @@ class LocalLedgerRepository implements LedgerRepository {
     required String name,
     String currency = 'CNY',
   }) async {
-    return db.into(db.ledgers).insert(
-        LedgersCompanion.insert(name: name, currency: d.Value(currency)));
+    final syncId = _uuid.v4();
+    final now = DateTime.now();
+    final id = await db.into(db.ledgers).insert(
+        LedgersCompanion.insert(
+          name: name,
+          currency: d.Value(currency),
+          syncId: d.Value(syncId),
+          updatedAt: d.Value(now),
+        ));
+    syncNotifier?.onRecordChanged('ledgers', syncId, SyncOperation.upsert, {
+      'name': name,
+      'currency': currency,
+      'updatedAt': now.toIso8601String(),
+    });
+    return id;
   }
 
   @override
   Future<void> updateLedgerName({required int id, required String name}) async {
+    final now = DateTime.now();
     await (db.update(db.ledgers)..where((tbl) => tbl.id.equals(id))).write(
-      LedgersCompanion(name: d.Value(name)),
+      LedgersCompanion(name: d.Value(name), updatedAt: d.Value(now)),
     );
+    if (syncNotifier != null) {
+      final record = await getLedgerById(id);
+      if (record?.syncId != null) {
+        syncNotifier!.onRecordChanged('ledgers', record!.syncId!, SyncOperation.upsert, {
+          'name': record.name,
+          'currency': record.currency,
+          'updatedAt': now.toIso8601String(),
+        });
+      }
+    }
   }
 
   @override
@@ -147,22 +176,45 @@ class LocalLedgerRepository implements LedgerRepository {
     String? name,
     String? currency,
   }) async {
+    final now = DateTime.now();
     final comp = LedgersCompanion(
       name: name != null ? d.Value(name) : const d.Value.absent(),
       currency: currency != null ? d.Value(currency) : const d.Value.absent(),
+      updatedAt: d.Value(now),
     );
     await (db.update(db.ledgers)..where((tbl) => tbl.id.equals(id)))
         .write(comp);
+    if (syncNotifier != null) {
+      final record = await getLedgerById(id);
+      if (record?.syncId != null) {
+        syncNotifier!.onRecordChanged('ledgers', record!.syncId!, SyncOperation.upsert, {
+          'name': record.name,
+          'currency': record.currency,
+          'updatedAt': now.toIso8601String(),
+        });
+      }
+    }
   }
 
   @override
   Future<void> deleteLedger(int id) async {
+    // 先获取 syncId 用于通知
+    String? syncId;
+    if (syncNotifier != null) {
+      final record = await getLedgerById(id);
+      syncId = record?.syncId;
+    }
+
     // 先删除该账本下的所有交易，再删除账本本身
     await db.transaction(() async {
       await (db.delete(db.transactions)..where((t) => t.ledgerId.equals(id)))
           .go();
       await (db.delete(db.ledgers)..where((tbl) => tbl.id.equals(id))).go();
     });
+
+    if (syncId != null) {
+      syncNotifier!.onRecordChanged('ledgers', syncId, SyncOperation.delete, null);
+    }
   }
 
   @override

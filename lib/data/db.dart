@@ -15,14 +15,17 @@ part 'db.g.dart';
 
 class Ledgers extends Table {
   IntColumn get id => integer().autoIncrement()();
+  TextColumn get syncId => text().nullable()(); // UUID v4, 用于多设备同步
   TextColumn get name => text()();
   TextColumn get currency => text().withDefault(const Constant('CNY'))();
   TextColumn get type => text().withDefault(const Constant('personal'))();  // personal / shared
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get updatedAt => dateTime().nullable()(); // 多设备同步 LWW
 }
 
 class Accounts extends Table {
   IntColumn get id => integer().autoIncrement()();
+  TextColumn get syncId => text().nullable()(); // UUID v4, 用于多设备同步
   IntColumn get ledgerId => integer()(); // 保留用于v2迁移，后续会移除
   TextColumn get name => text()();
   TextColumn get type => text().withDefault(const Constant('cash'))();
@@ -36,6 +39,7 @@ class Accounts extends Table {
 
 class Categories extends Table {
   IntColumn get id => integer().autoIncrement()();
+  TextColumn get syncId => text().nullable()(); // UUID v4, 用于多设备同步
   TextColumn get name => text()();
   TextColumn get kind => text()(); // expense / income
   TextColumn get icon => text().nullable()();
@@ -49,10 +53,12 @@ class Categories extends Table {
       text().withDefault(const Constant('material'))(); // material / custom / community
   TextColumn get customIconPath => text().nullable()(); // 自定义图标本地路径
   TextColumn get communityIconId => text().nullable()(); // 社区图标ID（预留）
+  DateTimeColumn get updatedAt => dateTime().nullable()(); // 多设备同步 LWW
 }
 
 class Transactions extends Table {
   IntColumn get id => integer().autoIncrement()();
+  TextColumn get syncId => text().nullable()(); // UUID v4, 用于多设备同步
   IntColumn get ledgerId => integer()();
   TextColumn get type => text()(); // expense / income / transfer
   RealColumn get amount => real()();
@@ -62,10 +68,12 @@ class Transactions extends Table {
   DateTimeColumn get happenedAt => dateTime().withDefault(currentDateAndTime)();
   TextColumn get note => text().nullable()();
   IntColumn get recurringId => integer().nullable()(); // 关联到重复交易模板
+  DateTimeColumn get updatedAt => dateTime().nullable()(); // 多设备同步 LWW
 }
 
 class RecurringTransactions extends Table {
   IntColumn get id => integer().autoIncrement()();
+  TextColumn get syncId => text().nullable()(); // UUID v4, 用于多设备同步
   IntColumn get ledgerId => integer()();
   TextColumn get type => text()(); // expense / income / transfer
   RealColumn get amount => real()();
@@ -120,10 +128,12 @@ class Messages extends Table {
 // 标签表
 class Tags extends Table {
   IntColumn get id => integer().autoIncrement()();
+  TextColumn get syncId => text().nullable()(); // UUID v4, 用于多设备同步
   TextColumn get name => text()();                    // 标签名称
   TextColumn get color => text().nullable()();        // 颜色值（如 #FF5722）
   IntColumn get sortOrder => integer().withDefault(const Constant(0))();  // 排序
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get updatedAt => dateTime().nullable()(); // 多设备同步 LWW
 }
 
 // 交易-标签关联表
@@ -136,6 +146,7 @@ class TransactionTags extends Table {
 // 交易附件表
 class TransactionAttachments extends Table {
   IntColumn get id => integer().autoIncrement()();
+  TextColumn get syncId => text().nullable()(); // UUID v4, 用于多设备同步
   IntColumn get transactionId => integer()(); // 关联的交易ID
   TextColumn get fileName => text()();        // 文件名（不含路径）
   TextColumn get originalName => text().nullable()(); // 原始文件名
@@ -149,6 +160,7 @@ class TransactionAttachments extends Table {
 // 预算表
 class Budgets extends Table {
   IntColumn get id => integer().autoIncrement()();
+  TextColumn get syncId => text().nullable()(); // UUID v4, 用于多设备同步
 
   /// 关联账本ID
   IntColumn get ledgerId => integer()();
@@ -178,6 +190,17 @@ class Budgets extends Table {
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 }
 
+// 待同步变更队列（多设备同步用）
+class PendingSyncChanges extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get syncTable => text()(); // 表名：transactions, categories, etc.
+  TextColumn get recordSyncId => text()(); // 变更记录的 syncId
+  TextColumn get operation => text()(); // upsert | delete
+  TextColumn get payload => text().nullable()(); // JSON 序列化的记录数据
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  IntColumn get retryCount => integer().withDefault(const Constant(0))();
+}
+
 @DriftDatabase(tables: [
   Ledgers,
   Accounts,
@@ -190,12 +213,13 @@ class Budgets extends Table {
   TransactionTags,
   Budgets,
   TransactionAttachments,
+  PendingSyncChanges,
 ])
 class BeeDatabase extends _$BeeDatabase {
   BeeDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 14; // v14: 迁移转账记录到虚拟转账分类
+  int get schemaVersion => 15; // v15: 多设备同步 syncId + updatedAt + PendingSyncChanges
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -466,6 +490,53 @@ class BeeDatabase extends _$BeeDatabase {
             await SeedService.migrateTransferTransactions(this);
             logger.info('DB', 'v14 迁移完成: 转账记录已关联到虚拟转账分类');
             print('[DB Migration] v14 迁移完成');
+          }
+          if (from < 15) {
+            // v15: 多设备同步支持 - syncId + updatedAt + PendingSyncChanges
+            logger.info('DB', '开始迁移到 v15: 多设备同步支持');
+
+            // 1. 为同步表添加 sync_id 列
+            final syncIdTables = [
+              'ledgers', 'accounts', 'categories', 'transactions',
+              'tags', 'recurring_transactions', 'budgets', 'transaction_attachments',
+            ];
+            for (final table in syncIdTables) {
+              final tableInfo = await customSelect('PRAGMA table_info($table)').get();
+              final hasSyncId = tableInfo.any((row) => row.data['name'] == 'sync_id');
+              if (!hasSyncId) {
+                await customStatement('ALTER TABLE $table ADD COLUMN sync_id TEXT;');
+                logger.info('DB', 'v15: $table.sync_id 已添加');
+              }
+            }
+
+            // 2. 为缺少 updated_at 的表添加该列
+            final updatedAtTables = [
+              'ledgers', 'categories', 'transactions', 'tags',
+            ];
+            for (final table in updatedAtTables) {
+              final tableInfo = await customSelect('PRAGMA table_info($table)').get();
+              final hasUpdatedAt = tableInfo.any((row) => row.data['name'] == 'updated_at');
+              if (!hasUpdatedAt) {
+                await customStatement('ALTER TABLE $table ADD COLUMN updated_at INTEGER;');
+                logger.info('DB', 'v15: $table.updated_at 已添加');
+              }
+            }
+
+            // 3. 创建 pending_sync_changes 表
+            await migrator.createTable(pendingSyncChanges);
+            logger.info('DB', 'v15: pending_sync_changes 表已创建');
+
+            // 4. 创建 sync_id 索引（加速按 syncId 查找）
+            for (final table in syncIdTables) {
+              await customStatement(
+                'CREATE INDEX IF NOT EXISTS idx_${table}_sync_id ON $table(sync_id)');
+            }
+            // pending_sync_changes 索引
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_pending_sync_record ON pending_sync_changes(record_sync_id)');
+            logger.info('DB', 'v15: 同步索引已创建');
+
+            logger.info('DB', 'v15 迁移完成: 多设备同步基础设施就绪');
           }
         },
       );

@@ -1,6 +1,9 @@
 import 'package:drift/drift.dart' as d;
+import 'package:uuid/uuid.dart';
 
 import '../../db.dart';
+import '../../../cloud/sync_backend.dart';
+import '../../../cloud/sync_notifier.dart';
 import '../../../services/system/logger_service.dart';
 import '../account_repository.dart';
 
@@ -8,8 +11,10 @@ import '../account_repository.dart';
 /// 基于 Drift 数据库实现
 class LocalAccountRepository implements AccountRepository {
   final BeeDatabase db;
+  final SyncNotifier? syncNotifier;
+  static const _uuid = Uuid();
 
-  LocalAccountRepository(this.db);
+  LocalAccountRepository(this.db, {this.syncNotifier});
 
   @override
   Stream<List<Account>> watchAccountsForLedger(int ledgerId) {
@@ -75,26 +80,36 @@ class LocalAccountRepository implements AccountRepository {
     String currency = 'CNY',
     double initialBalance = 0.0,
   }) async {
-    logger.info('AccountCreate', '📝 开始创建账户: name=$name, ledgerId=$ledgerId, type=$type, currency=$currency, initialBalance=$initialBalance');
+    logger.info('AccountCreate', '开始创建账户: name=$name, ledgerId=$ledgerId, type=$type, currency=$currency, initialBalance=$initialBalance');
 
     try {
+      final syncId = _uuid.v4();
+      final now = DateTime.now();
       final companion = AccountsCompanion.insert(
         ledgerId: ledgerId,
         name: name,
         type: d.Value(type),
         currency: d.Value(currency),
         initialBalance: d.Value(initialBalance),
-        createdAt: d.Value(DateTime.now()),
+        createdAt: d.Value(now),
+        syncId: d.Value(syncId),
+        updatedAt: d.Value(now),
       );
-
-      logger.info('AccountCreate', '📦 Companion 创建成功，准备插入数据库');
 
       final id = await db.into(db.accounts).insert(companion);
 
-      logger.info('AccountCreate', '✅ 账户创建成功！ID=$id');
+      logger.info('AccountCreate', '账户创建成功 ID=$id');
+      syncNotifier?.onRecordChanged('accounts', syncId, SyncOperation.upsert, {
+        'ledgerId': ledgerId,
+        'name': name,
+        'type': type,
+        'currency': currency,
+        'initialBalance': initialBalance,
+        'updatedAt': now.toIso8601String(),
+      });
       return id;
     } catch (e, stack) {
-      logger.error('AccountCreate', '❌ 创建账户失败', e, stack);
+      logger.error('AccountCreate', '创建账户失败', e, stack);
       rethrow;
     }
   }
@@ -107,19 +122,42 @@ class LocalAccountRepository implements AccountRepository {
     String? currency,
     double? initialBalance,
   }) async {
+    final now = DateTime.now();
     await (db.update(db.accounts)..where((a) => a.id.equals(id))).write(
       AccountsCompanion(
         name: name != null ? d.Value(name) : const d.Value.absent(),
         type: type != null ? d.Value(type) : const d.Value.absent(),
         currency: currency != null ? d.Value(currency) : const d.Value.absent(),
         initialBalance: initialBalance != null ? d.Value(initialBalance) : const d.Value.absent(),
+        updatedAt: d.Value(now),
       ),
     );
+    if (syncNotifier != null) {
+      final record = await getAccount(id);
+      if (record?.syncId != null) {
+        syncNotifier!.onRecordChanged('accounts', record!.syncId!, SyncOperation.upsert, {
+          'ledgerId': record.ledgerId,
+          'name': record.name,
+          'type': record.type,
+          'currency': record.currency,
+          'initialBalance': record.initialBalance,
+          'updatedAt': now.toIso8601String(),
+        });
+      }
+    }
   }
 
   @override
   Future<void> deleteAccount(int id) async {
+    String? syncId;
+    if (syncNotifier != null) {
+      final record = await getAccount(id);
+      syncId = record?.syncId;
+    }
     await (db.delete(db.accounts)..where((a) => a.id.equals(id))).go();
+    if (syncId != null) {
+      syncNotifier!.onRecordChanged('accounts', syncId, SyncOperation.delete, null);
+    }
   }
 
   @override
