@@ -4,6 +4,7 @@ import 'dart:ui' show Locale;
 import 'package:drift/drift.dart';
 import '../l10n/app_localizations.dart';
 import '../services/data/seed_service.dart';
+import '../services/data/collab_sync_migration_service.dart';
 import '../services/system/logger_service.dart';
 import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
@@ -17,7 +18,8 @@ class Ledgers extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get name => text()();
   TextColumn get currency => text().withDefault(const Constant('CNY'))();
-  TextColumn get type => text().withDefault(const Constant('personal'))();  // personal / shared
+  TextColumn get type =>
+      text().withDefault(const Constant('personal'))(); // personal / shared
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 }
 
@@ -45,8 +47,8 @@ class Categories extends Table {
   IntColumn get level =>
       integer().withDefault(const Constant(1))(); // 层级：1=一级，2=二级
   // v13: 自定义图标支持
-  TextColumn get iconType =>
-      text().withDefault(const Constant('material'))(); // material / custom / community
+  TextColumn get iconType => text().withDefault(
+      const Constant('material'))(); // material / custom / community
   TextColumn get customIconPath => text().nullable()(); // 自定义图标本地路径
   TextColumn get communityIconId => text().nullable()(); // 社区图标ID（预留）
 }
@@ -120,28 +122,28 @@ class Messages extends Table {
 // 标签表
 class Tags extends Table {
   IntColumn get id => integer().autoIncrement()();
-  TextColumn get name => text()();                    // 标签名称
-  TextColumn get color => text().nullable()();        // 颜色值（如 #FF5722）
-  IntColumn get sortOrder => integer().withDefault(const Constant(0))();  // 排序
+  TextColumn get name => text()(); // 标签名称
+  TextColumn get color => text().nullable()(); // 颜色值（如 #FF5722）
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))(); // 排序
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 }
 
 // 交易-标签关联表
 class TransactionTags extends Table {
   IntColumn get id => integer().autoIncrement()();
-  IntColumn get transactionId => integer()();         // 交易ID
-  IntColumn get tagId => integer()();                 // 标签ID
+  IntColumn get transactionId => integer()(); // 交易ID
+  IntColumn get tagId => integer()(); // 标签ID
 }
 
 // 交易附件表
 class TransactionAttachments extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get transactionId => integer()(); // 关联的交易ID
-  TextColumn get fileName => text()();        // 文件名（不含路径）
+  TextColumn get fileName => text()(); // 文件名（不含路径）
   TextColumn get originalName => text().nullable()(); // 原始文件名
-  IntColumn get fileSize => integer().nullable()();   // 文件大小（bytes）
-  IntColumn get width => integer().nullable()();      // 图片宽度
-  IntColumn get height => integer().nullable()();     // 图片高度
+  IntColumn get fileSize => integer().nullable()(); // 文件大小（bytes）
+  IntColumn get width => integer().nullable()(); // 图片宽度
+  IntColumn get height => integer().nullable()(); // 图片高度
   IntColumn get sortOrder => integer().withDefault(const Constant(0))(); // 排序序号
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 }
@@ -195,10 +197,14 @@ class BeeDatabase extends _$BeeDatabase {
   BeeDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 14; // v14: 迁移转账记录到虚拟转账分类
+  int get schemaVersion => 15; // v15: 协作同步 syncId 与增量队列模型
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (migrator) async {
+          await migrator.createAll();
+          await CollabSyncMigrationService.initializeFreshSchemaV15(this);
+        },
         onUpgrade: (migrator, from, to) async {
           if (from < 2) {
             // 添加 sortOrder 字段（使用原始 SQL，因为此时代码还未生成）
@@ -340,7 +346,8 @@ class BeeDatabase extends _$BeeDatabase {
 
             // 4. 重命名新表
             print('[DB Migration] 步骤4: 重命名新表');
-            await customStatement('ALTER TABLE recurring_transactions_new RENAME TO recurring_transactions;');
+            await customStatement(
+                'ALTER TABLE recurring_transactions_new RENAME TO recurring_transactions;');
             print('[DB Migration] v7 迁移完成');
           }
           if (from < 8) {
@@ -358,8 +365,7 @@ class BeeDatabase extends _$BeeDatabase {
             // 检查字段是否已存在，避免重复添加
             final tableInfo =
                 await customSelect('PRAGMA table_info(ledgers)').get();
-            final hasType =
-                tableInfo.any((row) => row.data['name'] == 'type');
+            final hasType = tableInfo.any((row) => row.data['name'] == 'type');
 
             if (!hasType) {
               await customStatement(
@@ -466,6 +472,16 @@ class BeeDatabase extends _$BeeDatabase {
             await SeedService.migrateTransferTransactions(this);
             logger.info('DB', 'v14 迁移完成: 转账记录已关联到虚拟转账分类');
             print('[DB Migration] v14 迁移完成');
+          }
+          if (from < 15) {
+            print('[DB Migration] 开始迁移到 v15: 协作 syncId + 队列模型');
+            await CollabSyncMigrationService.migrateSchemaV15(
+              this,
+              fromSchema: from,
+              toSchema: 15,
+            );
+            logger.info('DB', 'v15 迁移完成: syncId/queue/state 已就绪');
+            print('[DB Migration] v15 迁移完成');
           }
         },
       );

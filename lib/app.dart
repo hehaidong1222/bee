@@ -410,7 +410,24 @@ class _BeeAppState extends ConsumerState<BeeApp>
         child: GestureDetector(
           key: _centerButtonKey,
           behavior: HitTestBehavior.opaque, // 防止点击穿透
-          onTap: () {
+          onTap: () async {
+            final ledgerId = ref.read(currentLedgerIdProvider);
+            final sync = ref.read(syncServiceProvider);
+            if (sync is TransactionsSyncManager) {
+              final allowed = await sync.canWriteLedger(ledgerId: ledgerId);
+              if (!allowed) {
+                if (mounted) {
+                  showToast(
+                    context,
+                    AppLocalizations.of(context).cloudCollabWriteDeniedMessage,
+                  );
+                }
+                return;
+              }
+            }
+            if (!mounted) {
+              return;
+            }
             Navigator.push(
               context,
               MaterialPageRoute(

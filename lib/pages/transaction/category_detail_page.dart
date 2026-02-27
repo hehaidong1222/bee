@@ -20,7 +20,7 @@ class CategoryDetailPage extends ConsumerStatefulWidget {
   final int categoryId;
   final String categoryName;
   final DateTime? startDate; // 周期开始时间（可选）
-  final DateTime? endDate;   // 周期结束时间（可选）
+  final DateTime? endDate; // 周期结束时间（可选）
   final String? periodLabel; // 周期标签（如"2024年11月"）
 
   const CategoryDetailPage({
@@ -42,19 +42,22 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
   @override
   Widget build(BuildContext context) {
     final categoryAsync = ref.watch(_categoryStreamProvider(widget.categoryId));
-    final transactionsAsync = ref.watch(_categoryTransactionsWithSortProvider(widget.categoryId));
-    final currentSortType = ref.watch(_categorySortTypeProvider(widget.categoryId));
+    final transactionsAsync =
+        ref.watch(_categoryTransactionsWithSortProvider(widget.categoryId));
+    final currentSortType =
+        ref.watch(_categorySortTypeProvider(widget.categoryId));
 
     // 如果有周期限制，需要筛选交易数据
     final filteredTransactionsAsync = transactionsAsync.when(
       loading: () => const AsyncValue<List<db.Transaction>>.loading(),
-      error: (error, stack) => AsyncValue<List<db.Transaction>>.error(error, stack),
+      error: (error, stack) =>
+          AsyncValue<List<db.Transaction>>.error(error, stack),
       data: (transactions) {
         if (widget.startDate != null && widget.endDate != null) {
           final filtered = transactions.where((t) {
             // 修复：使用 >= 和 < 来包含起始日期，排除结束日期的下一天
             return t.happenedAt.isAtSameMomentAs(widget.startDate!) ||
-                   (t.happenedAt.isAfter(widget.startDate!) &&
+                (t.happenedAt.isAfter(widget.startDate!) &&
                     t.happenedAt.isBefore(widget.endDate!));
           }).toList();
           return AsyncValue.data(filtered);
@@ -78,13 +81,14 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
         ));
       },
     );
-    
+
     return Scaffold(
       body: Column(
         children: [
           categoryAsync.when(
             loading: () => PrimaryHeader(
-              title: AppLocalizations.of(context).categoryDetailSummaryTitle, // "分类汇总"
+              title: AppLocalizations.of(context)
+                  .categoryDetailSummaryTitle, // "分类汇总"
               showBack: true,
               actions: [
                 IconButton(
@@ -117,40 +121,45 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
               actions: [
                 IconButton(
                   icon: const Icon(Icons.swap_horiz_outlined),
-                  tooltip: AppLocalizations.of(context).categoryMigrationTooltip,
-                  onPressed: category != null ? () async {
-                    final result = await Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => CategoryMigrationPage(
-                          preselectedFromCategory: category,
-                        ),
-                      ),
-                    );
+                  tooltip:
+                      AppLocalizations.of(context).categoryMigrationTooltip,
+                  onPressed: category != null
+                      ? () async {
+                          final result = await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => CategoryMigrationPage(
+                                preselectedFromCategory: category,
+                              ),
+                            ),
+                          );
 
-                    // 如果迁移完成，数据会自动通过Stream更新，无需手动刷新
-                    if (result == true && mounted) {
-                      // 响应式设计：数据库变化会自动推送到UI
-                    }
-                  } : null,
+                          // 如果迁移完成，数据会自动通过Stream更新，无需手动刷新
+                          if (result == true && mounted) {
+                            // 响应式设计：数据库变化会自动推送到UI
+                          }
+                        }
+                      : null,
                 ),
                 IconButton(
                   icon: const Icon(Icons.edit_outlined),
                   tooltip: AppLocalizations.of(context).commonEdit,
-                  onPressed: category != null ? () async {
-                    final result = await Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => CategoryEditPage(
-                          category: category,
-                          kind: category.kind,
-                        ),
-                      ),
-                    );
+                  onPressed: category != null
+                      ? () async {
+                          final result = await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => CategoryEditPage(
+                                category: category,
+                                kind: category.kind,
+                              ),
+                            ),
+                          );
 
-                    // 如果编辑成功，数据会自动通过Stream更新，无需手动刷新
-                    if (result == true && mounted) {
-                      // 响应式设计：数据库变化会自动推送到UI
-                    }
-                  } : null,
+                          // 如果编辑成功，数据会自动通过Stream更新，无需手动刷新
+                          if (result == true && mounted) {
+                            // 响应式设计：数据库变化会自动推送到UI
+                          }
+                        }
+                      : null,
                 ),
               ],
             ),
@@ -167,7 +176,9 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
                   error: (error, stack) => Container(
                     height: 120,
                     margin: const EdgeInsets.all(16),
-                    child: Center(child: Text(AppLocalizations.of(context).categoryLoadFailed(error.toString()))),
+                    child: Center(
+                        child: Text(AppLocalizations.of(context)
+                            .categoryLoadFailed(error.toString()))),
                   ),
                   data: (summary) => _buildSummaryCard(summary),
                 ),
@@ -176,9 +187,13 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
                 // 交易记录列表
                 Expanded(
                   child: filteredTransactionsAsync.when(
-                    loading: () => const Center(child: CircularProgressIndicator()),
-                    error: (error, stack) => Center(child: Text('${AppLocalizations.of(context).categoryDetailLoadFailed}: $error')),
-                    data: (transactions) => _buildTransactionsList(transactions, currentSortType),
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (error, stack) => Center(
+                        child: Text(
+                            '${AppLocalizations.of(context).categoryDetailLoadFailed}: $error')),
+                    data: (transactions) =>
+                        _buildTransactionsList(transactions, currentSortType),
                   ),
                 ),
               ],
@@ -188,8 +203,9 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
       ),
     );
   }
-  
-  Widget _buildSummaryCard(({int totalCount, double totalAmount, double averageAmount}) summary) {
+
+  Widget _buildSummaryCard(
+      ({int totalCount, double totalAmount, double averageAmount}) summary) {
     // 获取分类信息以确定颜色
     final categoryAsync = ref.watch(_categoryStreamProvider(widget.categoryId));
     final category = categoryAsync.value;
@@ -215,10 +231,11 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
                     child: Text(
                       widget.periodLabel != null
                           ? '${CategoryUtils.getDisplayName(widget.categoryName, context)} · ${widget.periodLabel}'
-                          : CategoryUtils.getDisplayName(widget.categoryName, context),
+                          : CategoryUtils.getDisplayName(
+                              widget.categoryName, context),
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                            fontWeight: FontWeight.w600,
+                          ),
                     ),
                   ),
                 ],
@@ -228,24 +245,29 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
                 children: [
                   Expanded(
                     child: _SummaryItem(
-                      label: AppLocalizations.of(context).categoryDetailTotalCount,
-                      value: AppLocalizations.of(context).categoryMigrationTransactionLabel(summary.totalCount),
+                      label:
+                          AppLocalizations.of(context).categoryDetailTotalCount,
+                      value: AppLocalizations.of(context)
+                          .categoryMigrationTransactionLabel(
+                              summary.totalCount),
                       color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
                   Expanded(
                     child: _SummaryItem(
-                      label: AppLocalizations.of(context).categoryDetailTotalAmount,
+                      label: AppLocalizations.of(context)
+                          .categoryDetailTotalAmount,
                       value: summary.totalAmount,
                       isAmount: true,
                       color: isIncome
-                        ? BeeTokens.incomeColor(context, ref)
-                        : BeeTokens.expenseColor(context, ref),
+                          ? BeeTokens.incomeColor(context, ref)
+                          : BeeTokens.expenseColor(context, ref),
                     ),
                   ),
                   Expanded(
                     child: _SummaryItem(
-                      label: AppLocalizations.of(context).categoryDetailAverageAmount,
+                      label: AppLocalizations.of(context)
+                          .categoryDetailAverageAmount,
                       value: summary.averageAmount,
                       isAmount: true,
                       color: Theme.of(context).colorScheme.outline,
@@ -274,8 +296,8 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
           Text(
             AppLocalizations.of(context).categoryDetailSortTitle,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.outline,
-            ),
+                  color: Theme.of(context).colorScheme.outline,
+                ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -284,27 +306,43 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
               child: Row(
                 children: [
                   _SortButton(
-                    label: AppLocalizations.of(context).categoryDetailSortTimeDesc,
+                    label:
+                        AppLocalizations.of(context).categoryDetailSortTimeDesc,
                     isSelected: currentSortType == SortType.timeDesc,
-                    onTap: () => ref.read(_categorySortTypeProvider(widget.categoryId).notifier).state = SortType.timeDesc,
+                    onTap: () => ref
+                        .read(_categorySortTypeProvider(widget.categoryId)
+                            .notifier)
+                        .state = SortType.timeDesc,
                   ),
                   const SizedBox(width: 8),
                   _SortButton(
-                    label: AppLocalizations.of(context).categoryDetailSortTimeAsc,
+                    label:
+                        AppLocalizations.of(context).categoryDetailSortTimeAsc,
                     isSelected: currentSortType == SortType.timeAsc,
-                    onTap: () => ref.read(_categorySortTypeProvider(widget.categoryId).notifier).state = SortType.timeAsc,
+                    onTap: () => ref
+                        .read(_categorySortTypeProvider(widget.categoryId)
+                            .notifier)
+                        .state = SortType.timeAsc,
                   ),
                   const SizedBox(width: 8),
                   _SortButton(
-                    label: AppLocalizations.of(context).categoryDetailSortAmountDesc,
+                    label: AppLocalizations.of(context)
+                        .categoryDetailSortAmountDesc,
                     isSelected: currentSortType == SortType.amountDesc,
-                    onTap: () => ref.read(_categorySortTypeProvider(widget.categoryId).notifier).state = SortType.amountDesc,
+                    onTap: () => ref
+                        .read(_categorySortTypeProvider(widget.categoryId)
+                            .notifier)
+                        .state = SortType.amountDesc,
                   ),
                   const SizedBox(width: 8),
                   _SortButton(
-                    label: AppLocalizations.of(context).categoryDetailSortAmountAsc,
+                    label: AppLocalizations.of(context)
+                        .categoryDetailSortAmountAsc,
                     isSelected: currentSortType == SortType.amountAsc,
-                    onTap: () => ref.read(_categorySortTypeProvider(widget.categoryId).notifier).state = SortType.amountAsc,
+                    onTap: () => ref
+                        .read(_categorySortTypeProvider(widget.categoryId)
+                            .notifier)
+                        .state = SortType.amountAsc,
                   ),
                 ],
               ),
@@ -315,42 +353,56 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
     );
   }
 
-
-  Widget _buildTransactionsList(List<db.Transaction> transactions, SortType currentSortType) {
+  Widget _buildTransactionsList(
+      List<db.Transaction> transactions, SortType currentSortType) {
     if (transactions.isEmpty) {
       return AppEmpty(
         text: AppLocalizations.of(context).categoryDetailNoTransactions,
-        subtext: AppLocalizations.of(context).categoryDetailNoTransactionsSubtext,
+        subtext:
+            AppLocalizations.of(context).categoryDetailNoTransactionsSubtext,
       );
     }
 
     // 金额排序时：预计算UI列表，避免动态插入导致卡顿
-    if (currentSortType == SortType.amountDesc || currentSortType == SortType.amountAsc) {
+    if (currentSortType == SortType.amountDesc ||
+        currentSortType == SortType.amountAsc) {
       // 先计算每个日期的统计数据（避免重复计算）
       final Map<String, ({double expense, double income})> dateStats = {};
       for (final transaction in transactions) {
-        final dateKey = DateFormat('yyyy-MM-dd').format(transaction.happenedAt.toLocal());
+        final dateKey =
+            DateFormat('yyyy-MM-dd').format(transaction.happenedAt.toLocal());
         final current = dateStats[dateKey] ?? (expense: 0.0, income: 0.0);
         dateStats[dateKey] = transaction.type == 'expense'
-          ? (expense: current.expense + transaction.amount, income: current.income)
-          : (expense: current.expense, income: current.income + transaction.amount);
+            ? (
+                expense: current.expense + transaction.amount,
+                income: current.income
+              )
+            : (
+                expense: current.expense,
+                income: current.income + transaction.amount
+              );
       }
 
       // 预构建显示项列表
-      final List<({bool isHeader, String? dateKey, db.Transaction? transaction})> displayItems = [];
+      final List<
+              ({bool isHeader, String? dateKey, db.Transaction? transaction})>
+          displayItems = [];
       String? lastDateKey;
 
       for (final transaction in transactions) {
-        final dateKey = DateFormat('yyyy-MM-dd').format(transaction.happenedAt.toLocal());
+        final dateKey =
+            DateFormat('yyyy-MM-dd').format(transaction.happenedAt.toLocal());
 
         // 当日期改变时，添加日期头
         if (lastDateKey != dateKey) {
-          displayItems.add((isHeader: true, dateKey: dateKey, transaction: null));
+          displayItems
+              .add((isHeader: true, dateKey: dateKey, transaction: null));
           lastDateKey = dateKey;
         }
 
         // 添加交易项
-        displayItems.add((isHeader: false, dateKey: null, transaction: transaction));
+        displayItems
+            .add((isHeader: false, dateKey: null, transaction: transaction));
       }
 
       return ListView.builder(
@@ -377,7 +429,8 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
               isExpense: transaction.type == 'expense',
               happenedAt: transaction.happenedAt,
               onTap: () async {
-                final categoryData = ref.read(_categoryStreamProvider(widget.categoryId));
+                final categoryData =
+                    ref.read(_categoryStreamProvider(widget.categoryId));
                 await TransactionEditUtils.editTransaction(
                   context,
                   ref,
@@ -388,6 +441,15 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
               onDelete: () async {
                 final repo = ref.read(repositoryProvider);
                 final ledgerId = ref.read(currentLedgerIdProvider);
+                final allowed = await TransactionEditUtils.canModifyTransaction(
+                  context,
+                  ref,
+                  transaction,
+                  ledgerId: ledgerId,
+                );
+                if (!allowed) {
+                  return;
+                }
 
                 try {
                   await repo.deleteTransaction(transaction.id);
@@ -402,7 +464,8 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
                   // 响应式provider会自动更新，无需手动刷新交易列表
                 } catch (e) {
                   if (context.mounted) {
-                    showToast(context, '${AppLocalizations.of(context).categoryDetailDeleteFailed}: $e');
+                    showToast(context,
+                        '${AppLocalizations.of(context).categoryDetailDeleteFailed}: $e');
                   }
                 }
               },
@@ -413,9 +476,11 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
     }
 
     // 时间排序时：按日期分组，然后按时间排序日期分组
-    final Map<String, List<db.Transaction>> groupedTransactions = <String, List<db.Transaction>>{};
+    final Map<String, List<db.Transaction>> groupedTransactions =
+        <String, List<db.Transaction>>{};
     for (final transaction in transactions) {
-      final dateKey = DateFormat('yyyy-MM-dd').format(transaction.happenedAt.toLocal());
+      final dateKey =
+          DateFormat('yyyy-MM-dd').format(transaction.happenedAt.toLocal());
       groupedTransactions.putIfAbsent(dateKey, () => []).add(transaction);
     }
 
@@ -426,14 +491,14 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
     } else {
       sortedKeys.sort((a, b) => a.compareTo(b)); // 最早日期在前
     }
-    
+
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       itemCount: sortedKeys.length,
       itemBuilder: (context, index) {
         final dateKey = sortedKeys[index];
         final dayTransactions = groupedTransactions[dateKey]!;
-        
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -449,53 +514,63 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
             ...dayTransactions.map((transaction) {
               final category = _getTransactionCategory();
               return TransactionListItem(
-              icon: _getTransactionIcon(transaction),
-              category: category,
-              title: _getTransactionTitle(transaction),
-              amount: transaction.amount,
-              isExpense: transaction.type == 'expense',
-              happenedAt: transaction.happenedAt,
-              onTap: () async {
-                final categoryData = ref.read(_categoryStreamProvider(widget.categoryId));
-                await TransactionEditUtils.editTransaction(
-                  context,
-                  ref,
-                  transaction,
-                  categoryData.value,
-                );
-                // 注意：现在无需手动刷新！
-                // 数据库变化会自动通过Stream推送到UI
-              },
-              onDelete: () async {
-                final repo = ref.read(repositoryProvider);
-                final ledgerId = ref.read(currentLedgerIdProvider);
-
-                try {
-                  await repo.deleteTransaction(transaction.id);
-
-                  // 统一处理：自动/手动同步与状态刷新（后台静默）
-                  await PostProcessor.sync(ref, ledgerId: ledgerId);
-
-                  // 刷新：账本笔数与全局统计
-                  ref.invalidate(countsForLedgerProvider(ledgerId));
-                  ref.read(statsRefreshProvider.notifier).state++;
-
-                  // 响应式provider会自动更新，无需手动刷新交易列表
-                } catch (e) {
-                  if (context.mounted) {
-                    showToast(context, '${AppLocalizations.of(context).categoryDetailDeleteFailed}: $e');
+                icon: _getTransactionIcon(transaction),
+                category: category,
+                title: _getTransactionTitle(transaction),
+                amount: transaction.amount,
+                isExpense: transaction.type == 'expense',
+                happenedAt: transaction.happenedAt,
+                onTap: () async {
+                  final categoryData =
+                      ref.read(_categoryStreamProvider(widget.categoryId));
+                  await TransactionEditUtils.editTransaction(
+                    context,
+                    ref,
+                    transaction,
+                    categoryData.value,
+                  );
+                  // 注意：现在无需手动刷新！
+                  // 数据库变化会自动通过Stream推送到UI
+                },
+                onDelete: () async {
+                  final repo = ref.read(repositoryProvider);
+                  final ledgerId = ref.read(currentLedgerIdProvider);
+                  final allowed =
+                      await TransactionEditUtils.canModifyTransaction(
+                    context,
+                    ref,
+                    transaction,
+                    ledgerId: ledgerId,
+                  );
+                  if (!allowed) {
+                    return;
                   }
-                }
-              },
-            );
+
+                  try {
+                    await repo.deleteTransaction(transaction.id);
+
+                    // 统一处理：自动/手动同步与状态刷新（后台静默）
+                    await PostProcessor.sync(ref, ledgerId: ledgerId);
+
+                    // 刷新：账本笔数与全局统计
+                    ref.invalidate(countsForLedgerProvider(ledgerId));
+                    ref.read(statsRefreshProvider.notifier).state++;
+
+                    // 响应式provider会自动更新，无需手动刷新交易列表
+                  } catch (e) {
+                    if (context.mounted) {
+                      showToast(context,
+                          '${AppLocalizations.of(context).categoryDetailDeleteFailed}: $e');
+                    }
+                  }
+                },
+              );
             }),
           ],
         );
       },
     );
   }
-
-
 
   db.Category? _getTransactionCategory() {
     final categoryAsync = ref.read(_categoryStreamProvider(widget.categoryId));
@@ -515,8 +590,8 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
     final categoryName = categoryAsync.value?.name ?? widget.categoryName;
     // 优先显示备注，无备注时显示翻译后的分类名
     return transaction.note?.isNotEmpty == true
-      ? transaction.note!
-      : CategoryUtils.getDisplayName(categoryName, context);
+        ? transaction.note!
+        : CategoryUtils.getDisplayName(categoryName, context);
   }
 }
 
@@ -542,18 +617,18 @@ class _SummaryItem extends ConsumerWidget {
         value: value as double,
         signed: false,
         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-          color: color,
-          fontWeight: FontWeight.w600,
-        ),
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
       );
     } else {
       // 其他类型,直接显示字符串
       valueWidget = Text(
         value.toString(),
         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-          color: color,
-          fontWeight: FontWeight.w600,
-        ),
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
       );
     }
 
@@ -564,8 +639,8 @@ class _SummaryItem extends ConsumerWidget {
         Text(
           label,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.outline,
-          ),
+                color: Theme.of(context).colorScheme.outline,
+              ),
         ),
       ],
     );
@@ -575,26 +650,31 @@ class _SummaryItem extends ConsumerWidget {
 // ===== 响应式Provider设计 =====
 
 // 基础数据流：监听分类信息变化
-final _categoryStreamProvider = StreamProvider.family<db.Category?, int>((ref, categoryId) {
+final _categoryStreamProvider =
+    StreamProvider.family<db.Category?, int>((ref, categoryId) {
   final repo = ref.watch(repositoryProvider);
   return repo.watchCategory(categoryId);
 });
 
 // 基础数据流：监听分类下交易变化（仅当前账本）
-final _categoryTransactionsStreamProvider = StreamProvider.family<List<db.Transaction>, int>((ref, categoryId) {
+final _categoryTransactionsStreamProvider =
+    StreamProvider.family<List<db.Transaction>, int>((ref, categoryId) {
   final repo = ref.watch(repositoryProvider);
   final ledgerId = ref.watch(currentLedgerIdProvider);
   return repo.watchTransactionsByCategory(categoryId, ledgerId: ledgerId);
 });
 
 // 排序状态管理
-final _categorySortTypeProvider = StateProvider.family<SortType, int>((ref, categoryId) {
+final _categorySortTypeProvider =
+    StateProvider.family<SortType, int>((ref, categoryId) {
   return SortType.timeDesc; // 默认时间倒序
 });
 
 // 派生数据：排序后的交易列表（自动响应排序状态变化）
-final _categoryTransactionsWithSortProvider = Provider.family<AsyncValue<List<db.Transaction>>, int>((ref, categoryId) {
-  final transactionsAsync = ref.watch(_categoryTransactionsStreamProvider(categoryId));
+final _categoryTransactionsWithSortProvider =
+    Provider.family<AsyncValue<List<db.Transaction>>, int>((ref, categoryId) {
+  final transactionsAsync =
+      ref.watch(_categoryTransactionsStreamProvider(categoryId));
   final sortType = ref.watch(_categorySortTypeProvider(categoryId));
 
   return transactionsAsync.when(
@@ -624,8 +704,11 @@ final _categoryTransactionsWithSortProvider = Provider.family<AsyncValue<List<db
 });
 
 // 派生数据：汇总统计（自动基于交易数据计算）
-final _categorySummaryProvider = Provider.family<AsyncValue<({int totalCount, double totalAmount, double averageAmount})>, int>((ref, categoryId) {
-  final transactionsAsync = ref.watch(_categoryTransactionsStreamProvider(categoryId));
+final _categorySummaryProvider = Provider.family<
+    AsyncValue<({int totalCount, double totalAmount, double averageAmount})>,
+    int>((ref, categoryId) {
+  final transactionsAsync =
+      ref.watch(_categoryTransactionsStreamProvider(categoryId));
 
   return transactionsAsync.when(
     loading: () => const AsyncValue.loading(),
@@ -663,23 +746,23 @@ class _SortButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected
-            ? Theme.of(context).colorScheme.primary
-            : Theme.of(context).colorScheme.surface,
+              ? Theme.of(context).colorScheme.primary
+              : Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
           ),
         ),
         child: Text(
           label,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: isSelected
-              ? Colors.white
-              : Theme.of(context).colorScheme.onSurface,
-            fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
-          ),
+                color: isSelected
+                    ? Colors.white
+                    : Theme.of(context).colorScheme.onSurface,
+                fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
+              ),
         ),
       ),
     );

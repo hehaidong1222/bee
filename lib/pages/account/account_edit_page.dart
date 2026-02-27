@@ -9,6 +9,7 @@ import '../../l10n/app_localizations.dart';
 import '../../services/billing/post_processor.dart';
 import '../../utils/currencies.dart';
 import '../../styles/tokens.dart';
+import '../../utils/transaction_edit_utils.dart';
 import '../../utils/ui_scale_extensions.dart';
 
 class AccountEditPage extends ConsumerStatefulWidget {
@@ -199,7 +200,9 @@ class _AccountEditPageState extends ConsumerState<AccountEditPage> {
                               ),
                               focusedBorder: UnderlineInputBorder(
                                 borderSide: BorderSide(
-                                  color: _isNameDuplicate ? Colors.red : primaryColor,
+                                  color: _isNameDuplicate
+                                      ? Colors.red
+                                      : primaryColor,
                                   width: 2,
                                 ),
                               ),
@@ -284,7 +287,8 @@ class _AccountEditPageState extends ConsumerState<AccountEditPage> {
                         // 检查是否有交易记录
                         if (isEditing) {
                           final repo = ref.read(repositoryProvider);
-                          final hasTransactions = await repo.hasTransactions(widget.account!.id);
+                          final hasTransactions =
+                              await repo.hasTransactions(widget.account!.id);
                           if (hasTransactions) {
                             if (!mounted) return;
                             await AppDialog.info(
@@ -297,7 +301,8 @@ class _AccountEditPageState extends ConsumerState<AccountEditPage> {
                         }
 
                         if (!mounted) return;
-                        final picked = await _showCurrencyPicker(context, initial: _selectedCurrency);
+                        final picked = await _showCurrencyPicker(context,
+                            initial: _selectedCurrency);
                         if (picked != null) {
                           setState(() => _selectedCurrency = picked);
                         }
@@ -415,8 +420,8 @@ class _AccountEditPageState extends ConsumerState<AccountEditPage> {
                           foregroundColor: Colors.red,
                           side: const BorderSide(color: Colors.red, width: 1.5),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                                8.0.scaled(context, ref)),
+                            borderRadius:
+                                BorderRadius.circular(8.0.scaled(context, ref)),
                           ),
                         ),
                         child: Text(
@@ -439,6 +444,12 @@ class _AccountEditPageState extends ConsumerState<AccountEditPage> {
   }
 
   Future<void> _save() async {
+    final allowed = await TransactionEditUtils.canManageLedger(
+      context,
+      ref,
+      ledgerId: widget.ledgerId,
+    );
+    if (!allowed) return;
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _saving = true);
@@ -455,7 +466,8 @@ class _AccountEditPageState extends ConsumerState<AccountEditPage> {
         String? currencyToUpdate;
         if (_selectedCurrency != widget.account!.currency) {
           // 币种变化了，需要再次检查是否有交易
-          final hasTransactions = await repo.hasTransactions(widget.account!.id);
+          final hasTransactions =
+              await repo.hasTransactions(widget.account!.id);
           if (hasTransactions) {
             if (mounted) {
               setState(() => _saving = false);
@@ -505,6 +517,12 @@ class _AccountEditPageState extends ConsumerState<AccountEditPage> {
   }
 
   Future<void> _delete() async {
+    final allowed = await TransactionEditUtils.canManageLedger(
+      context,
+      ref,
+      ledgerId: widget.ledgerId,
+    );
+    if (!allowed) return;
     final l10n = AppLocalizations.of(context);
 
     // 检查是否有关联交易
@@ -581,7 +599,8 @@ class _AccountEditPageState extends ConsumerState<AccountEditPage> {
   }
 
   /// 显示币种选择器（复用账本页面的实现）
-  Future<String?> _showCurrencyPicker(BuildContext context, {String? initial}) async {
+  Future<String?> _showCurrencyPicker(BuildContext context,
+      {String? initial}) async {
     return showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -684,8 +703,9 @@ class _AccountTypeCard extends ConsumerWidget {
       borderRadius: BorderRadius.circular(8.0.scaled(context, ref)),
       child: Container(
         decoration: BoxDecoration(
-          color:
-              isSelected ? primaryColor.withValues(alpha: 0.12) : BeeTokens.surfaceElevated(context),
+          color: isSelected
+              ? primaryColor.withValues(alpha: 0.12)
+              : BeeTokens.surfaceElevated(context),
           border: Border.all(
             color: isSelected ? primaryColor : BeeTokens.border(context),
             width: isSelected ? 2 : 1,
@@ -697,7 +717,8 @@ class _AccountTypeCard extends ConsumerWidget {
           children: [
             Icon(
               icon,
-              color: isSelected ? primaryColor : BeeTokens.textSecondary(context),
+              color:
+                  isSelected ? primaryColor : BeeTokens.textSecondary(context),
               size: 28.0.scaled(context, ref),
             ),
             SizedBox(height: 8.0.scaled(context, ref)),
@@ -706,7 +727,9 @@ class _AccountTypeCard extends ConsumerWidget {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: isSelected ? primaryColor : BeeTokens.textSecondary(context),
+                color: isSelected
+                    ? primaryColor
+                    : BeeTokens.textSecondary(context),
               ),
               textAlign: TextAlign.center,
             ),

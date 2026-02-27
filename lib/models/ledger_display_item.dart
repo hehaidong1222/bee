@@ -26,6 +26,9 @@ class LedgerDisplayItem {
   /// 是否为仅远程账本（本地不存在）
   final bool isRemoteOnly;
 
+  /// 账本类型：personal / shared
+  final String ledgerType;
+
   const LedgerDisplayItem({
     required this.id,
     required this.name,
@@ -34,6 +37,7 @@ class LedgerDisplayItem {
     required this.balance,
     required this.lastUpdated,
     this.isRemoteOnly = false,
+    this.ledgerType = 'personal',
   });
 
   /// 从本地账本创建
@@ -44,6 +48,7 @@ class LedgerDisplayItem {
     required DateTime createdAt,
     required int transactionCount,
     required double balance,
+    String ledgerType = 'personal',
   }) {
     return LedgerDisplayItem(
       id: id,
@@ -53,6 +58,7 @@ class LedgerDisplayItem {
       balance: balance,
       lastUpdated: createdAt,
       isRemoteOnly: false,
+      ledgerType: ledgerType,
     );
   }
 
@@ -64,6 +70,7 @@ class LedgerDisplayItem {
     required DateTime updatedAt,
     required int transactionCount,
     required double balance,
+    String ledgerType = 'personal',
   }) {
     return LedgerDisplayItem(
       id: remoteId,
@@ -73,6 +80,7 @@ class LedgerDisplayItem {
       balance: balance,
       lastUpdated: updatedAt,
       isRemoteOnly: true,
+      ledgerType: ledgerType,
     );
   }
 
@@ -82,12 +90,13 @@ class LedgerDisplayItem {
       other is LedgerDisplayItem &&
           runtimeType == other.runtimeType &&
           id == other.id &&
-          isRemoteOnly == other.isRemoteOnly;
+          isRemoteOnly == other.isRemoteOnly &&
+          ledgerType == other.ledgerType;
 
   @override
-  int get hashCode => id.hashCode ^ isRemoteOnly.hashCode;
+  int get hashCode => id.hashCode ^ isRemoteOnly.hashCode ^ ledgerType.hashCode;
 
   @override
   String toString() =>
-      'LedgerDisplayItem(id: $id, name: $name, isRemoteOnly: $isRemoteOnly)';
+      'LedgerDisplayItem(id: $id, name: $name, isRemoteOnly: $isRemoteOnly, ledgerType: $ledgerType)';
 }

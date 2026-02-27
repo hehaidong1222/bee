@@ -2514,6 +2514,12 @@ abstract class AppLocalizations {
   /// **'New imports: {inserted}'**
   String mineDownloadResult(Object inserted);
 
+  /// No description provided for @mineDownloadRefreshedNoChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Refreshed from cloud, no new records'**
+  String get mineDownloadRefreshedNoChanges;
+
   /// No description provided for @mineLoginTitle.
   ///
   /// In en, this message translates to:
@@ -4248,23 +4254,47 @@ abstract class AppLocalizations {
   /// **'Select Cloud Service Type'**
   String get cloudSelectServiceType;
 
-  /// No description provided for @cloudMultiDeviceWarningTitle.
+  /// No description provided for @cloudGroupCollaborative.
   ///
   /// In en, this message translates to:
-  /// **'Multi-Device Sync Notice'**
-  String get cloudMultiDeviceWarningTitle;
+  /// **'Collaborative Cloud'**
+  String get cloudGroupCollaborative;
 
-  /// No description provided for @cloudMultiDeviceWarningMessage.
+  /// No description provided for @cloudGroupBackup.
   ///
   /// In en, this message translates to:
-  /// **'Multi-device collaborative editing is not currently supported. To use on a new device, please clear local data first, then download ledgers from cloud.'**
-  String get cloudMultiDeviceWarningMessage;
+  /// **'Backup Cloud'**
+  String get cloudGroupBackup;
 
-  /// No description provided for @cloudMultiDeviceWarningDetail.
+  /// No description provided for @cloudGroupLocal.
   ///
   /// In en, this message translates to:
-  /// **'Multi-Device Sync Instructions:\n\n1. Simultaneous editing on multiple devices is not supported\n2. To switch from Device A to Device B:\n   • Clear all ledgers on Device B\n   • Download latest data from cloud\n3. True multi-device collaboration will be supported in future versions'**
-  String get cloudMultiDeviceWarningDetail;
+  /// **'Local'**
+  String get cloudGroupLocal;
+
+  /// No description provided for @cloudCapabilityCollaborativeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Collaborative Capability'**
+  String get cloudCapabilityCollaborativeTitle;
+
+  /// No description provided for @cloudCapabilityCollaborativeMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Supports multi-user and multi-device collaborative sync and editing (subject to server permissions and version capabilities).'**
+  String get cloudCapabilityCollaborativeMessage;
+
+  /// No description provided for @cloudCapabilityBackupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup Capability'**
+  String get cloudCapabilityBackupTitle;
+
+  /// No description provided for @cloudCapabilityBackupMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Best for backup and cross-device migration; concurrent collaborative editing is not guaranteed.'**
+  String get cloudCapabilityBackupMessage;
 
   /// No description provided for @cloudWebdavUrlLabel.
   ///
@@ -4395,7 +4425,7 @@ abstract class AppLocalizations {
   /// No description provided for @authRememberAccountHint.
   ///
   /// In en, this message translates to:
-  /// **'Auto-fill on next login (Supabase only)'**
+  /// **'Auto-fill on next login (Supabase/BeeCount Cloud)'**
   String get authRememberAccountHint;
 
   /// No description provided for @cloudConfigSaved.
@@ -4464,6 +4494,12 @@ abstract class AppLocalizations {
   /// **'Please enter a valid email address'**
   String get authInvalidEmail;
 
+  /// No description provided for @authPasswordRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter password'**
+  String get authPasswordRequired;
+
   /// No description provided for @authPasswordRequirementShort.
   ///
   /// In en, this message translates to:
@@ -4475,6 +4511,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Passwords do not match'**
   String get authPasswordMismatch;
+
+  /// No description provided for @authBeeCountCloudLoginOnlyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'BeeCount Cloud accounts are managed by your cloud service; this page supports login only.'**
+  String get authBeeCountCloudLoginOnlyHint;
 
   /// No description provided for @authResendVerification.
   ///
@@ -10313,6 +10355,750 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Leave empty to use default model'**
   String get aiModelInputHelper;
+
+  /// No description provided for @cloudCollabCurrentRoleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Current Collaboration Role'**
+  String get cloudCollabCurrentRoleTitle;
+
+  /// No description provided for @cloudCollabCurrentRoleSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Role and permissions in this ledger'**
+  String get cloudCollabCurrentRoleSubtitle;
+
+  /// No description provided for @cloudCollabRoleLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading...'**
+  String get cloudCollabRoleLoading;
+
+  /// No description provided for @cloudCollabRoleOwner.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner'**
+  String get cloudCollabRoleOwner;
+
+  /// No description provided for @cloudCollabRoleEditor.
+  ///
+  /// In en, this message translates to:
+  /// **'Editor'**
+  String get cloudCollabRoleEditor;
+
+  /// No description provided for @cloudCollabRoleViewer.
+  ///
+  /// In en, this message translates to:
+  /// **'Viewer'**
+  String get cloudCollabRoleViewer;
+
+  /// No description provided for @cloudCollabRoleViewerLegacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Viewer (legacy read-only)'**
+  String get cloudCollabRoleViewerLegacy;
+
+  /// No description provided for @cloudCollabRoleUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get cloudCollabRoleUnknown;
+
+  /// No description provided for @cloudCollabRoleNotReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Permission not ready'**
+  String get cloudCollabRoleNotReady;
+
+  /// No description provided for @cloudCollabExperimentalBetaTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Experimental Collaboration'**
+  String get cloudCollabExperimentalBetaTitle;
+
+  /// No description provided for @cloudCollabExperimentalBetaSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Collaborative editing is in beta. Please verify synced results after write actions.'**
+  String get cloudCollabExperimentalBetaSubtitle;
+
+  /// No description provided for @cloudCollabExperimentalWriteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Experimental feature: collaborative writes may be unstable. Please verify sync results.'**
+  String get cloudCollabExperimentalWriteHint;
+
+  /// No description provided for @cloudCollabSharedTag.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared'**
+  String get cloudCollabSharedTag;
+
+  /// No description provided for @cloudCollabManageEntryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared Ledger Management'**
+  String get cloudCollabManageEntryTitle;
+
+  /// No description provided for @cloudCollabManageEntrySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Role and members (managed in backend)'**
+  String get cloudCollabManageEntrySubtitle;
+
+  /// No description provided for @cloudCollabManagePageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared Ledger Management'**
+  String get cloudCollabManagePageTitle;
+
+  /// No description provided for @cloudCollabManagePageSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage collaboration and permissions for this ledger'**
+  String get cloudCollabManagePageSubtitle;
+
+  /// No description provided for @cloudCollabMembersEntryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Members'**
+  String get cloudCollabMembersEntryTitle;
+
+  /// No description provided for @cloudCollabMembersEntrySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'View member list and roles'**
+  String get cloudCollabMembersEntrySubtitle;
+
+  /// No description provided for @cloudCollabInvitesEntryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite Codes'**
+  String get cloudCollabInvitesEntryTitle;
+
+  /// No description provided for @cloudCollabInvitesEntrySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create and manage invite codes'**
+  String get cloudCollabInvitesEntrySubtitle;
+
+  /// No description provided for @cloudCollabDevicesEntryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Device Sessions'**
+  String get cloudCollabDevicesEntryTitle;
+
+  /// No description provided for @cloudCollabDevicesEntrySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'View and revoke active devices'**
+  String get cloudCollabDevicesEntrySubtitle;
+
+  /// No description provided for @cloudCollabJoinByCodeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Join by Invite Code'**
+  String get cloudCollabJoinByCodeTitle;
+
+  /// No description provided for @cloudCollabJoinByCodeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Join another shared ledger'**
+  String get cloudCollabJoinByCodeSubtitle;
+
+  /// No description provided for @cloudCollabJoinByCodeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. abcDEF123'**
+  String get cloudCollabJoinByCodeHint;
+
+  /// No description provided for @cloudCollabJoinSuccessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Joined'**
+  String get cloudCollabJoinSuccessTitle;
+
+  /// No description provided for @cloudCollabJoinSuccessMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Joined shared ledger successfully. Go back to ledger list to view it.'**
+  String get cloudCollabJoinSuccessMessage;
+
+  /// No description provided for @cloudCollabLeaveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave Shared Ledger'**
+  String get cloudCollabLeaveTitle;
+
+  /// No description provided for @cloudCollabLeaveSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Only non-owner members can leave'**
+  String get cloudCollabLeaveSubtitle;
+
+  /// No description provided for @cloudCollabLeaveOwnerBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner cannot leave this ledger.'**
+  String get cloudCollabLeaveOwnerBlocked;
+
+  /// No description provided for @cloudCollabLeaveConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to leave this shared ledger?'**
+  String get cloudCollabLeaveConfirm;
+
+  /// No description provided for @cloudCollabLeaveDoneTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Left'**
+  String get cloudCollabLeaveDoneTitle;
+
+  /// No description provided for @cloudCollabLeaveDoneMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'You have left this shared ledger.'**
+  String get cloudCollabLeaveDoneMessage;
+
+  /// No description provided for @cloudCollabMembersPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared Members'**
+  String get cloudCollabMembersPageTitle;
+
+  /// No description provided for @cloudCollabMembersPageSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'View member roles in current ledger'**
+  String get cloudCollabMembersPageSubtitle;
+
+  /// No description provided for @cloudCollabLegacyViewerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Legacy viewer members are read-only for compatibility.'**
+  String get cloudCollabLegacyViewerHint;
+
+  /// No description provided for @cloudCollabManagedInBackendTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Managed in Backend'**
+  String get cloudCollabManagedInBackendTitle;
+
+  /// No description provided for @cloudCollabManagedInBackendHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add/remove members and share settings are managed in BeeCount Web.'**
+  String get cloudCollabManagedInBackendHint;
+
+  /// No description provided for @cloudCollabNoMembers.
+  ///
+  /// In en, this message translates to:
+  /// **'No members in current ledger'**
+  String get cloudCollabNoMembers;
+
+  /// No description provided for @cloudCollabJoinedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Joined: {time}'**
+  String cloudCollabJoinedAt(String time);
+
+  /// No description provided for @cloudCollabRoleUpdateSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Role updated'**
+  String get cloudCollabRoleUpdateSuccess;
+
+  /// No description provided for @cloudCollabUpgradeViewerToEditor.
+  ///
+  /// In en, this message translates to:
+  /// **'Upgrade to Editor'**
+  String get cloudCollabUpgradeViewerToEditor;
+
+  /// No description provided for @cloudCollabInvitesPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite Codes'**
+  String get cloudCollabInvitesPageTitle;
+
+  /// No description provided for @cloudCollabInvitesPageSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create and manage shared invite codes'**
+  String get cloudCollabInvitesPageSubtitle;
+
+  /// No description provided for @cloudCollabNoInvites.
+  ///
+  /// In en, this message translates to:
+  /// **'No invite codes'**
+  String get cloudCollabNoInvites;
+
+  /// No description provided for @cloudCollabOwnerOnlyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Only owner can manage invite codes.'**
+  String get cloudCollabOwnerOnlyHint;
+
+  /// No description provided for @cloudCollabInviteRoleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite Role'**
+  String get cloudCollabInviteRoleTitle;
+
+  /// No description provided for @cloudCollabInviteRoleHint.
+  ///
+  /// In en, this message translates to:
+  /// **'editor only'**
+  String get cloudCollabInviteRoleHint;
+
+  /// No description provided for @cloudCollabRoleInvalidTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid Role'**
+  String get cloudCollabRoleInvalidTitle;
+
+  /// No description provided for @cloudCollabRoleInvalidMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Only editor is allowed.'**
+  String get cloudCollabRoleInvalidMessage;
+
+  /// No description provided for @cloudCollabInviteMaxUsesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Max Uses'**
+  String get cloudCollabInviteMaxUsesTitle;
+
+  /// No description provided for @cloudCollabInviteMaxUsesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a positive integer'**
+  String get cloudCollabInviteMaxUsesHint;
+
+  /// No description provided for @cloudCollabInviteMaxUsesInvalidTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid Max Uses'**
+  String get cloudCollabInviteMaxUsesInvalidTitle;
+
+  /// No description provided for @cloudCollabInviteMaxUsesInvalidMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter an integer greater than 0.'**
+  String get cloudCollabInviteMaxUsesInvalidMessage;
+
+  /// No description provided for @cloudCollabInviteExpiresHoursTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Expires In (Hours)'**
+  String get cloudCollabInviteExpiresHoursTitle;
+
+  /// No description provided for @cloudCollabInviteExpiresHoursHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a positive integer'**
+  String get cloudCollabInviteExpiresHoursHint;
+
+  /// No description provided for @cloudCollabInviteExpiresHoursInvalidTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid Expiration'**
+  String get cloudCollabInviteExpiresHoursInvalidTitle;
+
+  /// No description provided for @cloudCollabInviteExpiresHoursInvalidMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter an integer greater than 0.'**
+  String get cloudCollabInviteExpiresHoursInvalidMessage;
+
+  /// No description provided for @cloudCollabInviteCreatedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite Code Created'**
+  String get cloudCollabInviteCreatedTitle;
+
+  /// No description provided for @cloudCollabInviteCreatedDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite code: {inviteCode}\nInvite ID: {inviteId}\nRole: {role}\nExpires: {expiresAt}'**
+  String cloudCollabInviteCreatedDetail(String inviteCode, String inviteId, String role, String expiresAt);
+
+  /// No description provided for @cloudCollabCopyInviteCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy Code'**
+  String get cloudCollabCopyInviteCode;
+
+  /// No description provided for @cloudCollabInviteCodeCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite code copied'**
+  String get cloudCollabInviteCodeCopied;
+
+  /// No description provided for @cloudCollabInviteStatusActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get cloudCollabInviteStatusActive;
+
+  /// No description provided for @cloudCollabInviteStatusExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get cloudCollabInviteStatusExpired;
+
+  /// No description provided for @cloudCollabInviteStatusExhausted.
+  ///
+  /// In en, this message translates to:
+  /// **'Exhausted'**
+  String get cloudCollabInviteStatusExhausted;
+
+  /// No description provided for @cloudCollabInviteStatusRevoked.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoked'**
+  String get cloudCollabInviteStatusRevoked;
+
+  /// No description provided for @cloudCollabInviteUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Used: {text}'**
+  String cloudCollabInviteUsed(String text);
+
+  /// No description provided for @cloudCollabInviteExpiresAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Expires: {time}'**
+  String cloudCollabInviteExpiresAt(String time);
+
+  /// No description provided for @cloudCollabInviteRevokeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke Invite'**
+  String get cloudCollabInviteRevokeTitle;
+
+  /// No description provided for @cloudCollabInviteRevokeMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke invite {inviteId}?'**
+  String cloudCollabInviteRevokeMessage(String inviteId);
+
+  /// No description provided for @cloudCollabInviteRevoked.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite revoked'**
+  String get cloudCollabInviteRevoked;
+
+  /// No description provided for @cloudCollabDevicesPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Device Sessions'**
+  String get cloudCollabDevicesPageTitle;
+
+  /// No description provided for @cloudCollabDevicesPageSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage active devices'**
+  String get cloudCollabDevicesPageSubtitle;
+
+  /// No description provided for @cloudCollabDevicesViewAllSessions.
+  ///
+  /// In en, this message translates to:
+  /// **'Show all sessions'**
+  String get cloudCollabDevicesViewAllSessions;
+
+  /// No description provided for @cloudCollabDevicesViewModeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Default view shows deduped devices active in the last 30 days.'**
+  String get cloudCollabDevicesViewModeHint;
+
+  /// No description provided for @cloudCollabNoDevices.
+  ///
+  /// In en, this message translates to:
+  /// **'No active devices'**
+  String get cloudCollabNoDevices;
+
+  /// No description provided for @cloudCollabUnknownDeviceName.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown Device'**
+  String get cloudCollabUnknownDeviceName;
+
+  /// No description provided for @cloudCollabDeviceCurrentTag.
+  ///
+  /// In en, this message translates to:
+  /// **'Current Device'**
+  String get cloudCollabDeviceCurrentTag;
+
+  /// No description provided for @cloudCollabCurrentDeviceCannotRevoke.
+  ///
+  /// In en, this message translates to:
+  /// **'Current device cannot be revoked.'**
+  String get cloudCollabCurrentDeviceCannotRevoke;
+
+  /// No description provided for @cloudCollabDeviceAppVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'App: {version}'**
+  String cloudCollabDeviceAppVersion(String version);
+
+  /// No description provided for @cloudCollabDeviceOsVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'OS: {version}'**
+  String cloudCollabDeviceOsVersion(String version);
+
+  /// No description provided for @cloudCollabDeviceModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Model: {model}'**
+  String cloudCollabDeviceModel(String model);
+
+  /// No description provided for @cloudCollabDeviceLastIp.
+  ///
+  /// In en, this message translates to:
+  /// **'IP: {ip}'**
+  String cloudCollabDeviceLastIp(String ip);
+
+  /// No description provided for @cloudCollabDeviceSessionCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Sessions: {count}'**
+  String cloudCollabDeviceSessionCount(String count);
+
+  /// No description provided for @cloudCollabDeviceLastSeen.
+  ///
+  /// In en, this message translates to:
+  /// **'Last seen: {time}'**
+  String cloudCollabDeviceLastSeen(String time);
+
+  /// No description provided for @cloudCollabDeviceCreatedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Created: {time}'**
+  String cloudCollabDeviceCreatedAt(String time);
+
+  /// No description provided for @cloudCollabDeviceRevokeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke Device'**
+  String get cloudCollabDeviceRevokeTitle;
+
+  /// No description provided for @cloudCollabDeviceRevokeMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke device {name} ({id})?'**
+  String cloudCollabDeviceRevokeMessage(String name, String id);
+
+  /// No description provided for @cloudCollabDeviceRevokeMultipleMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke {count} sessions for device {name}?'**
+  String cloudCollabDeviceRevokeMultipleMessage(String name, String count);
+
+  /// No description provided for @cloudCollabDeviceRevoked.
+  ///
+  /// In en, this message translates to:
+  /// **'Device revoked'**
+  String get cloudCollabDeviceRevoked;
+
+  /// No description provided for @cloudCollabManageBlockedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Permission Required'**
+  String get cloudCollabManageBlockedTitle;
+
+  /// No description provided for @cloudCollabManageBlockedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Only owner can manage this shared ledger.'**
+  String get cloudCollabManageBlockedMessage;
+
+  /// No description provided for @cloudCollabUnavailableMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud collaboration is unavailable.'**
+  String get cloudCollabUnavailableMessage;
+
+  /// No description provided for @cloudCollabScopeDeniedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Collaboration Scope Disabled'**
+  String get cloudCollabScopeDeniedTitle;
+
+  /// No description provided for @cloudCollabScopeDeniedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Server has not enabled ALLOW_APP_RW_SCOPES, so device sessions and collaboration read APIs are unavailable.'**
+  String get cloudCollabScopeDeniedHint;
+
+  /// No description provided for @cloudCollabScopeDeniedAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Set ALLOW_APP_RW_SCOPES=true in server .env (or deployment env), restart the service, then sign in again in app.'**
+  String get cloudCollabScopeDeniedAction;
+
+  /// No description provided for @cloudCollabEntryMovedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Ledger collaboration entry has moved to the Ledger Management page.'**
+  String get cloudCollabEntryMovedHint;
+
+  /// No description provided for @cloudCollabMediaRetryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual upload/download also retries missing attachment and category icon files.'**
+  String get cloudCollabMediaRetryHint;
+
+  /// No description provided for @cloudCollabMediaRetryPartialTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Media Sync Partially Completed'**
+  String get cloudCollabMediaRetryPartialTitle;
+
+  /// No description provided for @cloudCollabMediaRetryPartialMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded {downloaded} media files, {failed} files still failed. You can retry manual sync later.'**
+  String cloudCollabMediaRetryPartialMessage(String downloaded, String failed);
+
+  /// No description provided for @cloudCollabMediaRetrySuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Recovered {count} missing media files.'**
+  String cloudCollabMediaRetrySuccess(String count);
+
+  /// No description provided for @cloudCollabMediaRetryFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Media Retry Failed'**
+  String get cloudCollabMediaRetryFailedTitle;
+
+  /// No description provided for @cloudCollabMediaRetryFailedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to retry media sync: {error}'**
+  String cloudCollabMediaRetryFailedMessage(String error);
+
+  /// No description provided for @cloudCollabUnknownMember.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown member'**
+  String get cloudCollabUnknownMember;
+
+  /// No description provided for @cloudCollabMemberStatusActive.
+  ///
+  /// In en, this message translates to:
+  /// **'active'**
+  String get cloudCollabMemberStatusActive;
+
+  /// No description provided for @cloudCollabMemberStatusLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'left'**
+  String get cloudCollabMemberStatusLeft;
+
+  /// No description provided for @cloudCollabMembersCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} members'**
+  String cloudCollabMembersCount(String count);
+
+  /// No description provided for @cloudCollabCreatorLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Created by'**
+  String get cloudCollabCreatorLabel;
+
+  /// No description provided for @cloudCollabCreatorLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading creator...'**
+  String get cloudCollabCreatorLoading;
+
+  /// No description provided for @cloudCollabWriteDeniedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your current role cannot write in this shared ledger.'**
+  String get cloudCollabWriteDeniedMessage;
+
+  /// No description provided for @cloudCollabEditDeniedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your current role cannot edit this transaction.'**
+  String get cloudCollabEditDeniedMessage;
+
+  /// No description provided for @cloudCollabManageDeniedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your current role cannot manage this shared ledger.'**
+  String get cloudCollabManageDeniedMessage;
+
+  /// No description provided for @cloudCollabDeleteDeniedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your current role cannot delete this transaction.'**
+  String get cloudCollabDeleteDeniedMessage;
+
+  /// No description provided for @cloudCollabUploadQueuePending.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} changes pending upload'**
+  String cloudCollabUploadQueuePending(String count);
+
+  /// No description provided for @cloudCollabUploadQueueFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} changes failed, tap upload to retry'**
+  String cloudCollabUploadQueueFailed(String count);
+
+  /// No description provided for @cloudCollabUploadQueueFailedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto upload failed for {count} changes, open Cloud Sync to retry.'**
+  String cloudCollabUploadQueueFailedToast(String count);
+
+  /// No description provided for @cloudCollabAvatarUploadSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Avatar synced to cloud.'**
+  String get cloudCollabAvatarUploadSuccess;
+
+  /// No description provided for @cloudCollabAvatarUploadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Avatar upload failed. You can retry in Cloud Sync.'**
+  String get cloudCollabAvatarUploadFailed;
+
+  /// No description provided for @cloudCollabAvatarRetryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry avatar upload'**
+  String get cloudCollabAvatarRetryTitle;
+
+  /// No description provided for @cloudCollabAvatarRetrySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to retry syncing your avatar to BeeCount Cloud.'**
+  String get cloudCollabAvatarRetrySubtitle;
+
+  /// No description provided for @cloudCollabDiagnosticsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Collaboration diagnostics'**
+  String get cloudCollabDiagnosticsTitle;
+
+  /// No description provided for @cloudCollabDiagnosticsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy ledger/scope/device details for self-host troubleshooting.'**
+  String get cloudCollabDiagnosticsSubtitle;
+
+  /// No description provided for @cloudCollabDiagnosticsCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostics copied.'**
+  String get cloudCollabDiagnosticsCopied;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -5,6 +5,8 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_cloud_sync/flutter_cloud_sync.dart'
+    show CloudBackendType;
 
 import '../../models/ledger_display_item.dart';
 import '../../cloud/sync_service.dart';
@@ -14,6 +16,7 @@ import '../../utils/format_utils.dart';
 import '../../utils/currencies.dart';
 import '../../l10n/app_localizations.dart';
 import '../../styles/tokens.dart';
+import 'collab_member_avatar.dart';
 
 /// 账本卡片
 class LedgerCard extends ConsumerWidget {
@@ -30,10 +33,122 @@ class LedgerCard extends ConsumerWidget {
     this.selected = false,
   });
 
+  String _roleLabel(AppLocalizations l10n, LedgerCollabCapability capability) {
+    final normalized = normalizeCollabRole(capability.role);
+    switch (normalized) {
+      case 'owner':
+        return l10n.cloudCollabRoleOwner;
+      case 'editor':
+        return l10n.cloudCollabRoleEditor;
+      case 'viewer':
+        return l10n.cloudCollabRoleViewerLegacy;
+      default:
+        return l10n.cloudCollabRoleLoading;
+    }
+  }
+
+  List<LedgerCollabMemberSummary> _activeMembers(
+      List<LedgerCollabMemberSummary> members) {
+    return members
+        .where((member) => (member.status ?? '').trim().toLowerCase() != 'left')
+        .toList(growable: false);
+  }
+
+  Widget _buildMemberStack(
+    BuildContext context,
+    List<LedgerCollabMemberSummary> members,
+  ) {
+    final active = _activeMembers(members);
+    if (active.isEmpty) return const SizedBox.shrink();
+    final visible = active.take(3).toList(growable: false);
+    final hiddenCount = active.length - visible.length;
+    final stackWidth =
+        20 + (visible.length <= 1 ? 0 : (visible.length - 1) * 14);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: stackWidth.toDouble(),
+          height: 20,
+          child: Stack(
+            children: [
+              for (var i = 0; i < visible.length; i++)
+                Positioned(
+                  left: i * 14,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: BeeTokens.surface(context),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: CollabMemberAvatar(
+                      userId: visible[i].userId,
+                      label: visible[i].resolvedDisplayName,
+                      avatarUrl: visible[i].avatarUrl,
+                      size: 20,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        if (hiddenCount > 0) ...[
+          const SizedBox(width: 6),
+          Container(
+            height: 20,
+            constraints: const BoxConstraints(minWidth: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            decoration: BoxDecoration(
+              color: BeeTokens.surfaceElevated(context),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: BeeTokens.border(context)),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '+$hiddenCount',
+              style: TextStyle(
+                fontSize: 11,
+                color: BeeTokens.textSecondary(context),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildPillTag(
+    BuildContext context, {
+    required String text,
+    required Color background,
+    required Color foreground,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: foreground,
+              fontWeight: FontWeight.w600,
+            ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final primaryColor = ref.watch(primaryColorProvider);
     final l10n = AppLocalizations.of(context);
+    final cloudConfig = ref.watch(activeCloudConfigProvider);
+    final isBeeCountCloudMode = cloudConfig.hasValue &&
+        cloudConfig.value!.type == CloudBackendType.beecountCloud;
 
     // 获取同步状态
     final syncStatusAsync = ref.watch(syncStatusProvider(ledger.id));
@@ -41,11 +156,27 @@ class LedgerCard extends ConsumerWidget {
 
     // 检查是否正在上传
     final uploadingIds = ref.watch(uploadingLedgerIdsProvider);
-    final isUploading = !ledger.isRemoteOnly && uploadingIds.contains(ledger.id);
+    final isUploading =
+        !ledger.isRemoteOnly && uploadingIds.contains(ledger.id);
 
     // 判断同步状态
     final isRemote = ledger.isRemoteOnly;
     final isSynced = syncStatus?.diff == SyncDiff.inSync;
+    final collabCapability = (!isRemote && ledger.ledgerType == 'shared')
+        ? (isBeeCountCloudMode
+            ? ref.watch(ledgerCollabCapabilityProvider(ledger.id)).asData?.value
+            : null)
+        : null;
+    final collabMembers =
+        (!isRemote && ledger.ledgerType == 'shared' && isBeeCountCloudMode)
+            ? ref.watch(ledgerCollabMembersProvider(ledger.id)).asData?.value ??
+                const <LedgerCollabMemberSummary>[]
+            : const <LedgerCollabMemberSummary>[];
+    final activeMemberCount = _activeMembers(collabMembers).length;
+    final showMemberStack = !isRemote &&
+        ledger.ledgerType == 'shared' &&
+        isBeeCountCloudMode &&
+        activeMemberCount > 0;
 
     // 非同步状态：除了inSync和noRemote之外的所有状态
     final isNotSynced = syncStatus != null &&
@@ -107,34 +238,54 @@ class LedgerCard extends ConsumerWidget {
                   children: [
                     // 顶部：名称 + 状态图标
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // 账本名称
+                        // 账本名称 + 标签
                         Expanded(
-                          child: RichText(
-                            text: TextSpan(
-                              children: [
-                                TextSpan(
-                                  text: translateLedgerName(context, ledger.name),
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w600,
-                                    color: BeeTokens.textPrimary(context),
-                                  ),
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(
+                                translateLedgerName(context, ledger.name),
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                  color: BeeTokens.textPrimary(context),
                                 ),
-                                TextSpan(
-                                  text: ' (ID:${ledger.id})',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: isRemote
-                                        ? primaryColor.withValues(alpha: 0.8)
-                                        : BeeTokens.textSecondary(context),
-                                  ),
+                              ),
+                              if (ledger.ledgerType == 'shared')
+                                _buildPillTag(
+                                  context,
+                                  text: l10n.cloudCollabSharedTag,
+                                  background:
+                                      Colors.blue.withValues(alpha: 0.16),
+                                  foreground: Colors.blue.shade700,
                                 ),
-                              ],
-                            ),
+                              if (isBeeCountCloudMode &&
+                                  (collabCapability?.roleResolved ?? false))
+                                _buildPillTag(
+                                  context,
+                                  text: _roleLabel(l10n, collabCapability!),
+                                  background:
+                                      primaryColor.withValues(alpha: 0.16),
+                                  foreground: primaryColor,
+                                ),
+                            ],
                           ),
                         ),
+                        if (!isRemote) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            '(ID:${ledger.id})',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: primaryColor.withValues(alpha: 0.8),
+                            ),
+                          ),
+                        ],
 
                         const SizedBox(width: 8),
 
@@ -179,24 +330,41 @@ class LedgerCard extends ConsumerWidget {
                         Text(
                           l10n.ledgersBalance(
                             ref.watch(compactAmountProvider)
-                              ? formatBalance(
-                                  ledger.balance,
-                                  ledger.currency,
-                                  isChineseLocale: Localizations.localeOf(context).languageCode == 'zh',
-                                )
-                              : formatBalanceFull(ledger.balance, ledger.currency),
+                                ? formatBalance(
+                                    ledger.balance,
+                                    ledger.currency,
+                                    isChineseLocale:
+                                        Localizations.localeOf(context)
+                                                .languageCode ==
+                                            'zh',
+                                  )
+                                : formatBalanceFull(
+                                    ledger.balance, ledger.currency),
                           ),
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
-                            color: ledger.balance >= 0 ? BeeTokens.success(context) : BeeTokens.error(context),
+                            color: ledger.balance >= 0
+                                ? BeeTokens.success(context)
+                                : BeeTokens.error(context),
                           ),
                         ),
                       ],
                     ),
+                    if (showMemberStack) const SizedBox(height: 24),
                   ],
                 ),
               ),
+
+              if (showMemberStack)
+                Positioned(
+                  right: 12,
+                  bottom: 12,
+                  child: _buildMemberStack(
+                    context,
+                    collabMembers,
+                  ),
+                ),
 
               // 蒙层：仅远程账本显示
               if (isRemote)
@@ -285,5 +453,4 @@ class LedgerCard extends ConsumerWidget {
       );
     }
   }
-
 }

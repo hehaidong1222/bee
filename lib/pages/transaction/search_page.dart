@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:drift/drift.dart' as d;
 import '../../data/db.dart';
 import '../../providers.dart';
 import '../../widgets/biz/biz.dart';
@@ -63,8 +62,11 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   /// 执行搜索
   void _performSearch() {
     // 如果没有任何搜索条件，清空结果
-    if (_searchText.isEmpty && _minAmount == null && _maxAmount == null &&
-        _startDate == null && _endDate == null) {
+    if (_searchText.isEmpty &&
+        _minAmount == null &&
+        _maxAmount == null &&
+        _startDate == null &&
+        _endDate == null) {
       setState(() {
         _searchResults = [];
         _isSearching = false;
@@ -113,13 +115,15 @@ class _SearchPageState extends ConsumerState<SearchPage> {
       if (_startDate != null || _endDate != null) {
         final happenedAt = transaction.happenedAt;
         if (_startDate != null) {
-          final startOfDay = DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
+          final startOfDay =
+              DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
           if (happenedAt.isBefore(startOfDay)) {
             dateMatch = false;
           }
         }
         if (_endDate != null) {
-          final endOfDay = DateTime(_endDate!.year, _endDate!.month, _endDate!.day, 23, 59, 59);
+          final endOfDay = DateTime(
+              _endDate!.year, _endDate!.month, _endDate!.day, 23, 59, 59);
           if (happenedAt.isAfter(endOfDay)) {
             dateMatch = false;
           }
@@ -212,7 +216,8 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 金额筛选
-                  Text(l10n.searchAmountFilter, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text(l10n.searchAmountFilter,
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -223,8 +228,10 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                             border: const OutlineInputBorder(),
                             isDense: true,
                           ),
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          controller: TextEditingController(text: tempMinAmount?.toString() ?? ''),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          controller: TextEditingController(
+                              text: tempMinAmount?.toString() ?? ''),
                           onChanged: (value) {
                             tempMinAmount = double.tryParse(value);
                           },
@@ -241,8 +248,10 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                             border: const OutlineInputBorder(),
                             isDense: true,
                           ),
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          controller: TextEditingController(text: tempMaxAmount?.toString() ?? ''),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          controller: TextEditingController(
+                              text: tempMaxAmount?.toString() ?? ''),
                           onChanged: (value) {
                             tempMaxAmount = double.tryParse(value);
                           },
@@ -252,7 +261,8 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                   ),
                   const SizedBox(height: 16),
                   // 时间筛选
-                  Text(l10n.searchDateFilter, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text(l10n.searchDateFilter,
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
@@ -421,12 +431,41 @@ class _SearchPageState extends ConsumerState<SearchPage> {
 
     try {
       final repo = ref.read(repositoryProvider);
-      // 批量删除交易
+      final ledgerId = ref.read(currentLedgerIdProvider);
+      final txById = {
+        for (final item in _allTransactions) item.t.id: item.t,
+      };
+      final denied = <int>[];
+      var deletedCount = 0;
       for (final id in _selectedIds) {
+        final tx = txById[id];
+        if (tx != null) {
+          final allowed = await TransactionEditUtils.canModifyTransaction(
+            context,
+            ref,
+            tx,
+            ledgerId: ledgerId,
+            showDeniedMessage: false,
+          );
+          if (!allowed) {
+            denied.add(id);
+            continue;
+          }
+        }
         await repo.deleteTransaction(id);
+        deletedCount++;
       }
-      await _refreshAfterBatchOperation(
-          count, l10n.searchBatchDeleteSuccess(count));
+
+      if (denied.isNotEmpty && mounted) {
+        showToast(context, '其中 ${denied.length} 笔无权限，已跳过');
+      }
+
+      if (deletedCount > 0) {
+        await _refreshAfterBatchOperation(
+            deletedCount, l10n.searchBatchDeleteSuccess(deletedCount));
+      } else if (count > 0 && mounted) {
+        showToast(context, '未删除任何交易');
+      }
     } catch (e) {
       if (mounted) {
         showToast(context, l10n.searchBatchDeleteFailed(e.toString()));
@@ -629,13 +668,15 @@ class _SearchPageState extends ConsumerState<SearchPage> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
               decoration: BoxDecoration(
                 color: BeeTokens.surfaceElevated(context),
-                boxShadow: BeeTokens.isDark(context) ? null : [
-                  BoxShadow(
-                    color: Colors.grey.withValues(alpha: 0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                boxShadow: BeeTokens.isDark(context)
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: Colors.grey.withValues(alpha: 0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
               ),
               child: Column(
                 children: [
@@ -679,8 +720,10 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                         onPressed: _showFilterDialog,
                         icon: Icon(
                           Icons.filter_list,
-                          color: (_minAmount != null || _maxAmount != null ||
-                                  _startDate != null || _endDate != null)
+                          color: (_minAmount != null ||
+                                  _maxAmount != null ||
+                                  _startDate != null ||
+                                  _endDate != null)
                               ? ref.watch(primaryColorProvider)
                               : BeeTokens.iconPrimary(context),
                         ),
@@ -689,8 +732,10 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                     ],
                   ),
                   // 显示已选筛选条件
-                  if (_minAmount != null || _maxAmount != null ||
-                      _startDate != null || _endDate != null) ...[
+                  if (_minAmount != null ||
+                      _maxAmount != null ||
+                      _startDate != null ||
+                      _endDate != null) ...[
                     const SizedBox(height: 12),
                     Wrap(
                       spacing: 8,
@@ -700,10 +745,16 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                           Chip(
                             label: Text(
                               '${l10n.searchAmountFilter}: ${_minAmount?.toStringAsFixed(2) ?? '0'} ~ ${_maxAmount?.toStringAsFixed(2) ?? '∞'}',
-                              style: TextStyle(fontSize: 12, color: ref.watch(primaryColorProvider)),
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: ref.watch(primaryColorProvider)),
                             ),
-                            backgroundColor: ref.watch(primaryColorProvider).withValues(alpha: 0.1),
-                            side: BorderSide(color: ref.watch(primaryColorProvider), width: 1),
+                            backgroundColor: ref
+                                .watch(primaryColorProvider)
+                                .withValues(alpha: 0.1),
+                            side: BorderSide(
+                                color: ref.watch(primaryColorProvider),
+                                width: 1),
                             deleteIconColor: ref.watch(primaryColorProvider),
                             deleteIcon: const Icon(Icons.close, size: 16),
                             onDeleted: () {
@@ -718,10 +769,16 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                           Chip(
                             label: Text(
                               '${l10n.searchDateFilter}: ${_startDate != null ? '${_startDate!.year}-${_startDate!.month.toString().padLeft(2, '0')}-${_startDate!.day.toString().padLeft(2, '0')}' : l10n.searchDateStart} ~ ${_endDate != null ? '${_endDate!.year}-${_endDate!.month.toString().padLeft(2, '0')}-${_endDate!.day.toString().padLeft(2, '0')}' : l10n.searchDateEnd}',
-                              style: TextStyle(fontSize: 12, color: ref.watch(primaryColorProvider)),
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: ref.watch(primaryColorProvider)),
                             ),
-                            backgroundColor: ref.watch(primaryColorProvider).withValues(alpha: 0.1),
-                            side: BorderSide(color: ref.watch(primaryColorProvider), width: 1),
+                            backgroundColor: ref
+                                .watch(primaryColorProvider)
+                                .withValues(alpha: 0.1),
+                            side: BorderSide(
+                                color: ref.watch(primaryColorProvider),
+                                width: 1),
                             deleteIconColor: ref.watch(primaryColorProvider),
                             deleteIcon: const Icon(Icons.close, size: 16),
                             onDeleted: () {
@@ -781,7 +838,8 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                         Text(
                           AppLocalizations.of(context).searchNoInput,
                           style: TextStyle(
-                              color: BeeTokens.textTertiary(context), fontSize: 16),
+                              color: BeeTokens.textTertiary(context),
+                              fontSize: 16),
                         ),
                       ],
                     ),
@@ -799,7 +857,8 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                         Text(
                           AppLocalizations.of(context).searchNoResults,
                           style: TextStyle(
-                              color: BeeTokens.textTertiary(context), fontSize: 16),
+                              color: BeeTokens.textTertiary(context),
+                              fontSize: 16),
                         ),
                       ],
                     ),
@@ -950,7 +1009,8 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                           final isExpense = item.t.type == 'expense';
 
                           // 获取分类显示名称
-                          final categoryName = CategoryUtils.getDisplayName(item.category?.name, context);
+                          final categoryName = CategoryUtils.getDisplayName(
+                              item.category?.name, context);
 
                           final subtitle = item.t.note ?? '';
                           final isSelected = _selectedIds.contains(item.t.id);

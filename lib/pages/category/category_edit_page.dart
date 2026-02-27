@@ -14,6 +14,7 @@ import '../../utils/category_utils.dart';
 import '../../styles/tokens.dart';
 import '../../services/custom_icon_service.dart';
 import '../../services/system/logger_service.dart';
+import '../../utils/transaction_edit_utils.dart';
 import '../transaction/category_detail_page.dart';
 import 'category_migration_page.dart';
 
@@ -422,6 +423,14 @@ class _CategoryEditPageState extends ConsumerState<CategoryEditPage> {
   }
 
   void _saveCategory() async {
+    final ledgerId = ref.read(currentLedgerIdProvider);
+    final allowed = await TransactionEditUtils.canManageLedger(
+      context,
+      ref,
+      ledgerId: ledgerId,
+    );
+    if (!allowed) return;
+
     if (!_formKey.currentState!.validate()) return;
 
     // 如果是二级分类，必须选择父分类
@@ -559,6 +568,13 @@ class _CategoryEditPageState extends ConsumerState<CategoryEditPage> {
 
   void _deleteCategory() async {
     if (!isEditing) return;
+    final ledgerId = ref.read(currentLedgerIdProvider);
+    final allowed = await TransactionEditUtils.canManageLedger(
+      context,
+      ref,
+      ledgerId: ledgerId,
+    );
+    if (!allowed) return;
 
     final repo = ref.read(repositoryProvider);
 

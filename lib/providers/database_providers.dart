@@ -1,14 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:drift/drift.dart';
 import '../data/db.dart';
 import '../data/repositories/local/local_repository.dart';
-import '../data/repositories/cloud/cloud_repository.dart';
 import '../data/repositories/base_repository.dart';
 import '../services/system/logger_service.dart';
 import 'sync_providers.dart';
 import 'cloud_mode_providers.dart';
-import 'supabase_providers.dart';
 
 // 数据库Provider
 final databaseProvider = Provider<BeeDatabase>((ref) {
@@ -28,24 +25,12 @@ final repositoryProvider = Provider<BaseRepository>((ref) {
 
   switch (mode) {
     case AppMode.local:
-      // 本地优先模式：使用 LocalRepository（基于 Drift）
-      logger.info('RepositoryProvider', '✅ 使用 LocalRepository (本地模式)');
+      logger.info('RepositoryProvider', '✅ 使用 LocalRepository');
       return LocalRepository(db);
-
     case AppMode.cloud:
-      // 仅云端模式：使用 CloudRepository（基于 Supabase）
-      final supabaseAsync = ref.watch(supabaseInstanceProvider);
-
-      logger.info('RepositoryProvider', 'Supabase 状态: hasValue=${supabaseAsync.hasValue}, value=${supabaseAsync.value != null ? "已加载" : "null"}');
-
-      // 如果 Supabase 未加载完成或为 null，回退到本地模式
-      if (!supabaseAsync.hasValue || supabaseAsync.value == null) {
-        logger.warning('RepositoryProvider', '⚠️ Supabase 未就绪，回退到 LocalRepository');
-        return LocalRepository(db);
-      }
-
-      logger.info('RepositoryProvider', '✅ 使用 CloudRepository (仅云端模式)');
-      return CloudRepository(supabaseAsync.value!);
+      logger.warning(
+          'RepositoryProvider', '⚠️ AppMode.cloud 已退役，回退 LocalRepository');
+      return LocalRepository(db);
   }
 });
 
@@ -57,19 +42,9 @@ final dynamicRepositoryProvider = Provider<Object>((ref) {
 
   switch (mode) {
     case AppMode.local:
-      // 本地模式：使用 LocalRepository（基于 Drift）
       return LocalRepository(db);
-
     case AppMode.cloud:
-      // 云端模式：使用 CloudRepository（基于 Supabase）
-      final supabaseAsync = ref.watch(supabaseInstanceProvider);
-
-      // 如果 Supabase 未加载完成或为 null，回退到本地模式
-      if (!supabaseAsync.hasValue || supabaseAsync.value == null) {
-        return LocalRepository(db);
-      }
-
-      return CloudRepository(supabaseAsync.value!);
+      return LocalRepository(db);
   }
 });
 
@@ -85,7 +60,8 @@ final currentLedgerProvider = FutureProvider<Ledger?>((ref) async {
 });
 
 // 获取指定账本的详细信息
-final ledgerByIdProvider = FutureProvider.family<Ledger?, int>((ref, ledgerId) async {
+final ledgerByIdProvider =
+    FutureProvider.family<Ledger?, int>((ref, ledgerId) async {
   final repo = ref.watch(repositoryProvider);
 
   return await repo.getLedgerById(ledgerId);
@@ -143,7 +119,8 @@ final categoriesProvider = FutureProvider<List<Category>>((ref) async {
 
 // 分类与交易笔数组合Provider（响应式版本）
 // 使用 autoDispose 在页面关闭时自动取消订阅
-final categoriesWithCountProvider = StreamProvider.autoDispose<List<({Category category, int transactionCount})>>((ref) {
+final categoriesWithCountProvider = StreamProvider.autoDispose<
+    List<({Category category, int transactionCount})>>((ref) {
   final repo = ref.watch(repositoryProvider);
   return repo.watchCategoriesWithCount();
 });
@@ -156,20 +133,24 @@ final transferCategoryProvider = FutureProvider<Category>((ref) async {
 
 // 重复交易Provider（按账本过滤）
 // 注意：此 provider 已废弃，请使用 allRecurringTransactionsProvider 并在业务层过滤
-final recurringTransactionsProvider = FutureProvider.family<List<RecurringTransaction>, int>((ref, ledgerId) async {
+final recurringTransactionsProvider =
+    FutureProvider.family<List<RecurringTransaction>, int>(
+        (ref, ledgerId) async {
   final repo = ref.watch(repositoryProvider);
   final all = await repo.watchRecurringTransactionsByLedger(ledgerId).first;
   return all;
 });
 
 // 所有重复交易Provider（不限账本）
-final allRecurringTransactionsProvider = StreamProvider.autoDispose<List<RecurringTransaction>>((ref) {
+final allRecurringTransactionsProvider =
+    StreamProvider.autoDispose<List<RecurringTransaction>>((ref) {
   final repo = ref.watch(repositoryProvider);
   return repo.watchAllRecurringTransactions();
 });
 
 // 账户Provider（按账本过滤）
-final accountsStreamProvider = StreamProvider.family<List<Account>, int>((ref, ledgerId) {
+final accountsStreamProvider =
+    StreamProvider.family<List<Account>, int>((ref, ledgerId) {
   final repo = ref.watch(repositoryProvider);
   return repo.watchAccountsForLedger(ledgerId);
 });
@@ -183,7 +164,8 @@ final allAccountsStreamProvider = StreamProvider<List<Account>>((ref) {
 });
 
 // 获取单个账户信息
-final accountByIdProvider = FutureProvider.family<Account?, int>((ref, accountId) async {
+final accountByIdProvider =
+    FutureProvider.family<Account?, int>((ref, accountId) async {
   final repo = ref.watch(repositoryProvider);
   return await repo.getAccount(accountId);
 });

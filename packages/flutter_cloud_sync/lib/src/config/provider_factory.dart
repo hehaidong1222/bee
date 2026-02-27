@@ -5,6 +5,7 @@ import 'package:flutter_cloud_sync_supabase/flutter_cloud_sync_supabase.dart';
 import 'package:flutter_cloud_sync_webdav/flutter_cloud_sync_webdav.dart';
 import 'package:flutter_cloud_sync_icloud/flutter_cloud_sync_icloud.dart';
 import 'package:flutter_cloud_sync_s3/flutter_cloud_sync_s3.dart';
+import '../providers/beecount_cloud_provider.dart';
 
 import '../core/auth_service.dart';
 import '../core/cloud_provider.dart';
@@ -28,6 +29,14 @@ Future<({CloudProvider? provider, CloudAuthService? auth})> createCloudServices(
     case CloudBackendType.local:
       return (provider: null, auth: null);
 
+    case CloudBackendType.beecountCloud:
+      final provider = BeeCountCloudProvider();
+      await provider.initialize({
+        'baseUrl': config.beecountCloudBaseUrl!,
+        'apiPrefix': config.beecountCloudApiPrefix ?? '/api/v1',
+      });
+      return (provider: provider, auth: provider.auth);
+
     case CloudBackendType.supabase:
       // 创建并初始化 Supabase provider
       // 包内会处理重复初始化的问题
@@ -35,8 +44,8 @@ Future<({CloudProvider? provider, CloudAuthService? auth})> createCloudServices(
       await provider.initialize({
         'url': config.supabaseUrl!,
         'anonKey': config.supabaseAnonKey!,
-        'bucket': config.supabaseBucket ?? 'beecount-backups',  // 兼容老配置，提供默认值
-        'pathPrefix': null,  // 使用默认的 users/{userId}/ 结构，基础包支持但业务层不配置
+        'bucket': config.supabaseBucket ?? 'beecount-backups', // 兼容老配置，提供默认值
+        'pathPrefix': null, // 使用默认的 users/{userId}/ 结构，基础包支持但业务层不配置
       });
 
       // Auth service 直接从 provider 获取

@@ -3,10 +3,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// 应用模式枚举
 /// - local: 本地优先模式，本地 SQLite + 可选云端同步
-/// - cloud: 仅云端模式，所有数据仅存储在 Supabase（带 Realtime 实时同步）
+/// - cloud: 兼容保留值（启动时自动迁回 local）
 enum AppMode {
   local('本地优先模式'),
-  cloud('仅云端模式');
+  cloud('兼容模式（已迁回本地）');
 
   final String label;
   const AppMode(this.label);
@@ -38,7 +38,14 @@ class AppModeNotifier extends StateNotifier<AppMode> {
       final prefs = await SharedPreferences.getInstance();
       final modeStr = prefs.getString('app_mode');
       if (modeStr != null) {
-        state = AppMode.fromString(modeStr);
+        final loaded = AppMode.fromString(modeStr);
+        if (loaded == AppMode.cloud) {
+          state = AppMode.local;
+          await prefs.setString('app_mode', AppMode.local.name);
+          await prefs.setBool('app_mode_cloud_retired', true);
+        } else {
+          state = loaded;
+        }
       }
     } catch (e) {
       // 加载失败，保持默认的本地模式
@@ -48,12 +55,16 @@ class AppModeNotifier extends StateNotifier<AppMode> {
 
   /// 切换到指定模式
   Future<void> switchMode(AppMode mode) async {
-    state = mode;
+    final normalized = mode == AppMode.cloud ? AppMode.local : mode;
+    state = normalized;
 
     // 持久化到 SharedPreferences
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('app_mode', mode.name);
+      await prefs.setString('app_mode', normalized.name);
+      if (mode == AppMode.cloud) {
+        await prefs.setBool('app_mode_cloud_retired', true);
+      }
     } catch (e) {
       // 保存失败，但状态已经切换
     }

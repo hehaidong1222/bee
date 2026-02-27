@@ -536,6 +536,7 @@
   "mineDownloadNeedCloudService": "仅限云服务模式可用",
   "mineDownloadComplete": "完成",
   "mineDownloadResult": "新增导入：{inserted} 条",
+  "mineDownloadRefreshedNoChanges": "已从云端刷新，无新增记录",
   "mineLoginTitle": "登录 / 注册",
   "mineLoginSubtitle": "仅在同步时需要",
   "mineLoggedInEmail": "已登录",
@@ -890,9 +891,13 @@
   "cloudSupabaseUrlHint": "https://xxx.supabase.co",
   "cloudAnonKeyLabel": "Anon Key",
   "cloudSelectServiceType": "选择云服务类型",
-  "cloudMultiDeviceWarningTitle": "多设备同步提示",
-  "cloudMultiDeviceWarningMessage": "当前暂不支持多设备协同编辑。如需在新设备使用，请先清空新设备的本地数据，然后从云端下载账本。",
-  "cloudMultiDeviceWarningDetail": "多设备同步说明：\n\n1. 目前不支持多设备同时编辑同一账本\n2. 如果在设备A编辑后，切换到设备B使用：\n   • 需要在设备B上清空所有账本\n   • 然后从云端下载最新数据\n3. 未来版本将支持真正的多设备协同",
+  "cloudGroupCollaborative": "协同云",
+  "cloudGroupBackup": "备份云",
+  "cloudGroupLocal": "本地",
+  "cloudCapabilityCollaborativeTitle": "协同云能力",
+  "cloudCapabilityCollaborativeMessage": "支持多用户、多设备协同同步与编辑（以服务端权限与版本能力为准）。",
+  "cloudCapabilityBackupTitle": "备份云能力",
+  "cloudCapabilityBackupMessage": "适合备份与跨设备迁移，不保证多设备并发协同编辑。",
   "cloudWebdavUrlLabel": "WebDAV 服务器地址",
   "cloudWebdavUrlHint": "https://dav.jianguoyun.com/dav/",
   "cloudWebdavUsernameLabel": "用户名",
@@ -914,7 +919,7 @@
   "cloudSupabaseBucketLabel": "Storage Bucket 名称",
   "cloudSupabaseBucketHint": "留空使用默认值 beecount-backups",
   "authRememberAccount": "记住账号密码",
-  "authRememberAccountHint": "下次登录时自动填充（仅Supabase）",
+  "authRememberAccountHint": "下次登录时自动填充（Supabase/BeeCount Cloud）",
   "cloudConfigSaved": "配置已保存",
   "cloudTestSuccess": "连接测试成功！",
   "cloudTestFailed": "连接测试失败，请检查配置是否正确。",
@@ -949,8 +954,10 @@
   "authPasswordRequirement": "密码（至少 6 位，需包含字母和数字）",
   "authConfirmPassword": "确认密码",
   "authInvalidEmail": "请输入有效的邮箱地址",
+  "authPasswordRequired": "请输入密码",
   "authPasswordRequirementShort": "密码需包含字母和数字，长度至少 6 位",
   "authPasswordMismatch": "两次输入的密码不一致",
+  "authBeeCountCloudLoginOnlyHint": "BeeCount Cloud 账号由云服务侧管理，此处仅支持登录。",
   "authResendVerification": "重发验证邮件",
   "authSignupSuccess": "注册成功",
   "authVerificationEmailSent": "验证邮件已发送，请前往邮箱完成验证后再登录。",
@@ -2371,5 +2378,294 @@
   "aiProviderTestFailed": "测试失败",
   "aiProviderTestAll": "一键测试全部",
   "aiProviderTestAllRetry": "重新测试",
-  "aiModelInputHelper": "留空则使用默认模型"
+  "aiModelInputHelper": "留空则使用默认模型",
+  "cloudCollabCurrentRoleTitle": "当前协作角色",
+  "cloudCollabCurrentRoleSubtitle": "当前账本中的角色与权限",
+  "cloudCollabRoleLoading": "加载中...",
+  "cloudCollabRoleOwner": "Owner",
+  "cloudCollabRoleEditor": "Editor",
+  "cloudCollabRoleViewer": "Viewer",
+  "cloudCollabRoleViewerLegacy": "Viewer（历史只读）",
+  "cloudCollabRoleUnknown": "未知",
+  "cloudCollabRoleNotReady": "权限未就绪",
+  "cloudCollabExperimentalBetaTitle": "实验功能",
+  "cloudCollabExperimentalBetaSubtitle": "协作编辑仍在实验阶段，写入后请手动核对同步结果。",
+  "cloudCollabExperimentalWriteHint": "实验功能：协作写入可能不稳定，操作后请核对同步结果。",
+  "cloudCollabSharedTag": "共享",
+  "cloudCollabManageEntryTitle": "共享账本管理",
+  "cloudCollabManageEntrySubtitle": "角色与成员查看（后台管理）",
+  "cloudCollabManagePageTitle": "共享账本管理",
+  "cloudCollabManagePageSubtitle": "管理当前账本协作与权限",
+  "cloudCollabMembersEntryTitle": "共享成员",
+  "cloudCollabMembersEntrySubtitle": "查看成员与角色",
+  "cloudCollabInvitesEntryTitle": "邀请码管理",
+  "cloudCollabInvitesEntrySubtitle": "创建与管理邀请码",
+  "cloudCollabDevicesEntryTitle": "设备会话",
+  "cloudCollabDevicesEntrySubtitle": "查看并远程下线设备",
+  "cloudCollabJoinByCodeTitle": "通过邀请码加入",
+  "cloudCollabJoinByCodeSubtitle": "加入其他共享账本",
+  "cloudCollabJoinByCodeHint": "例如 abcDEF123",
+  "cloudCollabJoinSuccessTitle": "加入成功",
+  "cloudCollabJoinSuccessMessage": "已加入共享账本，请返回账本列表查看。",
+  "cloudCollabLeaveTitle": "退出共享账本",
+  "cloudCollabLeaveSubtitle": "仅非 Owner 成员可退出",
+  "cloudCollabLeaveOwnerBlocked": "Owner 不能退出当前账本。",
+  "cloudCollabLeaveConfirm": "确认退出当前共享账本吗？",
+  "cloudCollabLeaveDoneTitle": "已退出",
+  "cloudCollabLeaveDoneMessage": "你已退出当前共享账本。",
+  "cloudCollabMembersPageTitle": "共享成员",
+  "cloudCollabMembersPageSubtitle": "查看当前账本成员角色",
+  "cloudCollabLegacyViewerHint": "历史 Viewer 成员仅做兼容保留，维持只读。",
+  "cloudCollabManagedInBackendTitle": "后台管理",
+  "cloudCollabManagedInBackendHint": "成员增删与共享配置请在 BeeCount Web 后台完成。",
+  "cloudCollabNoMembers": "当前账本暂无成员",
+  "cloudCollabJoinedAt": "加入时间：{time}",
+  "@cloudCollabJoinedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabRoleUpdateSuccess": "角色已更新",
+  "cloudCollabUpgradeViewerToEditor": "升级为 Editor",
+  "cloudCollabInvitesPageTitle": "邀请码管理",
+  "cloudCollabInvitesPageSubtitle": "创建并管理共享邀请码",
+  "cloudCollabNoInvites": "当前暂无邀请码",
+  "cloudCollabOwnerOnlyHint": "仅 Owner 可管理邀请码。",
+  "cloudCollabInviteRoleTitle": "邀请角色",
+  "cloudCollabInviteRoleHint": "仅 editor",
+  "cloudCollabRoleInvalidTitle": "角色无效",
+  "cloudCollabRoleInvalidMessage": "仅支持 editor。",
+  "cloudCollabInviteMaxUsesTitle": "可使用次数",
+  "cloudCollabInviteMaxUsesHint": "输入正整数",
+  "cloudCollabInviteMaxUsesInvalidTitle": "次数无效",
+  "cloudCollabInviteMaxUsesInvalidMessage": "请输入大于 0 的整数。",
+  "cloudCollabInviteExpiresHoursTitle": "过期时长（小时）",
+  "cloudCollabInviteExpiresHoursHint": "输入正整数",
+  "cloudCollabInviteExpiresHoursInvalidTitle": "过期时长无效",
+  "cloudCollabInviteExpiresHoursInvalidMessage": "请输入大于 0 的整数。",
+  "cloudCollabInviteCreatedTitle": "邀请码已创建",
+  "cloudCollabInviteCreatedDetail": "邀请码：{inviteCode}\n邀请ID：{inviteId}\n角色：{role}\n过期时间：{expiresAt}",
+  "@cloudCollabInviteCreatedDetail": {
+    "placeholders": {
+      "inviteCode": {
+        "type": "String"
+      },
+      "inviteId": {
+        "type": "String"
+      },
+      "role": {
+        "type": "String"
+      },
+      "expiresAt": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabCopyInviteCode": "复制邀请码",
+  "cloudCollabInviteCodeCopied": "邀请码已复制",
+  "cloudCollabInviteStatusActive": "有效",
+  "cloudCollabInviteStatusExpired": "已过期",
+  "cloudCollabInviteStatusExhausted": "已用尽",
+  "cloudCollabInviteStatusRevoked": "已撤销",
+  "cloudCollabInviteUsed": "使用次数：{text}",
+  "@cloudCollabInviteUsed": {
+    "placeholders": {
+      "text": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabInviteExpiresAt": "过期时间：{time}",
+  "@cloudCollabInviteExpiresAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabInviteRevokeTitle": "撤销邀请码",
+  "cloudCollabInviteRevokeMessage": "确认撤销邀请码 {inviteId} 吗？",
+  "@cloudCollabInviteRevokeMessage": {
+    "placeholders": {
+      "inviteId": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabInviteRevoked": "邀请码已撤销",
+  "cloudCollabDevicesPageTitle": "设备会话",
+  "cloudCollabDevicesPageSubtitle": "管理当前账号活跃设备",
+  "cloudCollabDevicesViewAllSessions": "显示全部会话",
+  "cloudCollabDevicesViewModeHint": "默认展示近 30 天去重设备，可切换查看全部会话。",
+  "cloudCollabNoDevices": "当前没有活跃设备",
+  "cloudCollabUnknownDeviceName": "未知设备",
+  "cloudCollabDeviceCurrentTag": "当前设备",
+  "cloudCollabCurrentDeviceCannotRevoke": "当前设备不能远程下线。",
+  "cloudCollabDeviceAppVersion": "应用：{version}",
+  "@cloudCollabDeviceAppVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabDeviceOsVersion": "系统：{version}",
+  "@cloudCollabDeviceOsVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabDeviceModel": "型号：{model}",
+  "@cloudCollabDeviceModel": {
+    "placeholders": {
+      "model": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabDeviceLastIp": "IP：{ip}",
+  "@cloudCollabDeviceLastIp": {
+    "placeholders": {
+      "ip": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabDeviceSessionCount": "会话数：{count}",
+  "@cloudCollabDeviceSessionCount": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabDeviceLastSeen": "最近活跃：{time}",
+  "@cloudCollabDeviceLastSeen": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabDeviceCreatedAt": "创建时间：{time}",
+  "@cloudCollabDeviceCreatedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabDeviceRevokeTitle": "远程下线设备",
+  "cloudCollabDeviceRevokeMessage": "确认下线设备 {name}（{id}）吗？",
+  "@cloudCollabDeviceRevokeMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabDeviceRevokeMultipleMessage": "确认下线设备 {name} 的 {count} 个会话吗？",
+  "@cloudCollabDeviceRevokeMultipleMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabDeviceRevoked": "设备已下线",
+  "cloudCollabManageBlockedTitle": "权限不足",
+  "cloudCollabManageBlockedMessage": "仅 Owner 可以管理该共享账本。",
+  "cloudCollabUnavailableMessage": "云协作功能暂不可用。",
+  "cloudCollabScopeDeniedTitle": "协作权限未开启",
+  "cloudCollabScopeDeniedHint": "服务端尚未开启 ALLOW_APP_RW_SCOPES，当前设备会话与协作读取不可用。",
+  "cloudCollabScopeDeniedAction": "请在服务端 .env 或部署环境中设置 ALLOW_APP_RW_SCOPES=true，重启服务后重新登录 App。",
+  "cloudCollabEntryMovedHint": "账本协作入口已迁移到“账本管理”页面。",
+  "cloudCollabMediaRetryHint": "手动上传/下载会同时重试缺失的附件与分类图标文件。",
+  "cloudCollabMediaRetryPartialTitle": "媒体补齐部分完成",
+  "cloudCollabMediaRetryPartialMessage": "已补齐 {downloaded} 个媒体文件，仍有 {failed} 个失败，可稍后再次手动同步。",
+  "@cloudCollabMediaRetryPartialMessage": {
+    "placeholders": {
+      "downloaded": {
+        "type": "String"
+      },
+      "failed": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabMediaRetrySuccess": "已补齐 {count} 个缺失媒体文件。",
+  "@cloudCollabMediaRetrySuccess": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabMediaRetryFailedTitle": "媒体重试失败",
+  "cloudCollabMediaRetryFailedMessage": "媒体补齐重试失败：{error}",
+  "@cloudCollabMediaRetryFailedMessage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabUnknownMember": "未知成员",
+  "cloudCollabMemberStatusActive": "活跃",
+  "cloudCollabMemberStatusLeft": "已退出",
+  "cloudCollabMembersCount": "{count} 位成员",
+  "@cloudCollabMembersCount": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabCreatorLabel": "创建者",
+  "cloudCollabCreatorLoading": "正在加载创建者...",
+  "cloudCollabWriteDeniedMessage": "当前角色无权在该共享账本中写入。",
+  "cloudCollabEditDeniedMessage": "当前角色无权编辑该交易。",
+  "cloudCollabManageDeniedMessage": "当前角色无权管理该共享账本。",
+  "cloudCollabDeleteDeniedMessage": "当前角色无权删除该交易。",
+  "cloudCollabUploadQueuePending": "待上传 {count} 条变更",
+  "@cloudCollabUploadQueuePending": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabUploadQueueFailed": "{count} 条变更上传失败，点击上传重试",
+  "@cloudCollabUploadQueueFailed": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabUploadQueueFailedToast": "自动上传失败 {count} 条，请在云同步页点击上传重试。",
+  "@cloudCollabUploadQueueFailedToast": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabAvatarUploadSuccess": "头像已同步到云端。",
+  "cloudCollabAvatarUploadFailed": "头像上传失败，可在云同步页重试。",
+  "cloudCollabAvatarRetryTitle": "重试头像上传",
+  "cloudCollabAvatarRetrySubtitle": "点击重试将当前头像同步到 BeeCount Cloud。",
+  "cloudCollabDiagnosticsTitle": "协作诊断信息",
+  "cloudCollabDiagnosticsSubtitle": "复制账本/权限/deviceId 信息用于自部署排障。",
+  "cloudCollabDiagnosticsCopied": "诊断信息已复制。"
 }

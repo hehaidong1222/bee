@@ -1,0 +1,3573 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
+
+import '../core/auth_service.dart';
+import '../core/cloud_provider.dart';
+import '../core/exceptions.dart';
+import '../core/storage_service.dart';
+import '../utils/path_helper.dart';
+
+class BeeCountCloudProvider implements CloudProvider {
+  BeeCountCloudAuthService? _auth;
+  BeeCountCloudStorageService? _storage;
+  BeeCountCloudRealtimeClient? _realtime;
+
+  @override
+  String get providerId => 'beecount_cloud';
+
+  @override
+  String get providerName => 'BeeCount Cloud';
+
+  @override
+  CloudAuthService get auth {
+    final auth = _auth;
+    if (auth == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud provider is not initialized.');
+    }
+    return auth;
+  }
+
+  @override
+  CloudStorageService get storage {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud provider is not initialized.');
+    }
+    return storage;
+  }
+
+  @override
+  Future<void> initialize(Map<String, dynamic> config) async {
+    if (!validateConfig(config)) {
+      throw CloudConfigurationException(
+          'Invalid BeeCount Cloud config. Required: baseUrl');
+    }
+
+    final rawBaseUrl = (config['baseUrl'] as String).trim();
+    final rawApiPrefix = (config['apiPrefix'] as String?)?.trim();
+    final baseUrl = rawBaseUrl.replaceFirst(RegExp(r'/$'), '');
+    final apiPrefix = _normalizeApiPrefix(rawApiPrefix ?? '/api/v1');
+
+    final authService = BeeCountCloudAuthService(
+      baseUrl: baseUrl,
+      apiPrefix: apiPrefix,
+    );
+    await authService.initialize();
+
+    _auth = authService;
+    final storage = BeeCountCloudStorageService(
+      baseUrl: baseUrl,
+      apiPrefix: apiPrefix,
+      auth: authService,
+    );
+    _storage = storage;
+    _realtime = BeeCountCloudRealtimeClient(
+      baseUrl: baseUrl,
+      auth: authService,
+    );
+  }
+
+  @override
+  bool validateConfig(Map<String, dynamic> config) {
+    final baseUrl = config['baseUrl'];
+    if (baseUrl is! String || baseUrl.trim().isEmpty) {
+      return false;
+    }
+    final apiPrefix = config['apiPrefix'];
+    if (apiPrefix != null && apiPrefix is! String) {
+      return false;
+    }
+    return true;
+  }
+
+  @override
+  Future<void> dispose() async {
+    await _realtime?.stop();
+    _realtime?.dispose();
+    _realtime = null;
+    _storage?.dispose();
+    _storage = null;
+    _auth?.dispose();
+    _auth = null;
+  }
+
+  Stream<BeeCountCloudRealtimeEvent> get realtimeEvents {
+    final realtime = _realtime;
+    if (realtime == null) {
+      return const Stream.empty();
+    }
+    return realtime.events;
+  }
+
+  Future<void> startRealtime() async {
+    final realtime = _realtime;
+    if (realtime == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud realtime is not initialized.');
+    }
+    await realtime.start();
+  }
+
+  Future<void> stopRealtime() async {
+    await _realtime?.stop();
+  }
+
+  Future<BeeCountCloudProfile> getMyProfile() async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.getMyProfile();
+  }
+
+  Future<BeeCountCloudProfile> updateMyProfileDisplayName({
+    required String displayName,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.updateMyProfileDisplayName(displayName: displayName);
+  }
+
+  Future<BeeCountCloudAvatarUploadResult> uploadMyAvatar({
+    required Uint8List bytes,
+    required String fileName,
+    String? mimeType,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.uploadMyAvatar(
+      bytes: bytes,
+      fileName: fileName,
+      mimeType: mimeType,
+    );
+  }
+
+  Future<BeeCountCloudPullResult> pullChanges({
+    int? since,
+    int limit = 1000,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.pullChanges(since: since, limit: limit);
+  }
+
+  Future<Map<String, BeeCountCloudAttachmentExistsItem>> attachmentBatchExists({
+    required String ledgerId,
+    required List<String> sha256List,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.attachmentBatchExists(
+      ledgerId: ledgerId,
+      sha256List: sha256List,
+    );
+  }
+
+  Future<BeeCountCloudAttachmentUploadResult> uploadAttachment({
+    required String ledgerId,
+    required Uint8List bytes,
+    required String fileName,
+    String? mimeType,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.uploadAttachment(
+      ledgerId: ledgerId,
+      bytes: bytes,
+      fileName: fileName,
+      mimeType: mimeType,
+    );
+  }
+
+  Future<Uint8List> downloadAttachment({required String fileId}) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.downloadAttachment(fileId: fileId);
+  }
+
+  Future<List<BeeCountCloudShareMember>> listShareMembers({
+    required String ledgerId,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.listShareMembers(ledgerId: ledgerId);
+  }
+
+  Future<List<BeeCountCloudShareInvite>> listShareInvites({
+    required String ledgerId,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.listShareInvites(ledgerId: ledgerId);
+  }
+
+  Future<BeeCountCloudShareInviteCreateResult> createShareInvite({
+    required String ledgerId,
+    String role = 'editor',
+    int maxUses = 1,
+    int expiresInHours = 168,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.createShareInvite(
+      ledgerId: ledgerId,
+      role: role,
+      maxUses: maxUses,
+      expiresInHours: expiresInHours,
+    );
+  }
+
+  Future<void> revokeShareInvite({required String inviteId}) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.revokeShareInvite(inviteId: inviteId);
+  }
+
+  Future<void> joinShare({required String inviteCode}) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.joinShare(inviteCode: inviteCode);
+  }
+
+  Future<void> leaveShare({required String ledgerId}) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.leaveShare(ledgerId: ledgerId);
+  }
+
+  Future<void> updateShareMemberRole({
+    required String ledgerId,
+    required String userId,
+    required String role,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.updateShareMemberRole(
+      ledgerId: ledgerId,
+      userId: userId,
+      role: role,
+    );
+  }
+
+  Future<List<BeeCountCloudDevice>> listDevices({
+    String view = 'deduped',
+    int activeWithinDays = 30,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.listDevices(
+      view: view,
+      activeWithinDays: activeWithinDays,
+    );
+  }
+
+  Future<void> revokeDevice({required String deviceId}) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.revokeDevice(deviceId: deviceId);
+  }
+
+  Future<List<BeeCountCloudReadLedger>> readLedgers() async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.readLedgers();
+  }
+
+  Future<BeeCountCloudReadLedgerDetail> readLedgerDetail({
+    required String ledgerId,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.readLedgerDetail(ledgerId: ledgerId);
+  }
+
+  Future<List<BeeCountCloudReadTransaction>> readTransactions({
+    required String ledgerId,
+    String? txType,
+    String? query,
+    DateTime? startAt,
+    DateTime? endAt,
+    int limit = 200,
+    int offset = 0,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.readTransactions(
+      ledgerId: ledgerId,
+      txType: txType,
+      query: query,
+      startAt: startAt,
+      endAt: endAt,
+      limit: limit,
+      offset: offset,
+    );
+  }
+
+  Future<List<BeeCountCloudReadAccount>> readAccounts({
+    required String ledgerId,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.readAccounts(ledgerId: ledgerId);
+  }
+
+  Future<List<BeeCountCloudReadCategory>> readCategories({
+    required String ledgerId,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.readCategories(ledgerId: ledgerId);
+  }
+
+  Future<List<BeeCountCloudReadTag>> readTags({
+    required String ledgerId,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.readTags(ledgerId: ledgerId);
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeCreateLedger({
+    String? ledgerId,
+    required String ledgerName,
+    String currency = 'CNY',
+    String? idempotencyKey,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.writeCreateLedger(
+      ledgerId: ledgerId,
+      ledgerName: ledgerName,
+      currency: currency,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeLedgerMeta({
+    required String ledgerId,
+    required int baseChangeId,
+    String? ledgerName,
+    String? currency,
+    String? requestId,
+    String? idempotencyKey,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.writeLedgerMeta(
+      ledgerId: ledgerId,
+      baseChangeId: baseChangeId,
+      ledgerName: ledgerName,
+      currency: currency,
+      requestId: requestId,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeCreateTransaction({
+    required String ledgerId,
+    required int baseChangeId,
+    required String txType,
+    required double amount,
+    required DateTime happenedAt,
+    String? note,
+    String? categoryName,
+    String? categoryKind,
+    String? accountName,
+    String? fromAccountName,
+    String? toAccountName,
+    String? categoryId,
+    String? accountId,
+    String? fromAccountId,
+    String? toAccountId,
+    Object? tags,
+    List<String>? tagIds,
+    List<Map<String, dynamic>>? attachments,
+    String? requestId,
+    String? idempotencyKey,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.writeCreateTransaction(
+      ledgerId: ledgerId,
+      baseChangeId: baseChangeId,
+      txType: txType,
+      amount: amount,
+      happenedAt: happenedAt,
+      note: note,
+      categoryName: categoryName,
+      categoryKind: categoryKind,
+      accountName: accountName,
+      fromAccountName: fromAccountName,
+      toAccountName: toAccountName,
+      categoryId: categoryId,
+      accountId: accountId,
+      fromAccountId: fromAccountId,
+      toAccountId: toAccountId,
+      tags: tags,
+      tagIds: tagIds,
+      attachments: attachments,
+      requestId: requestId,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeUpdateTransaction({
+    required String ledgerId,
+    required String txId,
+    required int baseChangeId,
+    String? txType,
+    double? amount,
+    DateTime? happenedAt,
+    String? note,
+    String? categoryName,
+    String? categoryKind,
+    String? accountName,
+    String? fromAccountName,
+    String? toAccountName,
+    String? categoryId,
+    String? accountId,
+    String? fromAccountId,
+    String? toAccountId,
+    Object? tags,
+    List<String>? tagIds,
+    List<Map<String, dynamic>>? attachments,
+    String? requestId,
+    String? idempotencyKey,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.writeUpdateTransaction(
+      ledgerId: ledgerId,
+      txId: txId,
+      baseChangeId: baseChangeId,
+      txType: txType,
+      amount: amount,
+      happenedAt: happenedAt,
+      note: note,
+      categoryName: categoryName,
+      categoryKind: categoryKind,
+      accountName: accountName,
+      fromAccountName: fromAccountName,
+      toAccountName: toAccountName,
+      categoryId: categoryId,
+      accountId: accountId,
+      fromAccountId: fromAccountId,
+      toAccountId: toAccountId,
+      tags: tags,
+      tagIds: tagIds,
+      attachments: attachments,
+      requestId: requestId,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeDeleteTransaction({
+    required String ledgerId,
+    required String txId,
+    required int baseChangeId,
+    String? requestId,
+    String? idempotencyKey,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.writeDeleteTransaction(
+      ledgerId: ledgerId,
+      txId: txId,
+      baseChangeId: baseChangeId,
+      requestId: requestId,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeCreateAccount({
+    required String ledgerId,
+    required int baseChangeId,
+    required String name,
+    String? accountType,
+    String? currency,
+    double? initialBalance,
+    String? requestId,
+    String? idempotencyKey,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.writeCreateAccount(
+      ledgerId: ledgerId,
+      baseChangeId: baseChangeId,
+      name: name,
+      accountType: accountType,
+      currency: currency,
+      initialBalance: initialBalance,
+      requestId: requestId,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeUpdateAccount({
+    required String ledgerId,
+    required String accountId,
+    required int baseChangeId,
+    String? name,
+    String? accountType,
+    String? currency,
+    double? initialBalance,
+    String? requestId,
+    String? idempotencyKey,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.writeUpdateAccount(
+      ledgerId: ledgerId,
+      accountId: accountId,
+      baseChangeId: baseChangeId,
+      name: name,
+      accountType: accountType,
+      currency: currency,
+      initialBalance: initialBalance,
+      requestId: requestId,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeDeleteAccount({
+    required String ledgerId,
+    required String accountId,
+    required int baseChangeId,
+    String? requestId,
+    String? idempotencyKey,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.writeDeleteAccount(
+      ledgerId: ledgerId,
+      accountId: accountId,
+      baseChangeId: baseChangeId,
+      requestId: requestId,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeCreateCategory({
+    required String ledgerId,
+    required int baseChangeId,
+    required String name,
+    required String kind,
+    int? level,
+    int? sortOrder,
+    String? icon,
+    String? iconType,
+    String? customIconPath,
+    String? iconCloudFileId,
+    String? iconCloudSha256,
+    String? parentName,
+    String? requestId,
+    String? idempotencyKey,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.writeCreateCategory(
+      ledgerId: ledgerId,
+      baseChangeId: baseChangeId,
+      name: name,
+      kind: kind,
+      level: level,
+      sortOrder: sortOrder,
+      icon: icon,
+      iconType: iconType,
+      customIconPath: customIconPath,
+      iconCloudFileId: iconCloudFileId,
+      iconCloudSha256: iconCloudSha256,
+      parentName: parentName,
+      requestId: requestId,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeUpdateCategory({
+    required String ledgerId,
+    required String categoryId,
+    required int baseChangeId,
+    String? name,
+    String? kind,
+    int? level,
+    int? sortOrder,
+    String? icon,
+    String? iconType,
+    String? customIconPath,
+    String? iconCloudFileId,
+    String? iconCloudSha256,
+    String? parentName,
+    String? requestId,
+    String? idempotencyKey,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.writeUpdateCategory(
+      ledgerId: ledgerId,
+      categoryId: categoryId,
+      baseChangeId: baseChangeId,
+      name: name,
+      kind: kind,
+      level: level,
+      sortOrder: sortOrder,
+      icon: icon,
+      iconType: iconType,
+      customIconPath: customIconPath,
+      iconCloudFileId: iconCloudFileId,
+      iconCloudSha256: iconCloudSha256,
+      parentName: parentName,
+      requestId: requestId,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeDeleteCategory({
+    required String ledgerId,
+    required String categoryId,
+    required int baseChangeId,
+    String? requestId,
+    String? idempotencyKey,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.writeDeleteCategory(
+      ledgerId: ledgerId,
+      categoryId: categoryId,
+      baseChangeId: baseChangeId,
+      requestId: requestId,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeCreateTag({
+    required String ledgerId,
+    required int baseChangeId,
+    required String name,
+    String? color,
+    String? requestId,
+    String? idempotencyKey,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.writeCreateTag(
+      ledgerId: ledgerId,
+      baseChangeId: baseChangeId,
+      name: name,
+      color: color,
+      requestId: requestId,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeUpdateTag({
+    required String ledgerId,
+    required String tagId,
+    required int baseChangeId,
+    String? name,
+    String? color,
+    String? requestId,
+    String? idempotencyKey,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.writeUpdateTag(
+      ledgerId: ledgerId,
+      tagId: tagId,
+      baseChangeId: baseChangeId,
+      name: name,
+      color: color,
+      requestId: requestId,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeDeleteTag({
+    required String ledgerId,
+    required String tagId,
+    required int baseChangeId,
+    String? requestId,
+    String? idempotencyKey,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException(
+          'BeeCount Cloud storage is not initialized.');
+    }
+    return storage.writeDeleteTag(
+      ledgerId: ledgerId,
+      tagId: tagId,
+      baseChangeId: baseChangeId,
+      requestId: requestId,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+}
+
+class _BeeCountDeviceMetadata {
+  const _BeeCountDeviceMetadata({
+    required this.deviceId,
+    required this.deviceName,
+    required this.platform,
+    this.appVersion,
+    this.osVersion,
+    this.deviceModel,
+  });
+
+  final String deviceId;
+  final String deviceName;
+  final String platform;
+  final String? appVersion;
+  final String? osVersion;
+  final String? deviceModel;
+}
+
+String? _trimOrNull(String? value) {
+  final normalized = value?.trim() ?? '';
+  return normalized.isEmpty ? null : normalized;
+}
+
+String _firstNonEmpty(List<String?> values, {required String fallback}) {
+  for (final value in values) {
+    final normalized = _trimOrNull(value);
+    if (normalized != null) {
+      return normalized;
+    }
+  }
+  return fallback;
+}
+
+String _joinNonEmpty(List<String?> values) {
+  return values
+      .map(_trimOrNull)
+      .whereType<String>()
+      .where((value) => value.isNotEmpty)
+      .join(' ')
+      .trim();
+}
+
+class BeeCountCloudAuthService implements CloudAuthService {
+  BeeCountCloudAuthService({
+    required this.baseUrl,
+    required this.apiPrefix,
+    http.Client? httpClient,
+  }) : _httpClient = httpClient ?? http.Client();
+
+  final String baseUrl;
+  final String apiPrefix;
+  final http.Client _httpClient;
+
+  final StreamController<CloudUser?> _authStateController =
+      StreamController<CloudUser?>.broadcast();
+
+  _BeeCountCloudSession? _session;
+  _BeeCountDeviceMetadata? _deviceMetadataCache;
+  Future<_BeeCountDeviceMetadata>? _deviceMetadataFuture;
+
+  String get _sessionStorageKey {
+    final raw = '$baseUrl|$apiPrefix';
+    final digest = sha1.convert(utf8.encode(raw)).toString();
+    return 'beecount_cloud_session_$digest';
+  }
+
+  String get _localDeviceIdStorageKey {
+    final raw = '$baseUrl|$apiPrefix';
+    final digest = sha1.convert(utf8.encode(raw)).toString();
+    return 'beecount_cloud_local_device_id_$digest';
+  }
+
+  Future<void> initialize() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_sessionStorageKey);
+    if (raw == null || raw.isEmpty) {
+      return;
+    }
+
+    try {
+      final json = jsonDecode(raw) as Map<String, dynamic>;
+      _session = _BeeCountCloudSession.fromJson(json);
+      if (_isAccessTokenExpired(_session!)) {
+        await _refreshSessionOrClear();
+      } else {
+        _emitCurrentUser();
+      }
+    } catch (_) {
+      await _clearSession();
+    }
+  }
+
+  @override
+  Stream<CloudUser?> get authStateChanges => _authStateController.stream;
+
+  @override
+  Future<CloudUser?> get currentUser async {
+    final session = _session;
+    if (session == null) return null;
+    if (_isAccessTokenExpired(session)) {
+      final refreshed = await tryRefreshSession();
+      if (!refreshed) return null;
+    }
+    final latest = _session;
+    if (latest == null) return null;
+    return _toCloudUser(latest);
+  }
+
+  Future<String> requireAccessToken() async {
+    final session = _session;
+    if (session == null) {
+      throw CloudNotAuthenticatedException();
+    }
+    if (_isAccessTokenExpired(session)) {
+      final refreshed = await tryRefreshSession();
+      if (!refreshed || _session == null) {
+        throw CloudNotAuthenticatedException(
+            'Session expired, please login again.');
+      }
+    }
+    return _session!.accessToken;
+  }
+
+  String? get currentDeviceId => _session?.deviceId;
+  String? get currentUserId => _session?.userId;
+
+  Future<bool> tryRefreshSession() async {
+    try {
+      await _refreshSession();
+      return true;
+    } catch (_) {
+      await _clearSession();
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>> _buildAuthBody({
+    required String email,
+    required String password,
+  }) async {
+    final metadata = await _resolveDeviceMetadata();
+    return <String, dynamic>{
+      'email': email,
+      'password': password,
+      'device_id': metadata.deviceId,
+      'device_name': metadata.deviceName,
+      'platform': metadata.platform,
+      if (metadata.appVersion != null) 'app_version': metadata.appVersion,
+      if (metadata.osVersion != null) 'os_version': metadata.osVersion,
+      if (metadata.deviceModel != null) 'device_model': metadata.deviceModel,
+    };
+  }
+
+  Future<_BeeCountDeviceMetadata> _resolveDeviceMetadata() {
+    final cached = _deviceMetadataCache;
+    if (cached != null) {
+      return Future.value(cached);
+    }
+    final inflight = _deviceMetadataFuture;
+    if (inflight != null) {
+      return inflight;
+    }
+    final future = _loadDeviceMetadata();
+    _deviceMetadataFuture = future;
+    return future.then((value) {
+      _deviceMetadataCache = value;
+      _deviceMetadataFuture = null;
+      return value;
+    }).catchError((error) {
+      _deviceMetadataFuture = null;
+      throw error;
+    });
+  }
+
+  Future<_BeeCountDeviceMetadata> _loadDeviceMetadata() async {
+    final localDeviceId = await _resolveOrCreateLocalDeviceId();
+    String deviceName = 'BeeCount App';
+    String platform = 'flutter';
+    String? appVersion;
+    String? osVersion;
+    String? deviceModel;
+
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      final version = _trimOrNull(packageInfo.version);
+      final buildNumber = _trimOrNull(packageInfo.buildNumber);
+      appVersion = _trimOrNull(_joinNonEmpty([version, buildNumber]));
+      deviceName = _firstNonEmpty(
+        [packageInfo.appName, deviceName],
+        fallback: deviceName,
+      );
+    } catch (_) {
+      // Ignore package info failure and fall back to defaults.
+    }
+
+    try {
+      final deviceInfo = DeviceInfoPlugin();
+      if (kIsWeb) {
+        final web = await deviceInfo.webBrowserInfo;
+        platform = 'web';
+        osVersion = _trimOrNull(web.platform);
+        deviceModel = _trimOrNull(web.userAgent);
+        deviceName = _firstNonEmpty(
+          [
+            web.browserName.name,
+            deviceName,
+          ],
+          fallback: deviceName,
+        );
+      } else {
+        switch (defaultTargetPlatform) {
+          case TargetPlatform.android:
+            final info = await deviceInfo.androidInfo;
+            platform = 'android';
+            osVersion = _joinNonEmpty(
+              ['Android', _trimOrNull(info.version.release)],
+            );
+            deviceModel = _joinNonEmpty([
+              _trimOrNull(info.brand),
+              _trimOrNull(info.model),
+            ]);
+            deviceName = _firstNonEmpty(
+              [info.brand, info.model, deviceName],
+              fallback: deviceName,
+            );
+            break;
+          case TargetPlatform.iOS:
+            final info = await deviceInfo.iosInfo;
+            platform = 'ios';
+            osVersion = _joinNonEmpty([
+              _trimOrNull(info.systemName),
+              _trimOrNull(info.systemVersion),
+            ]);
+            deviceModel = _joinNonEmpty([
+              _trimOrNull(info.model),
+              _trimOrNull(info.utsname.machine),
+            ]);
+            deviceName = _firstNonEmpty(
+              [info.name, info.model, deviceName],
+              fallback: deviceName,
+            );
+            break;
+          case TargetPlatform.macOS:
+            final info = await deviceInfo.macOsInfo;
+            platform = 'macos';
+            osVersion = _joinNonEmpty([
+              _trimOrNull(info.osRelease),
+              _trimOrNull(info.arch),
+            ]);
+            deviceModel = _joinNonEmpty([
+              _trimOrNull(info.model),
+              _trimOrNull(info.hostName),
+            ]);
+            deviceName = _firstNonEmpty(
+              [info.computerName, info.model, deviceName],
+              fallback: deviceName,
+            );
+            break;
+          case TargetPlatform.windows:
+            final info = await deviceInfo.windowsInfo;
+            platform = 'windows';
+            osVersion = _joinNonEmpty([
+              _trimOrNull(info.displayVersion),
+              _trimOrNull(info.releaseId),
+            ]);
+            deviceModel = _joinNonEmpty([
+              _trimOrNull(info.productName),
+              _trimOrNull(info.deviceId),
+            ]);
+            deviceName = _firstNonEmpty(
+              [info.computerName, info.productName, deviceName],
+              fallback: deviceName,
+            );
+            break;
+          case TargetPlatform.linux:
+            final info = await deviceInfo.linuxInfo;
+            platform = 'linux';
+            osVersion = _joinNonEmpty([
+              _trimOrNull(info.prettyName),
+              _trimOrNull(info.version),
+            ]);
+            deviceModel = _joinNonEmpty([
+              _trimOrNull(info.machineId),
+              _trimOrNull(info.id),
+            ]);
+            deviceName = _firstNonEmpty(
+              [info.name, info.prettyName, deviceName],
+              fallback: deviceName,
+            );
+            break;
+          case TargetPlatform.fuchsia:
+            platform = 'fuchsia';
+            break;
+        }
+      }
+    } catch (_) {
+      // Ignore device info failure and keep fallback values.
+    }
+
+    return _BeeCountDeviceMetadata(
+      deviceId: localDeviceId,
+      deviceName: deviceName,
+      platform: platform,
+      appVersion: _trimOrNull(appVersion),
+      osVersion: _trimOrNull(osVersion),
+      deviceModel: _trimOrNull(deviceModel),
+    );
+  }
+
+  Future<String> _resolveOrCreateLocalDeviceId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final existing = _trimOrNull(prefs.getString(_localDeviceIdStorageKey));
+    if (existing != null) {
+      return existing;
+    }
+    final next = _generateLocalDeviceId();
+    await prefs.setString(_localDeviceIdStorageKey, next);
+    return next;
+  }
+
+  String _generateLocalDeviceId() {
+    final now = DateTime.now().microsecondsSinceEpoch.toString();
+    final digest = sha1
+        .convert(utf8.encode(
+            '$baseUrl|$apiPrefix|$now|${DateTime.now().millisecondsSinceEpoch}'))
+        .toString();
+    return 'dev_${digest.substring(0, 32)}';
+  }
+
+  @override
+  Future<CloudUser> signInWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    final body = await _buildAuthBody(email: email, password: password);
+    final session = await _authenticate(
+      path: '/auth/login',
+      body: body,
+      actionName: 'login',
+    );
+    return _toCloudUser(session);
+  }
+
+  @override
+  Future<CloudUser> signUpWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    final body = await _buildAuthBody(email: email, password: password);
+    final session = await _authenticate(
+      path: '/auth/register',
+      body: body,
+      actionName: 'register',
+    );
+    return _toCloudUser(session);
+  }
+
+  @override
+  Future<void> signOut() async {
+    final session = _session;
+    if (session == null) {
+      return;
+    }
+
+    try {
+      await _request(
+        method: 'POST',
+        path: '/auth/logout',
+        body: {'refresh_token': session.refreshToken},
+        accessToken: session.accessToken,
+      );
+    } catch (_) {
+      // Ignore network/logout errors and clear local session directly.
+    } finally {
+      await _clearSession();
+    }
+  }
+
+  @override
+  Future<void> sendPasswordResetEmail({required String email}) async {
+    throw CloudAuthException(
+        'BeeCount Cloud v1 does not support password reset.');
+  }
+
+  @override
+  Future<void> resendEmailVerification({required String email}) async {
+    throw CloudAuthException(
+        'BeeCount Cloud v1 does not require email verification.');
+  }
+
+  void dispose() {
+    _authStateController.close();
+    _httpClient.close();
+  }
+
+  Future<_BeeCountCloudSession> _authenticate({
+    required String path,
+    required Map<String, dynamic> body,
+    required String actionName,
+  }) async {
+    final response = await _request(method: 'POST', path: path, body: body);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudAuthException(
+          '${actionName[0].toUpperCase()}${actionName.substring(1)} failed: ${_extractErrorMessage(response)}');
+    }
+
+    final payload = _decodeJsonObject(response.body);
+    final session = _BeeCountCloudSession.fromAuthResponse(payload);
+    await _saveSession(session);
+    return session;
+  }
+
+  Future<void> _refreshSessionOrClear() async {
+    try {
+      await _refreshSession();
+    } catch (_) {
+      await _clearSession();
+    }
+  }
+
+  Future<void> _refreshSession() async {
+    final session = _session;
+    if (session == null) {
+      throw CloudNotAuthenticatedException();
+    }
+
+    final response = await _request(
+      method: 'POST',
+      path: '/auth/refresh',
+      body: {'refresh_token': session.refreshToken},
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudAuthException(
+          'Refresh token failed: ${_extractErrorMessage(response)}');
+    }
+
+    final payload = _decodeJsonObject(response.body);
+    final refreshed = _BeeCountCloudSession.fromAuthResponse(payload);
+    await _saveSession(refreshed);
+  }
+
+  Future<void> _saveSession(_BeeCountCloudSession session) async {
+    _session = session;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_sessionStorageKey, jsonEncode(session.toJson()));
+    await prefs.setString(_localDeviceIdStorageKey, session.deviceId);
+    final metadata = _deviceMetadataCache;
+    if (metadata != null && metadata.deviceId != session.deviceId) {
+      _deviceMetadataCache = _BeeCountDeviceMetadata(
+        deviceId: session.deviceId,
+        deviceName: metadata.deviceName,
+        platform: metadata.platform,
+        appVersion: metadata.appVersion,
+        osVersion: metadata.osVersion,
+        deviceModel: metadata.deviceModel,
+      );
+    }
+    _emitCurrentUser();
+  }
+
+  Future<void> _clearSession() async {
+    _session = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_sessionStorageKey);
+    _authStateController.add(null);
+  }
+
+  void _emitCurrentUser() {
+    final session = _session;
+    if (session == null) {
+      _authStateController.add(null);
+      return;
+    }
+    _authStateController.add(_toCloudUser(session));
+  }
+
+  CloudUser _toCloudUser(_BeeCountCloudSession session) {
+    return CloudUser(
+      id: session.userId,
+      email: session.email,
+      metadata: {
+        'provider': 'beecount_cloud',
+        'deviceId': session.deviceId,
+      },
+    );
+  }
+
+  bool _isAccessTokenExpired(_BeeCountCloudSession session) {
+    final now = DateTime.now().toUtc();
+    return now.isAfter(
+        session.accessTokenExpiresAt.subtract(const Duration(seconds: 30)));
+  }
+
+  Future<http.Response> _request({
+    required String method,
+    required String path,
+    Map<String, dynamic>? body,
+    String? accessToken,
+  }) async {
+    final uri = Uri.parse('$baseUrl$apiPrefix$path');
+    final request = http.Request(method, uri);
+    request.headers['Content-Type'] = 'application/json';
+    if (accessToken != null && accessToken.isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer $accessToken';
+    }
+    if (body != null) {
+      request.body = jsonEncode(body);
+    }
+
+    final streamed = await _httpClient.send(request);
+    return http.Response.fromStream(streamed);
+  }
+}
+
+class BeeCountCloudStorageService implements CloudStorageService {
+  BeeCountCloudStorageService({
+    required this.baseUrl,
+    required this.apiPrefix,
+    required this.auth,
+    http.Client? httpClient,
+  }) : _httpClient = httpClient ?? http.Client();
+
+  final String baseUrl;
+  final String apiPrefix;
+  final BeeCountCloudAuthService auth;
+  final http.Client _httpClient;
+
+  void dispose() {
+    _httpClient.close();
+  }
+
+  String? _normalizeAbsoluteUrl(String? value) {
+    final trimmed = value?.trim() ?? '';
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    final parsed = Uri.tryParse(trimmed);
+    if (parsed != null && parsed.hasScheme) {
+      return parsed.toString();
+    }
+    final normalizedBase = baseUrl.trim();
+    if (normalizedBase.isEmpty) {
+      return trimmed;
+    }
+    final base = Uri.parse(
+      normalizedBase.endsWith('/') ? normalizedBase : '$normalizedBase/',
+    );
+    if (parsed != null) {
+      if (!parsed.hasScheme && parsed.hasAuthority) {
+        final fallbackScheme = base.scheme.isNotEmpty ? base.scheme : 'https';
+        return parsed.replace(scheme: fallbackScheme).toString();
+      }
+      return base.resolveUri(parsed).toString();
+    }
+    return base.resolve(trimmed).toString();
+  }
+
+  Map<String, dynamic> _copyWithNormalizedUrl(
+    Map<String, dynamic> source,
+    String key,
+  ) {
+    final raw = source[key];
+    final normalized = raw is String ? _normalizeAbsoluteUrl(raw) : null;
+    if (raw == normalized) {
+      return source;
+    }
+    final out = Map<String, dynamic>.from(source);
+    out[key] = normalized;
+    return out;
+  }
+
+  @override
+  Future<void> upload({
+    required String path,
+    required String data,
+    Map<String, String>? metadata,
+  }) async {
+    final ledgerId = _ledgerIdFromPath(path);
+    final deviceId = auth.currentDeviceId;
+    if (deviceId == null || deviceId.isEmpty) {
+      throw CloudNotAuthenticatedException(
+          'Missing device id, please login again.');
+    }
+
+    final now = DateTime.now().toUtc().toIso8601String();
+    final response = await _authedRequest(
+      method: 'POST',
+      path: '/sync/push',
+      body: {
+        'device_id': deviceId,
+        'changes': [
+          {
+            'ledger_id': ledgerId,
+            'entity_type': 'ledger_snapshot',
+            'entity_sync_id': ledgerId,
+            'action': 'upsert',
+            'payload': {
+              'content': data,
+              'metadata': metadata ?? <String, String>{},
+            },
+            'updated_at': now,
+          }
+        ]
+      },
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'Upload failed: ${_extractErrorMessage(response)}');
+    }
+  }
+
+  @override
+  Future<String?> download({required String path}) async {
+    final ledgerId = _ledgerIdFromPath(path);
+    final response = await _authedRequest(
+      method: 'GET',
+      path: '/sync/full',
+      query: {'ledger_id': ledgerId},
+    );
+
+    if (response.statusCode == 404) {
+      return null;
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'Download failed: ${_extractErrorMessage(response)}');
+    }
+
+    final payload = _decodeJsonObject(response.body);
+    final snapshot = payload['snapshot'];
+    if (snapshot == null || snapshot is! Map<String, dynamic>) {
+      return null;
+    }
+
+    final changePayload = snapshot['payload'];
+    if (changePayload is! Map<String, dynamic>) {
+      return null;
+    }
+    final content = changePayload['content'];
+    return content is String ? content : null;
+  }
+
+  @override
+  Future<void> delete({required String path}) async {
+    final ledgerId = _ledgerIdFromPath(path);
+    final deviceId = auth.currentDeviceId;
+    if (deviceId == null || deviceId.isEmpty) {
+      throw CloudNotAuthenticatedException(
+          'Missing device id, please login again.');
+    }
+
+    final response = await _authedRequest(
+      method: 'POST',
+      path: '/sync/push',
+      body: {
+        'device_id': deviceId,
+        'changes': [
+          {
+            'ledger_id': ledgerId,
+            'entity_type': 'ledger_snapshot',
+            'entity_sync_id': ledgerId,
+            'action': 'delete',
+            'payload': <String, dynamic>{},
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          }
+        ]
+      },
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'Delete failed: ${_extractErrorMessage(response)}');
+    }
+  }
+
+  @override
+  Future<List<CloudFile>> list({required String path}) async {
+    final prefix = PathHelper.normalize(path);
+    final response = await _authedRequest(method: 'GET', path: '/sync/ledgers');
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'List failed: ${_extractErrorMessage(response)}');
+    }
+
+    final data = jsonDecode(response.body);
+    if (data is! List) {
+      return const [];
+    }
+
+    final files = <CloudFile>[];
+    for (final item in data) {
+      if (item is! Map<String, dynamic>) continue;
+      final ledgerId = item['ledger_id'];
+      if (ledgerId is! String || ledgerId.isEmpty) continue;
+
+      if (prefix.isNotEmpty && !ledgerId.startsWith(prefix)) {
+        continue;
+      }
+
+      final updatedAtRaw = item['updated_at'];
+      DateTime? updatedAt;
+      if (updatedAtRaw is String && updatedAtRaw.isNotEmpty) {
+        updatedAt = DateTime.tryParse(updatedAtRaw)?.toLocal();
+      }
+
+      final metadata = item['metadata'];
+      files.add(
+        CloudFile(
+          name: ledgerId,
+          path: ledgerId,
+          size: (item['size'] as num?)?.toInt(),
+          lastModified: updatedAt,
+          metadata: metadata is Map<String, dynamic> ? metadata : const {},
+        ),
+      );
+    }
+    return files;
+  }
+
+  @override
+  Future<bool> exists({required String path}) async {
+    final metadata = await getMetadata(path: path);
+    return metadata != null;
+  }
+
+  @override
+  Future<CloudFile?> getMetadata({required String path}) async {
+    final target = PathHelper.normalize(path);
+    if (target.isEmpty) return null;
+
+    final files = await list(path: '');
+    for (final file in files) {
+      if (PathHelper.normalize(file.path) == target ||
+          PathHelper.normalize(file.name) == target) {
+        return file;
+      }
+    }
+    return null;
+  }
+
+  Future<BeeCountCloudPullResult> pullChanges({
+    int? since,
+    int limit = 1000,
+  }) async {
+    final currentCursor = since ?? await _loadCursor();
+    final query = <String, String>{
+      'since': '$currentCursor',
+      'limit': '$limit',
+    };
+    final deviceId = auth.currentDeviceId;
+    if (deviceId != null && deviceId.isNotEmpty) {
+      query['device_id'] = deviceId;
+    }
+
+    final response = await _authedRequest(
+      method: 'GET',
+      path: '/sync/pull',
+      query: query,
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'Pull failed: ${_extractErrorMessage(response)}');
+    }
+
+    final payload = _decodeJsonObject(response.body);
+    final rawChanges = payload['changes'];
+    final nextCursor =
+        (payload['server_cursor'] as num?)?.toInt() ?? currentCursor;
+    final hasMore = payload['has_more'] == true;
+
+    final changes = <BeeCountCloudSyncChange>[];
+    if (rawChanges is List) {
+      for (final row in rawChanges) {
+        if (row is! Map<String, dynamic>) {
+          continue;
+        }
+        final changeId = (row['change_id'] as num?)?.toInt();
+        final ledgerId = row['ledger_id'];
+        final entityType = row['entity_type'];
+        final entitySyncId = row['entity_sync_id'];
+        final action = row['action'];
+        if (changeId == null ||
+            ledgerId is! String ||
+            entityType is! String ||
+            entitySyncId is! String ||
+            action is! String) {
+          continue;
+        }
+        changes.add(
+          BeeCountCloudSyncChange(
+            changeId: changeId,
+            ledgerId: ledgerId,
+            entityType: entityType,
+            entitySyncId: entitySyncId,
+            action: action,
+            updatedByDeviceId: row['updated_by_device_id'] as String?,
+            updatedAt: row['updated_at'] as String?,
+          ),
+        );
+      }
+    }
+
+    await _saveCursor(nextCursor);
+    return BeeCountCloudPullResult(
+      changes: changes,
+      serverCursor: nextCursor,
+      hasMore: hasMore,
+    );
+  }
+
+  Future<Map<String, BeeCountCloudAttachmentExistsItem>> attachmentBatchExists({
+    required String ledgerId,
+    required List<String> sha256List,
+  }) async {
+    final wanted = sha256List
+        .map((value) => value.trim().toLowerCase())
+        .where((value) => value.isNotEmpty)
+        .toList(growable: false);
+    if (wanted.isEmpty) {
+      return const {};
+    }
+    final response = await _authedRequest(
+      method: 'POST',
+      path: '/attachments/batch-exists',
+      body: {
+        'ledger_id': ledgerId,
+        'sha256_list': wanted,
+      },
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'Attachment batch exists failed: ${_extractErrorMessage(response)}');
+    }
+    final payload = _decodeJsonObject(response.body);
+    final itemsRaw = payload['items'];
+    final result = <String, BeeCountCloudAttachmentExistsItem>{};
+    if (itemsRaw is List) {
+      for (final row in itemsRaw) {
+        if (row is! Map<String, dynamic>) continue;
+        final item = BeeCountCloudAttachmentExistsItem.fromJson(row);
+        result[item.sha256] = item;
+      }
+    }
+    return result;
+  }
+
+  Future<BeeCountCloudProfile> getMyProfile() async {
+    final response = await _authedRequest(
+      method: 'GET',
+      path: '/profile/me',
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'Get profile failed: ${_extractErrorMessage(response)}');
+    }
+    final payload = _decodeJsonObject(response.body);
+    return BeeCountCloudProfile.fromJson(
+      _copyWithNormalizedUrl(payload, 'avatar_url'),
+    );
+  }
+
+  Future<BeeCountCloudProfile> updateMyProfileDisplayName({
+    required String displayName,
+  }) async {
+    final normalized = displayName.trim();
+    if (normalized.isEmpty) {
+      throw CloudStorageException('Update profile failed: empty display name');
+    }
+    final response = await _authedRequest(
+      method: 'PATCH',
+      path: '/profile/me',
+      body: {'display_name': normalized},
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'Update profile failed: ${_extractErrorMessage(response)}');
+    }
+    final payload = _decodeJsonObject(response.body);
+    return BeeCountCloudProfile.fromJson(
+      _copyWithNormalizedUrl(payload, 'avatar_url'),
+    );
+  }
+
+  Future<BeeCountCloudAvatarUploadResult> uploadMyAvatar({
+    required Uint8List bytes,
+    required String fileName,
+    String? mimeType,
+  }) async {
+    if (bytes.isEmpty) {
+      throw CloudStorageException('Avatar upload failed: empty file');
+    }
+    var token = await auth.requireAccessToken();
+    var response = await _profileAvatarMultipartRequest(
+      bytes: bytes,
+      fileName: fileName,
+      mimeType: mimeType,
+      token: token,
+    );
+    if (response.statusCode == 401) {
+      final refreshed = await auth.tryRefreshSession();
+      if (!refreshed) {
+        throw CloudNotAuthenticatedException(
+            'Session expired, please login again.');
+      }
+      token = await auth.requireAccessToken();
+      response = await _profileAvatarMultipartRequest(
+        bytes: bytes,
+        fileName: fileName,
+        mimeType: mimeType,
+        token: token,
+      );
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'Avatar upload failed: ${_extractErrorMessage(response)}');
+    }
+    final payload = _decodeJsonObject(response.body);
+    return BeeCountCloudAvatarUploadResult.fromJson(
+      _copyWithNormalizedUrl(payload, 'avatar_url'),
+    );
+  }
+
+  Future<BeeCountCloudAttachmentUploadResult> uploadAttachment({
+    required String ledgerId,
+    required Uint8List bytes,
+    required String fileName,
+    String? mimeType,
+  }) async {
+    if (bytes.isEmpty) {
+      throw CloudStorageException('Attachment upload failed: empty file');
+    }
+    var token = await auth.requireAccessToken();
+    var response = await _multipartRequest(
+      ledgerId: ledgerId,
+      bytes: bytes,
+      fileName: fileName,
+      mimeType: mimeType,
+      token: token,
+    );
+    if (response.statusCode == 401) {
+      final refreshed = await auth.tryRefreshSession();
+      if (!refreshed) {
+        throw CloudNotAuthenticatedException(
+            'Session expired, please login again.');
+      }
+      token = await auth.requireAccessToken();
+      response = await _multipartRequest(
+        ledgerId: ledgerId,
+        bytes: bytes,
+        fileName: fileName,
+        mimeType: mimeType,
+        token: token,
+      );
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'Attachment upload failed: ${_extractErrorMessage(response)}');
+    }
+    final payload = _decodeJsonObject(response.body);
+    return BeeCountCloudAttachmentUploadResult.fromJson(payload);
+  }
+
+  Future<Uint8List> downloadAttachment({required String fileId}) async {
+    final response = await _authedRequest(
+      method: 'GET',
+      path: '/attachments/$fileId',
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'Attachment download failed: ${_extractErrorMessage(response)}');
+    }
+    return response.bodyBytes;
+  }
+
+  Future<List<BeeCountCloudShareMember>> listShareMembers({
+    required String ledgerId,
+  }) async {
+    final response = await _authedRequest(
+      method: 'GET',
+      path: '/share/members',
+      query: {'ledger_id': ledgerId},
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'List share members failed: ${_extractErrorMessage(response)}');
+    }
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) return const [];
+    final out = <BeeCountCloudShareMember>[];
+    for (final row in decoded) {
+      if (row is! Map<String, dynamic>) continue;
+      out.add(
+        BeeCountCloudShareMember.fromJson(
+          _copyWithNormalizedUrl(row, 'user_avatar_url'),
+        ),
+      );
+    }
+    return out;
+  }
+
+  Future<List<BeeCountCloudShareInvite>> listShareInvites({
+    required String ledgerId,
+  }) async {
+    final response = await _authedRequest(
+      method: 'GET',
+      path: '/share/invites',
+      query: {'ledger_id': ledgerId},
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'List share invites failed: ${_extractErrorMessage(response)}');
+    }
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) return const [];
+    final out = <BeeCountCloudShareInvite>[];
+    for (final row in decoded) {
+      if (row is! Map<String, dynamic>) continue;
+      out.add(BeeCountCloudShareInvite.fromJson(row));
+    }
+    return out;
+  }
+
+  Future<BeeCountCloudShareInviteCreateResult> createShareInvite({
+    required String ledgerId,
+    String role = 'editor',
+    int maxUses = 1,
+    int expiresInHours = 168,
+  }) async {
+    final response = await _authedRequest(
+      method: 'POST',
+      path: '/share/invite',
+      body: {
+        'ledger_id': ledgerId,
+        'role': role,
+        'max_uses': maxUses,
+        'expires_in_hours': expiresInHours,
+      },
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'Create share invite failed: ${_extractErrorMessage(response)}');
+    }
+    final payload = _decodeJsonObject(response.body);
+    return BeeCountCloudShareInviteCreateResult.fromJson(payload);
+  }
+
+  Future<void> revokeShareInvite({required String inviteId}) async {
+    final response = await _authedRequest(
+      method: 'POST',
+      path: '/share/invite/revoke',
+      body: {
+        'invite_id': inviteId,
+      },
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'Revoke share invite failed: ${_extractErrorMessage(response)}');
+    }
+  }
+
+  Future<void> joinShare({required String inviteCode}) async {
+    final response = await _authedRequest(
+      method: 'POST',
+      path: '/share/join',
+      body: {'invite_code': inviteCode},
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'Join share failed: ${_extractErrorMessage(response)}');
+    }
+  }
+
+  Future<void> leaveShare({required String ledgerId}) async {
+    final response = await _authedRequest(
+      method: 'POST',
+      path: '/share/leave',
+      body: {'ledger_id': ledgerId},
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'Leave share failed: ${_extractErrorMessage(response)}');
+    }
+  }
+
+  Future<void> updateShareMemberRole({
+    required String ledgerId,
+    required String userId,
+    required String role,
+  }) async {
+    final response = await _authedRequest(
+      method: 'POST',
+      path: '/share/member/role',
+      body: {
+        'ledger_id': ledgerId,
+        'user_id': userId,
+        'role': role,
+      },
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'Update share role failed: ${_extractErrorMessage(response)}');
+    }
+  }
+
+  Future<List<BeeCountCloudDevice>> listDevices({
+    String view = 'deduped',
+    int activeWithinDays = 30,
+  }) async {
+    final normalizedView =
+        view.trim().toLowerCase() == 'sessions' ? 'sessions' : 'deduped';
+    final normalizedDays = activeWithinDays < 0 ? 0 : activeWithinDays;
+    final response = await _authedRequest(
+      method: 'GET',
+      path: '/devices',
+      query: {
+        'view': normalizedView,
+        'active_within_days': '$normalizedDays',
+      },
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'List devices failed: ${_extractErrorMessage(response)}');
+    }
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) return const [];
+    final out = <BeeCountCloudDevice>[];
+    for (final row in decoded) {
+      if (row is! Map<String, dynamic>) continue;
+      out.add(BeeCountCloudDevice.fromJson(row));
+    }
+    return out;
+  }
+
+  Future<void> revokeDevice({required String deviceId}) async {
+    final response = await _authedRequest(
+      method: 'POST',
+      path: '/devices/$deviceId/revoke',
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'Revoke device failed: ${_extractErrorMessage(response)}');
+    }
+  }
+
+  Future<List<BeeCountCloudReadLedger>> readLedgers() async {
+    final response = await _authedRequest(
+      method: 'GET',
+      path: '/read/ledgers',
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'Read ledgers failed: ${_extractErrorMessage(response)}');
+    }
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) return const [];
+    final out = <BeeCountCloudReadLedger>[];
+    for (final row in decoded) {
+      if (row is! Map<String, dynamic>) continue;
+      out.add(BeeCountCloudReadLedger.fromJson(row));
+    }
+    return out;
+  }
+
+  Future<BeeCountCloudReadLedgerDetail> readLedgerDetail({
+    required String ledgerId,
+  }) async {
+    final response = await _authedRequest(
+      method: 'GET',
+      path: '/read/ledgers/$ledgerId',
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'Read ledger detail failed: ${_extractErrorMessage(response)}');
+    }
+    final payload = _decodeJsonObject(response.body);
+    return BeeCountCloudReadLedgerDetail.fromJson(payload);
+  }
+
+  Future<List<BeeCountCloudReadTransaction>> readTransactions({
+    required String ledgerId,
+    String? txType,
+    String? query,
+    DateTime? startAt,
+    DateTime? endAt,
+    int limit = 200,
+    int offset = 0,
+  }) async {
+    final qp = <String, String>{
+      'limit': '$limit',
+      'offset': '$offset',
+      if (txType != null && txType.trim().isNotEmpty) 'tx_type': txType.trim(),
+      if (query != null && query.trim().isNotEmpty) 'q': query.trim(),
+      if (startAt != null) 'start_at': startAt.toUtc().toIso8601String(),
+      if (endAt != null) 'end_at': endAt.toUtc().toIso8601String(),
+    };
+    final response = await _authedRequest(
+      method: 'GET',
+      path: '/read/ledgers/$ledgerId/transactions',
+      query: qp,
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'Read transactions failed: ${_extractErrorMessage(response)}');
+    }
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) return const [];
+    final out = <BeeCountCloudReadTransaction>[];
+    for (final row in decoded) {
+      if (row is! Map<String, dynamic>) continue;
+      out.add(
+        BeeCountCloudReadTransaction.fromJson(
+          _copyWithNormalizedUrl(row, 'created_by_avatar_url'),
+        ),
+      );
+    }
+    return out;
+  }
+
+  Future<List<BeeCountCloudReadAccount>> readAccounts({
+    required String ledgerId,
+  }) async {
+    final response = await _authedRequest(
+      method: 'GET',
+      path: '/read/ledgers/$ledgerId/accounts',
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'Read accounts failed: ${_extractErrorMessage(response)}');
+    }
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) return const [];
+    final out = <BeeCountCloudReadAccount>[];
+    for (final row in decoded) {
+      if (row is! Map<String, dynamic>) continue;
+      out.add(BeeCountCloudReadAccount.fromJson(row));
+    }
+    return out;
+  }
+
+  Future<List<BeeCountCloudReadCategory>> readCategories({
+    required String ledgerId,
+  }) async {
+    final response = await _authedRequest(
+      method: 'GET',
+      path: '/read/ledgers/$ledgerId/categories',
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'Read categories failed: ${_extractErrorMessage(response)}');
+    }
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) return const [];
+    final out = <BeeCountCloudReadCategory>[];
+    for (final row in decoded) {
+      if (row is! Map<String, dynamic>) continue;
+      out.add(BeeCountCloudReadCategory.fromJson(row));
+    }
+    return out;
+  }
+
+  Future<List<BeeCountCloudReadTag>> readTags({
+    required String ledgerId,
+  }) async {
+    final response = await _authedRequest(
+      method: 'GET',
+      path: '/read/ledgers/$ledgerId/tags',
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'Read tags failed: ${_extractErrorMessage(response)}');
+    }
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) return const [];
+    final out = <BeeCountCloudReadTag>[];
+    for (final row in decoded) {
+      if (row is! Map<String, dynamic>) continue;
+      out.add(BeeCountCloudReadTag.fromJson(row));
+    }
+    return out;
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeCreateLedger({
+    String? ledgerId,
+    required String ledgerName,
+    String currency = 'CNY',
+    String? idempotencyKey,
+  }) async {
+    final body = <String, dynamic>{
+      'ledger_name': ledgerName,
+      'currency': currency,
+      if (ledgerId != null && ledgerId.trim().isNotEmpty)
+        'ledger_id': ledgerId.trim(),
+    };
+    return _writeRequest(
+      method: 'POST',
+      path: '/write/ledgers',
+      body: body,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeLedgerMeta({
+    required String ledgerId,
+    required int baseChangeId,
+    String? ledgerName,
+    String? currency,
+    String? requestId,
+    String? idempotencyKey,
+  }) async {
+    final body = <String, dynamic>{
+      'base_change_id': baseChangeId,
+      if (requestId != null && requestId.trim().isNotEmpty)
+        'request_id': requestId.trim(),
+      if (ledgerName != null && ledgerName.trim().isNotEmpty)
+        'ledger_name': ledgerName.trim(),
+      if (currency != null && currency.trim().isNotEmpty)
+        'currency': currency.trim(),
+    };
+    return _writeRequest(
+      method: 'PATCH',
+      path: '/write/ledgers/$ledgerId/meta',
+      body: body,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeCreateTransaction({
+    required String ledgerId,
+    required int baseChangeId,
+    required String txType,
+    required double amount,
+    required DateTime happenedAt,
+    String? note,
+    String? categoryName,
+    String? categoryKind,
+    String? accountName,
+    String? fromAccountName,
+    String? toAccountName,
+    String? categoryId,
+    String? accountId,
+    String? fromAccountId,
+    String? toAccountId,
+    Object? tags,
+    List<String>? tagIds,
+    List<Map<String, dynamic>>? attachments,
+    String? requestId,
+    String? idempotencyKey,
+  }) async {
+    final body = <String, dynamic>{
+      'base_change_id': baseChangeId,
+      'tx_type': txType,
+      'amount': amount,
+      'happened_at': happenedAt.toUtc().toIso8601String(),
+      if (requestId != null && requestId.trim().isNotEmpty)
+        'request_id': requestId.trim(),
+      if (note != null) 'note': note,
+      if (categoryName != null) 'category_name': categoryName,
+      if (categoryKind != null) 'category_kind': categoryKind,
+      if (accountName != null) 'account_name': accountName,
+      if (fromAccountName != null) 'from_account_name': fromAccountName,
+      if (toAccountName != null) 'to_account_name': toAccountName,
+      if (categoryId != null) 'category_id': categoryId,
+      if (accountId != null) 'account_id': accountId,
+      if (fromAccountId != null) 'from_account_id': fromAccountId,
+      if (toAccountId != null) 'to_account_id': toAccountId,
+      if (tags != null) 'tags': tags,
+      if (tagIds != null) 'tag_ids': tagIds,
+      if (attachments != null) 'attachments': attachments,
+    };
+    return _writeRequest(
+      method: 'POST',
+      path: '/write/ledgers/$ledgerId/transactions',
+      body: body,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeUpdateTransaction({
+    required String ledgerId,
+    required String txId,
+    required int baseChangeId,
+    String? txType,
+    double? amount,
+    DateTime? happenedAt,
+    String? note,
+    String? categoryName,
+    String? categoryKind,
+    String? accountName,
+    String? fromAccountName,
+    String? toAccountName,
+    String? categoryId,
+    String? accountId,
+    String? fromAccountId,
+    String? toAccountId,
+    Object? tags,
+    List<String>? tagIds,
+    List<Map<String, dynamic>>? attachments,
+    String? requestId,
+    String? idempotencyKey,
+  }) async {
+    final body = <String, dynamic>{
+      'base_change_id': baseChangeId,
+      if (requestId != null && requestId.trim().isNotEmpty)
+        'request_id': requestId.trim(),
+      if (txType != null) 'tx_type': txType,
+      if (amount != null) 'amount': amount,
+      if (happenedAt != null)
+        'happened_at': happenedAt.toUtc().toIso8601String(),
+      if (note != null) 'note': note,
+      if (categoryName != null) 'category_name': categoryName,
+      if (categoryKind != null) 'category_kind': categoryKind,
+      if (accountName != null) 'account_name': accountName,
+      if (fromAccountName != null) 'from_account_name': fromAccountName,
+      if (toAccountName != null) 'to_account_name': toAccountName,
+      if (categoryId != null) 'category_id': categoryId,
+      if (accountId != null) 'account_id': accountId,
+      if (fromAccountId != null) 'from_account_id': fromAccountId,
+      if (toAccountId != null) 'to_account_id': toAccountId,
+      if (tags != null) 'tags': tags,
+      if (tagIds != null) 'tag_ids': tagIds,
+      if (attachments != null) 'attachments': attachments,
+    };
+    return _writeRequest(
+      method: 'PATCH',
+      path: '/write/ledgers/$ledgerId/transactions/$txId',
+      body: body,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeDeleteTransaction({
+    required String ledgerId,
+    required String txId,
+    required int baseChangeId,
+    String? requestId,
+    String? idempotencyKey,
+  }) async {
+    final body = <String, dynamic>{
+      'base_change_id': baseChangeId,
+      if (requestId != null && requestId.trim().isNotEmpty)
+        'request_id': requestId.trim(),
+    };
+    return _writeRequest(
+      method: 'DELETE',
+      path: '/write/ledgers/$ledgerId/transactions/$txId',
+      body: body,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeCreateAccount({
+    required String ledgerId,
+    required int baseChangeId,
+    required String name,
+    String? accountType,
+    String? currency,
+    double? initialBalance,
+    String? requestId,
+    String? idempotencyKey,
+  }) async {
+    final body = <String, dynamic>{
+      'base_change_id': baseChangeId,
+      'name': name,
+      if (requestId != null && requestId.trim().isNotEmpty)
+        'request_id': requestId.trim(),
+      if (accountType != null) 'account_type': accountType,
+      if (currency != null) 'currency': currency,
+      if (initialBalance != null) 'initial_balance': initialBalance,
+    };
+    return _writeRequest(
+      method: 'POST',
+      path: '/write/ledgers/$ledgerId/accounts',
+      body: body,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeUpdateAccount({
+    required String ledgerId,
+    required String accountId,
+    required int baseChangeId,
+    String? name,
+    String? accountType,
+    String? currency,
+    double? initialBalance,
+    String? requestId,
+    String? idempotencyKey,
+  }) async {
+    final body = <String, dynamic>{
+      'base_change_id': baseChangeId,
+      if (requestId != null && requestId.trim().isNotEmpty)
+        'request_id': requestId.trim(),
+      if (name != null) 'name': name,
+      if (accountType != null) 'account_type': accountType,
+      if (currency != null) 'currency': currency,
+      if (initialBalance != null) 'initial_balance': initialBalance,
+    };
+    return _writeRequest(
+      method: 'PATCH',
+      path: '/write/ledgers/$ledgerId/accounts/$accountId',
+      body: body,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeDeleteAccount({
+    required String ledgerId,
+    required String accountId,
+    required int baseChangeId,
+    String? requestId,
+    String? idempotencyKey,
+  }) async {
+    final body = <String, dynamic>{
+      'base_change_id': baseChangeId,
+      if (requestId != null && requestId.trim().isNotEmpty)
+        'request_id': requestId.trim(),
+    };
+    return _writeRequest(
+      method: 'DELETE',
+      path: '/write/ledgers/$ledgerId/accounts/$accountId',
+      body: body,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeCreateCategory({
+    required String ledgerId,
+    required int baseChangeId,
+    required String name,
+    required String kind,
+    int? level,
+    int? sortOrder,
+    String? icon,
+    String? iconType,
+    String? customIconPath,
+    String? iconCloudFileId,
+    String? iconCloudSha256,
+    String? parentName,
+    String? requestId,
+    String? idempotencyKey,
+  }) async {
+    final body = <String, dynamic>{
+      'base_change_id': baseChangeId,
+      'name': name,
+      'kind': kind,
+      if (requestId != null && requestId.trim().isNotEmpty)
+        'request_id': requestId.trim(),
+      if (level != null) 'level': level,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (icon != null) 'icon': icon,
+      if (iconType != null) 'icon_type': iconType,
+      if (customIconPath != null) 'custom_icon_path': customIconPath,
+      if (iconCloudFileId != null) 'icon_cloud_file_id': iconCloudFileId,
+      if (iconCloudSha256 != null) 'icon_cloud_sha256': iconCloudSha256,
+      if (parentName != null) 'parent_name': parentName,
+    };
+    return _writeRequest(
+      method: 'POST',
+      path: '/write/ledgers/$ledgerId/categories',
+      body: body,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeUpdateCategory({
+    required String ledgerId,
+    required String categoryId,
+    required int baseChangeId,
+    String? name,
+    String? kind,
+    int? level,
+    int? sortOrder,
+    String? icon,
+    String? iconType,
+    String? customIconPath,
+    String? iconCloudFileId,
+    String? iconCloudSha256,
+    String? parentName,
+    String? requestId,
+    String? idempotencyKey,
+  }) async {
+    final body = <String, dynamic>{
+      'base_change_id': baseChangeId,
+      if (requestId != null && requestId.trim().isNotEmpty)
+        'request_id': requestId.trim(),
+      if (name != null) 'name': name,
+      if (kind != null) 'kind': kind,
+      if (level != null) 'level': level,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (icon != null) 'icon': icon,
+      if (iconType != null) 'icon_type': iconType,
+      if (customIconPath != null) 'custom_icon_path': customIconPath,
+      if (iconCloudFileId != null) 'icon_cloud_file_id': iconCloudFileId,
+      if (iconCloudSha256 != null) 'icon_cloud_sha256': iconCloudSha256,
+      if (parentName != null) 'parent_name': parentName,
+    };
+    return _writeRequest(
+      method: 'PATCH',
+      path: '/write/ledgers/$ledgerId/categories/$categoryId',
+      body: body,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeDeleteCategory({
+    required String ledgerId,
+    required String categoryId,
+    required int baseChangeId,
+    String? requestId,
+    String? idempotencyKey,
+  }) async {
+    final body = <String, dynamic>{
+      'base_change_id': baseChangeId,
+      if (requestId != null && requestId.trim().isNotEmpty)
+        'request_id': requestId.trim(),
+    };
+    return _writeRequest(
+      method: 'DELETE',
+      path: '/write/ledgers/$ledgerId/categories/$categoryId',
+      body: body,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeCreateTag({
+    required String ledgerId,
+    required int baseChangeId,
+    required String name,
+    String? color,
+    String? requestId,
+    String? idempotencyKey,
+  }) async {
+    final body = <String, dynamic>{
+      'base_change_id': baseChangeId,
+      'name': name,
+      if (requestId != null && requestId.trim().isNotEmpty)
+        'request_id': requestId.trim(),
+      if (color != null) 'color': color,
+    };
+    return _writeRequest(
+      method: 'POST',
+      path: '/write/ledgers/$ledgerId/tags',
+      body: body,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeUpdateTag({
+    required String ledgerId,
+    required String tagId,
+    required int baseChangeId,
+    String? name,
+    String? color,
+    String? requestId,
+    String? idempotencyKey,
+  }) async {
+    final body = <String, dynamic>{
+      'base_change_id': baseChangeId,
+      if (requestId != null && requestId.trim().isNotEmpty)
+        'request_id': requestId.trim(),
+      if (name != null) 'name': name,
+      if (color != null) 'color': color,
+    };
+    return _writeRequest(
+      method: 'PATCH',
+      path: '/write/ledgers/$ledgerId/tags/$tagId',
+      body: body,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> writeDeleteTag({
+    required String ledgerId,
+    required String tagId,
+    required int baseChangeId,
+    String? requestId,
+    String? idempotencyKey,
+  }) async {
+    final body = <String, dynamic>{
+      'base_change_id': baseChangeId,
+      if (requestId != null && requestId.trim().isNotEmpty)
+        'request_id': requestId.trim(),
+    };
+    return _writeRequest(
+      method: 'DELETE',
+      path: '/write/ledgers/$ledgerId/tags/$tagId',
+      body: body,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<BeeCountCloudWriteCommitMeta> _writeRequest({
+    required String method,
+    required String path,
+    required Map<String, dynamic> body,
+    String? idempotencyKey,
+  }) async {
+    final headers = <String, String>{};
+    if (idempotencyKey != null && idempotencyKey.trim().isNotEmpty) {
+      headers['Idempotency-Key'] = idempotencyKey.trim();
+    }
+    final response = await _authedRequest(
+      method: method,
+      path: path,
+      body: body,
+      headers: headers.isEmpty ? null : headers,
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'Write request failed: ${_extractErrorMessage(response)}');
+    }
+    final payload = _decodeJsonObject(response.body);
+    return BeeCountCloudWriteCommitMeta.fromJson(payload);
+  }
+
+  String _ledgerIdFromPath(String path) {
+    final normalized = PathHelper.normalize(path);
+    if (normalized.isEmpty) {
+      throw CloudStorageException('Invalid path: path is empty');
+    }
+    return PathHelper.basename(normalized);
+  }
+
+  String _cursorStorageKey() {
+    final userId = auth.currentUserId ?? 'unknown';
+    final deviceId = auth.currentDeviceId ?? 'unknown';
+    final raw = '$baseUrl|$apiPrefix|$userId|$deviceId';
+    final digest = sha1.convert(utf8.encode(raw)).toString();
+    return 'beecount_cloud_pull_cursor_$digest';
+  }
+
+  Future<int> _loadCursor() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_cursorStorageKey()) ?? 0;
+  }
+
+  Future<void> _saveCursor(int cursor) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_cursorStorageKey(), cursor);
+  }
+
+  Future<http.Response> _authedRequest({
+    required String method,
+    required String path,
+    Map<String, String>? query,
+    Map<String, dynamic>? body,
+    Map<String, String>? headers,
+  }) async {
+    var token = await auth.requireAccessToken();
+    var response = await _request(
+      method: method,
+      path: path,
+      query: query,
+      body: body,
+      headers: headers,
+      token: token,
+    );
+
+    if (response.statusCode == 401) {
+      final refreshed = await auth.tryRefreshSession();
+      if (!refreshed) {
+        throw CloudNotAuthenticatedException(
+            'Session expired, please login again.');
+      }
+      token = await auth.requireAccessToken();
+      response = await _request(
+        method: method,
+        path: path,
+        query: query,
+        body: body,
+        headers: headers,
+        token: token,
+      );
+    }
+
+    return response;
+  }
+
+  Future<http.Response> _request({
+    required String method,
+    required String path,
+    Map<String, String>? query,
+    Map<String, dynamic>? body,
+    Map<String, String>? headers,
+    required String token,
+  }) async {
+    final uri = Uri.parse('$baseUrl$apiPrefix$path').replace(
+      queryParameters: query == null || query.isEmpty ? null : query,
+    );
+    final request = http.Request(method, uri);
+    request.headers['Authorization'] = 'Bearer $token';
+    request.headers['Content-Type'] = 'application/json';
+    if (headers != null && headers.isNotEmpty) {
+      request.headers.addAll(headers);
+    }
+    if (body != null) {
+      request.body = jsonEncode(body);
+    }
+    final streamed = await _httpClient.send(request);
+    return http.Response.fromStream(streamed);
+  }
+
+  Future<http.Response> _multipartRequest({
+    required String ledgerId,
+    required Uint8List bytes,
+    required String fileName,
+    required String token,
+    String? mimeType,
+  }) async {
+    final uri = Uri.parse('$baseUrl$apiPrefix/attachments/upload');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers['Authorization'] = 'Bearer $token';
+    request.fields['ledger_id'] = ledgerId;
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: fileName,
+      ),
+    );
+    if (mimeType != null && mimeType.trim().isNotEmpty) {
+      request.fields['mime_type'] = mimeType.trim();
+    }
+    final streamed = await _httpClient.send(request);
+    return http.Response.fromStream(streamed);
+  }
+
+  Future<http.Response> _profileAvatarMultipartRequest({
+    required Uint8List bytes,
+    required String fileName,
+    required String token,
+    String? mimeType,
+  }) async {
+    final uri = Uri.parse('$baseUrl$apiPrefix/profile/avatar');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers['Authorization'] = 'Bearer $token';
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: fileName,
+      ),
+    );
+    if (mimeType != null && mimeType.trim().isNotEmpty) {
+      request.fields['mime_type'] = mimeType.trim();
+    }
+    final streamed = await _httpClient.send(request);
+    return http.Response.fromStream(streamed);
+  }
+}
+
+class _BeeCountCloudSession {
+  const _BeeCountCloudSession({
+    required this.userId,
+    required this.email,
+    required this.accessToken,
+    required this.refreshToken,
+    required this.accessTokenExpiresAt,
+    required this.deviceId,
+  });
+
+  final String userId;
+  final String? email;
+  final String accessToken;
+  final String refreshToken;
+  final DateTime accessTokenExpiresAt;
+  final String deviceId;
+
+  factory _BeeCountCloudSession.fromAuthResponse(Map<String, dynamic> payload) {
+    final user = payload['user'];
+    if (user is! Map<String, dynamic>) {
+      throw const FormatException('Invalid auth response: user missing');
+    }
+
+    final userId = user['id'];
+    final accessToken = payload['access_token'];
+    final refreshToken = payload['refresh_token'];
+    final expiresIn = payload['expires_in'];
+    final deviceId = payload['device_id'];
+
+    if (userId is! String ||
+        accessToken is! String ||
+        refreshToken is! String ||
+        expiresIn is! num ||
+        deviceId is! String) {
+      throw const FormatException('Invalid auth response payload');
+    }
+
+    return _BeeCountCloudSession(
+      userId: userId,
+      email: user['email'] as String?,
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+      accessTokenExpiresAt:
+          DateTime.now().toUtc().add(Duration(seconds: expiresIn.toInt())),
+      deviceId: deviceId,
+    );
+  }
+
+  factory _BeeCountCloudSession.fromJson(Map<String, dynamic> json) {
+    return _BeeCountCloudSession(
+      userId: json['userId'] as String,
+      email: json['email'] as String?,
+      accessToken: json['accessToken'] as String,
+      refreshToken: json['refreshToken'] as String,
+      accessTokenExpiresAt:
+          DateTime.parse(json['accessTokenExpiresAt'] as String).toUtc(),
+      deviceId: json['deviceId'] as String,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'userId': userId,
+      'email': email,
+      'accessToken': accessToken,
+      'refreshToken': refreshToken,
+      'accessTokenExpiresAt': accessTokenExpiresAt.toIso8601String(),
+      'deviceId': deviceId,
+    };
+  }
+}
+
+class BeeCountCloudSyncChange {
+  const BeeCountCloudSyncChange({
+    required this.changeId,
+    required this.ledgerId,
+    required this.entityType,
+    required this.entitySyncId,
+    required this.action,
+    this.updatedByDeviceId,
+    this.updatedAt,
+  });
+
+  final int changeId;
+  final String ledgerId;
+  final String entityType;
+  final String entitySyncId;
+  final String action;
+  final String? updatedByDeviceId;
+  final String? updatedAt;
+}
+
+class BeeCountCloudPullResult {
+  const BeeCountCloudPullResult({
+    required this.changes,
+    required this.serverCursor,
+    required this.hasMore,
+  });
+
+  final List<BeeCountCloudSyncChange> changes;
+  final int serverCursor;
+  final bool hasMore;
+}
+
+class BeeCountCloudAttachmentExistsItem {
+  const BeeCountCloudAttachmentExistsItem({
+    required this.sha256,
+    required this.exists,
+    this.fileId,
+    this.size,
+    this.mimeType,
+  });
+
+  final String sha256;
+  final bool exists;
+  final String? fileId;
+  final int? size;
+  final String? mimeType;
+
+  factory BeeCountCloudAttachmentExistsItem.fromJson(
+      Map<String, dynamic> json) {
+    return BeeCountCloudAttachmentExistsItem(
+      sha256: (json['sha256'] as String?)?.toLowerCase() ?? '',
+      exists: json['exists'] == true,
+      fileId: json['file_id'] as String?,
+      size: (json['size'] as num?)?.toInt(),
+      mimeType: json['mime_type'] as String?,
+    );
+  }
+}
+
+class BeeCountCloudAttachmentUploadResult {
+  const BeeCountCloudAttachmentUploadResult({
+    required this.fileId,
+    required this.ledgerId,
+    required this.sha256,
+    required this.size,
+    this.mimeType,
+    this.fileName,
+  });
+
+  final String fileId;
+  final String ledgerId;
+  final String sha256;
+  final int size;
+  final String? mimeType;
+  final String? fileName;
+
+  factory BeeCountCloudAttachmentUploadResult.fromJson(
+      Map<String, dynamic> json) {
+    final fileId = json['file_id'];
+    final ledgerId = json['ledger_id'];
+    final sha = json['sha256'];
+    if (fileId is! String || ledgerId is! String || sha is! String) {
+      throw const FormatException('Invalid attachment upload response payload');
+    }
+    return BeeCountCloudAttachmentUploadResult(
+      fileId: fileId,
+      ledgerId: ledgerId,
+      sha256: sha.toLowerCase(),
+      size: (json['size'] as num?)?.toInt() ?? 0,
+      mimeType: json['mime_type'] as String?,
+      fileName: json['file_name'] as String?,
+    );
+  }
+}
+
+class BeeCountCloudShareMember {
+  const BeeCountCloudShareMember({
+    required this.userId,
+    required this.role,
+    required this.status,
+    required this.joinedAt,
+    this.userEmail,
+    this.userDisplayName,
+    this.userAvatarUrl,
+    this.userAvatarVersion,
+    this.leftAt,
+  });
+
+  final String userId;
+  final String? userEmail;
+  final String? userDisplayName;
+  final String? userAvatarUrl;
+  final int? userAvatarVersion;
+  final String role;
+  final String status;
+  final DateTime? joinedAt;
+  final DateTime? leftAt;
+
+  factory BeeCountCloudShareMember.fromJson(Map<String, dynamic> json) {
+    return BeeCountCloudShareMember(
+      userId: json['user_id'] as String? ?? '',
+      userEmail: _trimOrNull(json['user_email'] as String?),
+      userDisplayName: _trimOrNull(json['user_display_name'] as String?),
+      userAvatarUrl: _trimOrNull(json['user_avatar_url'] as String?),
+      userAvatarVersion: (json['user_avatar_version'] as num?)?.toInt(),
+      role: json['role'] as String? ?? 'viewer',
+      status: json['status'] as String? ?? 'active',
+      joinedAt: DateTime.tryParse(json['joined_at'] as String? ?? ''),
+      leftAt: DateTime.tryParse(json['left_at'] as String? ?? ''),
+    );
+  }
+}
+
+class BeeCountCloudShareInvite {
+  const BeeCountCloudShareInvite({
+    required this.inviteId,
+    required this.ledgerId,
+    required this.role,
+    required this.maxUses,
+    required this.usedCount,
+    required this.status,
+    this.expiresAt,
+    this.revokedAt,
+    this.createdAt,
+  });
+
+  final String inviteId;
+  final String ledgerId;
+  final String role;
+  final int? maxUses;
+  final int usedCount;
+  final String status;
+  final DateTime? expiresAt;
+  final DateTime? revokedAt;
+  final DateTime? createdAt;
+
+  factory BeeCountCloudShareInvite.fromJson(Map<String, dynamic> json) {
+    return BeeCountCloudShareInvite(
+      inviteId: json['invite_id'] as String? ?? '',
+      ledgerId: json['ledger_id'] as String? ?? '',
+      role: json['role'] as String? ?? 'viewer',
+      maxUses: (json['max_uses'] as num?)?.toInt(),
+      usedCount: (json['used_count'] as num?)?.toInt() ?? 0,
+      status: json['status'] as String? ?? 'active',
+      expiresAt: DateTime.tryParse(json['expires_at'] as String? ?? ''),
+      revokedAt: DateTime.tryParse(json['revoked_at'] as String? ?? ''),
+      createdAt: DateTime.tryParse(json['created_at'] as String? ?? ''),
+    );
+  }
+}
+
+class BeeCountCloudShareInviteCreateResult {
+  const BeeCountCloudShareInviteCreateResult({
+    required this.inviteId,
+    required this.inviteCode,
+    required this.ledgerId,
+    required this.role,
+    required this.maxUses,
+    this.expiresAt,
+  });
+
+  final String inviteId;
+  final String inviteCode;
+  final String ledgerId;
+  final String role;
+  final int maxUses;
+  final DateTime? expiresAt;
+
+  factory BeeCountCloudShareInviteCreateResult.fromJson(
+      Map<String, dynamic> json) {
+    return BeeCountCloudShareInviteCreateResult(
+      inviteId: json['invite_id'] as String? ?? '',
+      inviteCode: json['invite_code'] as String? ?? '',
+      ledgerId: json['ledger_id'] as String? ?? '',
+      role: json['role'] as String? ?? 'viewer',
+      maxUses: (json['max_uses'] as num?)?.toInt() ?? 1,
+      expiresAt: DateTime.tryParse(json['expires_at'] as String? ?? ''),
+    );
+  }
+}
+
+class BeeCountCloudDevice {
+  const BeeCountCloudDevice({
+    required this.id,
+    required this.name,
+    required this.platform,
+    this.appVersion,
+    this.osVersion,
+    this.deviceModel,
+    this.lastIp,
+    this.lastSeenAt,
+    this.createdAt,
+    this.sessionCount = 1,
+  });
+
+  final String id;
+  final String name;
+  final String platform;
+  final String? appVersion;
+  final String? osVersion;
+  final String? deviceModel;
+  final String? lastIp;
+  final DateTime? lastSeenAt;
+  final DateTime? createdAt;
+  final int sessionCount;
+
+  factory BeeCountCloudDevice.fromJson(Map<String, dynamic> json) {
+    return BeeCountCloudDevice(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      platform: json['platform'] as String? ?? '',
+      appVersion: _trimOrNull(json['app_version'] as String?),
+      osVersion: _trimOrNull(json['os_version'] as String?),
+      deviceModel: _trimOrNull(json['device_model'] as String?),
+      lastIp: _trimOrNull(json['last_ip'] as String?),
+      lastSeenAt: DateTime.tryParse(json['last_seen_at'] as String? ?? ''),
+      createdAt: DateTime.tryParse(json['created_at'] as String? ?? ''),
+      sessionCount: (json['session_count'] as num?)?.toInt() ?? 1,
+    );
+  }
+}
+
+class BeeCountCloudReadLedger {
+  const BeeCountCloudReadLedger({
+    required this.ledgerId,
+    required this.ledgerName,
+    required this.currency,
+    required this.transactionCount,
+    required this.incomeTotal,
+    required this.expenseTotal,
+    required this.balance,
+    required this.role,
+    this.isShared = false,
+    this.memberCount = 1,
+    this.exportedAt,
+    this.updatedAt,
+  });
+
+  final String ledgerId;
+  final String ledgerName;
+  final String currency;
+  final int transactionCount;
+  final double incomeTotal;
+  final double expenseTotal;
+  final double balance;
+  final String role;
+  final bool isShared;
+  final int memberCount;
+  final DateTime? exportedAt;
+  final DateTime? updatedAt;
+
+  factory BeeCountCloudReadLedger.fromJson(Map<String, dynamic> json) {
+    return BeeCountCloudReadLedger(
+      ledgerId: json['ledger_id'] as String? ?? '',
+      ledgerName: json['ledger_name'] as String? ?? '',
+      currency: json['currency'] as String? ?? 'CNY',
+      transactionCount: (json['transaction_count'] as num?)?.toInt() ?? 0,
+      incomeTotal: (json['income_total'] as num?)?.toDouble() ?? 0,
+      expenseTotal: (json['expense_total'] as num?)?.toDouble() ?? 0,
+      balance: (json['balance'] as num?)?.toDouble() ?? 0,
+      role: json['role'] as String? ?? 'viewer',
+      isShared: json['is_shared'] as bool? ?? false,
+      memberCount: (json['member_count'] as num?)?.toInt() ?? 1,
+      exportedAt: DateTime.tryParse(json['exported_at'] as String? ?? ''),
+      updatedAt: DateTime.tryParse(json['updated_at'] as String? ?? ''),
+    );
+  }
+}
+
+class BeeCountCloudReadLedgerDetail extends BeeCountCloudReadLedger {
+  const BeeCountCloudReadLedgerDetail({
+    required super.ledgerId,
+    required super.ledgerName,
+    required super.currency,
+    required super.transactionCount,
+    required super.incomeTotal,
+    required super.expenseTotal,
+    required super.balance,
+    required super.role,
+    required super.isShared,
+    required super.memberCount,
+    required this.sourceChangeId,
+    super.exportedAt,
+    super.updatedAt,
+  });
+
+  final int sourceChangeId;
+
+  factory BeeCountCloudReadLedgerDetail.fromJson(Map<String, dynamic> json) {
+    final base = BeeCountCloudReadLedger.fromJson(json);
+    return BeeCountCloudReadLedgerDetail(
+      ledgerId: base.ledgerId,
+      ledgerName: base.ledgerName,
+      currency: base.currency,
+      transactionCount: base.transactionCount,
+      incomeTotal: base.incomeTotal,
+      expenseTotal: base.expenseTotal,
+      balance: base.balance,
+      role: base.role,
+      isShared: base.isShared,
+      memberCount: base.memberCount,
+      exportedAt: base.exportedAt,
+      updatedAt: base.updatedAt,
+      sourceChangeId: (json['source_change_id'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class BeeCountCloudReadTransaction {
+  const BeeCountCloudReadTransaction({
+    required this.id,
+    required this.txIndex,
+    required this.txType,
+    required this.amount,
+    required this.happenedAt,
+    required this.lastChangeId,
+    this.note,
+    this.categoryName,
+    this.categoryKind,
+    this.accountName,
+    this.fromAccountName,
+    this.toAccountName,
+    this.categoryId,
+    this.accountId,
+    this.fromAccountId,
+    this.toAccountId,
+    this.tags,
+    this.tagsList = const [],
+    this.tagIds = const [],
+    this.attachments,
+    this.ledgerId,
+    this.ledgerName,
+    this.createdByUserId,
+    this.createdByEmail,
+    this.createdByDisplayName,
+    this.createdByAvatarUrl,
+    this.createdByAvatarVersion,
+  });
+
+  final String id;
+  final int txIndex;
+  final String txType;
+  final double amount;
+  final DateTime? happenedAt;
+  final String? note;
+  final String? categoryName;
+  final String? categoryKind;
+  final String? accountName;
+  final String? fromAccountName;
+  final String? toAccountName;
+  final String? categoryId;
+  final String? accountId;
+  final String? fromAccountId;
+  final String? toAccountId;
+  final String? tags;
+  final List<String> tagsList;
+  final List<String> tagIds;
+  final List<Map<String, dynamic>>? attachments;
+  final int lastChangeId;
+  final String? ledgerId;
+  final String? ledgerName;
+  final String? createdByUserId;
+  final String? createdByEmail;
+  final String? createdByDisplayName;
+  final String? createdByAvatarUrl;
+  final int? createdByAvatarVersion;
+
+  factory BeeCountCloudReadTransaction.fromJson(Map<String, dynamic> json) {
+    List<Map<String, dynamic>>? attachments;
+    final attachmentsRaw = json['attachments'];
+    if (attachmentsRaw is List) {
+      attachments = attachmentsRaw
+          .whereType<Map>()
+          .map((row) => row.cast<String, dynamic>())
+          .toList(growable: false);
+    }
+    return BeeCountCloudReadTransaction(
+      id: json['id'] as String? ?? '',
+      txIndex: (json['tx_index'] as num?)?.toInt() ?? 0,
+      txType: json['tx_type'] as String? ?? 'expense',
+      amount: (json['amount'] as num?)?.toDouble() ?? 0,
+      happenedAt: DateTime.tryParse(json['happened_at'] as String? ?? ''),
+      note: json['note'] as String?,
+      categoryName: json['category_name'] as String?,
+      categoryKind: json['category_kind'] as String?,
+      accountName: json['account_name'] as String?,
+      fromAccountName: json['from_account_name'] as String?,
+      toAccountName: json['to_account_name'] as String?,
+      categoryId: json['category_id'] as String?,
+      accountId: json['account_id'] as String?,
+      fromAccountId: json['from_account_id'] as String?,
+      toAccountId: json['to_account_id'] as String?,
+      tags: json['tags'] as String?,
+      tagsList: _toStringList(json['tags_list']),
+      tagIds: _toStringList(json['tag_ids']),
+      attachments: attachments,
+      lastChangeId: (json['last_change_id'] as num?)?.toInt() ?? 0,
+      ledgerId: json['ledger_id'] as String?,
+      ledgerName: json['ledger_name'] as String?,
+      createdByUserId: json['created_by_user_id'] as String?,
+      createdByEmail: json['created_by_email'] as String?,
+      createdByDisplayName:
+          _trimOrNull(json['created_by_display_name'] as String?),
+      createdByAvatarUrl: _trimOrNull(json['created_by_avatar_url'] as String?),
+      createdByAvatarVersion:
+          (json['created_by_avatar_version'] as num?)?.toInt(),
+    );
+  }
+}
+
+class BeeCountCloudProfile {
+  const BeeCountCloudProfile({
+    required this.userId,
+    this.email,
+    this.displayName,
+    this.avatarUrl,
+    this.avatarVersion = 0,
+  });
+
+  final String userId;
+  final String? email;
+  final String? displayName;
+  final String? avatarUrl;
+  final int avatarVersion;
+
+  factory BeeCountCloudProfile.fromJson(Map<String, dynamic> json) {
+    return BeeCountCloudProfile(
+      userId: json['user_id'] as String? ?? '',
+      email: _trimOrNull(json['email'] as String?),
+      displayName: _trimOrNull(json['display_name'] as String?),
+      avatarUrl: _trimOrNull(json['avatar_url'] as String?),
+      avatarVersion: (json['avatar_version'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class BeeCountCloudAvatarUploadResult {
+  const BeeCountCloudAvatarUploadResult({
+    this.avatarUrl,
+    this.avatarVersion = 0,
+  });
+
+  final String? avatarUrl;
+  final int avatarVersion;
+
+  factory BeeCountCloudAvatarUploadResult.fromJson(Map<String, dynamic> json) {
+    return BeeCountCloudAvatarUploadResult(
+      avatarUrl: _trimOrNull(json['avatar_url'] as String?),
+      avatarVersion: (json['avatar_version'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class BeeCountCloudReadAccount {
+  const BeeCountCloudReadAccount({
+    required this.id,
+    required this.name,
+    required this.lastChangeId,
+    this.accountType,
+    this.currency,
+    this.initialBalance,
+    this.ledgerId,
+    this.ledgerName,
+    this.createdByUserId,
+    this.createdByEmail,
+  });
+
+  final String id;
+  final String name;
+  final String? accountType;
+  final String? currency;
+  final double? initialBalance;
+  final int lastChangeId;
+  final String? ledgerId;
+  final String? ledgerName;
+  final String? createdByUserId;
+  final String? createdByEmail;
+
+  factory BeeCountCloudReadAccount.fromJson(Map<String, dynamic> json) {
+    return BeeCountCloudReadAccount(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      accountType: json['account_type'] as String?,
+      currency: json['currency'] as String?,
+      initialBalance: (json['initial_balance'] as num?)?.toDouble(),
+      lastChangeId: (json['last_change_id'] as num?)?.toInt() ?? 0,
+      ledgerId: json['ledger_id'] as String?,
+      ledgerName: json['ledger_name'] as String?,
+      createdByUserId: json['created_by_user_id'] as String?,
+      createdByEmail: json['created_by_email'] as String?,
+    );
+  }
+}
+
+class BeeCountCloudReadCategory {
+  const BeeCountCloudReadCategory({
+    required this.id,
+    required this.name,
+    required this.kind,
+    required this.lastChangeId,
+    this.level,
+    this.sortOrder,
+    this.icon,
+    this.iconType,
+    this.customIconPath,
+    this.iconCloudFileId,
+    this.iconCloudSha256,
+    this.parentName,
+    this.ledgerId,
+    this.ledgerName,
+    this.createdByUserId,
+    this.createdByEmail,
+  });
+
+  final String id;
+  final String name;
+  final String kind;
+  final int? level;
+  final int? sortOrder;
+  final String? icon;
+  final String? iconType;
+  final String? customIconPath;
+  final String? iconCloudFileId;
+  final String? iconCloudSha256;
+  final String? parentName;
+  final int lastChangeId;
+  final String? ledgerId;
+  final String? ledgerName;
+  final String? createdByUserId;
+  final String? createdByEmail;
+
+  factory BeeCountCloudReadCategory.fromJson(Map<String, dynamic> json) {
+    return BeeCountCloudReadCategory(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      kind: json['kind'] as String? ?? 'expense',
+      level: (json['level'] as num?)?.toInt(),
+      sortOrder: (json['sort_order'] as num?)?.toInt(),
+      icon: json['icon'] as String?,
+      iconType: json['icon_type'] as String?,
+      customIconPath: json['custom_icon_path'] as String?,
+      iconCloudFileId: json['icon_cloud_file_id'] as String?,
+      iconCloudSha256: json['icon_cloud_sha256'] as String?,
+      parentName: json['parent_name'] as String?,
+      lastChangeId: (json['last_change_id'] as num?)?.toInt() ?? 0,
+      ledgerId: json['ledger_id'] as String?,
+      ledgerName: json['ledger_name'] as String?,
+      createdByUserId: json['created_by_user_id'] as String?,
+      createdByEmail: json['created_by_email'] as String?,
+    );
+  }
+}
+
+class BeeCountCloudReadTag {
+  const BeeCountCloudReadTag({
+    required this.id,
+    required this.name,
+    required this.lastChangeId,
+    this.color,
+    this.ledgerId,
+    this.ledgerName,
+    this.createdByUserId,
+    this.createdByEmail,
+  });
+
+  final String id;
+  final String name;
+  final String? color;
+  final int lastChangeId;
+  final String? ledgerId;
+  final String? ledgerName;
+  final String? createdByUserId;
+  final String? createdByEmail;
+
+  factory BeeCountCloudReadTag.fromJson(Map<String, dynamic> json) {
+    return BeeCountCloudReadTag(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      color: json['color'] as String?,
+      lastChangeId: (json['last_change_id'] as num?)?.toInt() ?? 0,
+      ledgerId: json['ledger_id'] as String?,
+      ledgerName: json['ledger_name'] as String?,
+      createdByUserId: json['created_by_user_id'] as String?,
+      createdByEmail: json['created_by_email'] as String?,
+    );
+  }
+}
+
+class BeeCountCloudWriteCommitMeta {
+  const BeeCountCloudWriteCommitMeta({
+    required this.ledgerId,
+    required this.baseChangeId,
+    required this.newChangeId,
+    required this.serverTimestamp,
+    required this.idempotencyReplayed,
+    this.entityId,
+  });
+
+  final String ledgerId;
+  final int baseChangeId;
+  final int newChangeId;
+  final DateTime? serverTimestamp;
+  final bool idempotencyReplayed;
+  final String? entityId;
+
+  factory BeeCountCloudWriteCommitMeta.fromJson(Map<String, dynamic> json) {
+    return BeeCountCloudWriteCommitMeta(
+      ledgerId: json['ledger_id'] as String? ?? '',
+      baseChangeId: (json['base_change_id'] as num?)?.toInt() ?? 0,
+      newChangeId: (json['new_change_id'] as num?)?.toInt() ?? 0,
+      serverTimestamp:
+          DateTime.tryParse(json['server_timestamp'] as String? ?? ''),
+      idempotencyReplayed: json['idempotency_replayed'] == true,
+      entityId: json['entity_id'] as String?,
+    );
+  }
+}
+
+class BeeCountCloudRealtimeEvent {
+  const BeeCountCloudRealtimeEvent({
+    required this.type,
+    this.ledgerId,
+    this.serverCursor,
+  });
+
+  final String type;
+  final String? ledgerId;
+  final int? serverCursor;
+}
+
+class BeeCountCloudRealtimeClient {
+  BeeCountCloudRealtimeClient({
+    required this.baseUrl,
+    required this.auth,
+  });
+
+  final String baseUrl;
+  final BeeCountCloudAuthService auth;
+
+  final StreamController<BeeCountCloudRealtimeEvent> _events =
+      StreamController<BeeCountCloudRealtimeEvent>.broadcast();
+
+  WebSocketChannel? _channel;
+  StreamSubscription<dynamic>? _channelSub;
+  Timer? _reconnectTimer;
+  Timer? _heartbeatTimer;
+  bool _running = false;
+  bool _connecting = false;
+
+  Stream<BeeCountCloudRealtimeEvent> get events => _events.stream;
+
+  Future<void> start() async {
+    if (_running) {
+      return;
+    }
+    _running = true;
+    await _connect();
+  }
+
+  Future<void> stop() async {
+    _running = false;
+    _reconnectTimer?.cancel();
+    _heartbeatTimer?.cancel();
+    _reconnectTimer = null;
+    _heartbeatTimer = null;
+    await _channelSub?.cancel();
+    _channelSub = null;
+    await _channel?.sink.close();
+    _channel = null;
+  }
+
+  void dispose() {
+    _events.close();
+  }
+
+  Future<void> _connect() async {
+    if (!_running || _connecting) {
+      return;
+    }
+    _connecting = true;
+
+    try {
+      final token = await auth.requireAccessToken();
+      final uri = _buildWebSocketUri(token);
+      final channel = WebSocketChannel.connect(uri);
+      _channel = channel;
+
+      _channelSub = channel.stream.listen(
+        _onMessage,
+        onDone: _scheduleReconnect,
+        onError: (_, __) => _scheduleReconnect(),
+        cancelOnError: true,
+      );
+
+      _heartbeatTimer?.cancel();
+      _heartbeatTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+        try {
+          _channel?.sink.add('ping');
+        } catch (_) {}
+      });
+    } catch (_) {
+      _scheduleReconnect();
+    } finally {
+      _connecting = false;
+    }
+  }
+
+  Uri _buildWebSocketUri(String token) {
+    final base = Uri.parse(baseUrl);
+    final scheme = base.scheme == 'https' ? 'wss' : 'ws';
+    final segments = <String>[
+      ...base.pathSegments.where((segment) => segment.isNotEmpty),
+      'ws',
+    ];
+
+    return Uri(
+      scheme: scheme,
+      host: base.host,
+      port: base.hasPort ? base.port : null,
+      path: '/${segments.join('/')}',
+      queryParameters: {'token': token},
+    );
+  }
+
+  void _onMessage(dynamic message) {
+    if (message is! String || message.trim().isEmpty || message == 'pong') {
+      return;
+    }
+
+    try {
+      final payload = jsonDecode(message);
+      if (payload is! Map<String, dynamic>) {
+        return;
+      }
+      final type = payload['type'];
+      if (type is! String || type.isEmpty) {
+        return;
+      }
+      final serverCursor = (payload['serverCursor'] as num?)?.toInt();
+      _events.add(
+        BeeCountCloudRealtimeEvent(
+          type: type,
+          ledgerId: payload['ledgerId'] as String?,
+          serverCursor: serverCursor,
+        ),
+      );
+    } catch (_) {}
+  }
+
+  void _scheduleReconnect([Object? _, StackTrace? __]) {
+    if (!_running) {
+      return;
+    }
+
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+    _channelSub?.cancel();
+    _channelSub = null;
+    _channel = null;
+
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(const Duration(seconds: 3), () async {
+      if (!_running) {
+        return;
+      }
+      await auth.tryRefreshSession();
+      await _connect();
+    });
+  }
+}
+
+String _normalizeApiPrefix(String raw) {
+  var prefix = raw.trim();
+  if (prefix.isEmpty) {
+    return '/api/v1';
+  }
+  if (!prefix.startsWith('/')) {
+    prefix = '/$prefix';
+  }
+  if (prefix.endsWith('/')) {
+    prefix = prefix.substring(0, prefix.length - 1);
+  }
+  return prefix;
+}
+
+Map<String, dynamic> _decodeJsonObject(String raw) {
+  final decoded = jsonDecode(raw);
+  if (decoded is! Map<String, dynamic>) {
+    throw const FormatException('Invalid JSON response');
+  }
+  return decoded;
+}
+
+List<String> _toStringList(Object? value) {
+  if (value is! List) return const [];
+  return value
+      .map((e) => e?.toString().trim() ?? '')
+      .where((e) => e.isNotEmpty)
+      .toList(growable: false);
+}
+
+String _extractErrorMessage(http.Response response) {
+  try {
+    final payload = _decodeJsonObject(response.body);
+    final detail = payload['detail'];
+    if (detail is String && detail.isNotEmpty) {
+      return detail;
+    }
+  } catch (_) {}
+  return 'HTTP ${response.statusCode}';
+}

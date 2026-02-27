@@ -2,9 +2,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'cloud_service_config.dart';
 
 /// 云服务配置持久化存储
-/// 支持4种类型:本地存储、自定义Supabase、自定义WebDAV、S3协议存储
+/// 支持类型: 本地存储、BeeCount Cloud、自定义 Supabase、自定义 WebDAV、iCloud、S3
 class CloudServiceStore {
-  static const _kActiveType = 'cloud_active_type'; // local | supabase | webdav | s3
+  static const _kActiveType =
+      'cloud_active_type'; // local | beecount_cloud | supabase | webdav | icloud | s3
+  static const _kBeeCountCloudCfg = 'cloud_beecount_cloud_cfg';
   static const _kSupabaseCfg = 'cloud_supabase_cfg';
   static const _kWebdavCfg = 'cloud_webdav_cfg';
   static const _kS3Cfg = 'cloud_s3_cfg';
@@ -16,6 +18,17 @@ class CloudServiceStore {
 
     switch (activeType) {
       case 'local':
+        return CloudServiceConfig.localStorage();
+
+      case 'beecount_cloud':
+        final raw = sp.getString(_kBeeCountCloudCfg);
+        if (raw != null) {
+          try {
+            return decodeCloudConfig(raw);
+          } catch (e) {
+            // 解析失败，静默回退到本地存储
+          }
+        }
         return CloudServiceConfig.localStorage();
 
       case 'supabase':
@@ -66,6 +79,18 @@ class CloudServiceStore {
     }
   }
 
+  /// 加载 BeeCount Cloud 配置(不管是否激活)
+  Future<CloudServiceConfig?> loadBeeCountCloud() async {
+    final sp = await SharedPreferences.getInstance();
+    final raw = sp.getString(_kBeeCountCloudCfg);
+    if (raw == null) return null;
+    try {
+      return decodeCloudConfig(raw);
+    } catch (e) {
+      return null;
+    }
+  }
+
   /// 加载Supabase配置(不管是否激活)
   Future<CloudServiceConfig?> loadSupabase() async {
     final sp = await SharedPreferences.getInstance();
@@ -112,6 +137,11 @@ class CloudServiceStore {
         // Provider 会在下次使用时自动初始化
         break;
 
+      case CloudBackendType.beecountCloud:
+        await sp.setString(_kBeeCountCloudCfg, encodeCloudConfig(cfg));
+        await sp.setString(_kActiveType, 'beecount_cloud');
+        break;
+
       case CloudBackendType.supabase:
         await sp.setString(_kSupabaseCfg, encodeCloudConfig(cfg));
         await sp.setString(_kActiveType, 'supabase');
@@ -146,6 +176,10 @@ class CloudServiceStore {
         // 本地存储无需保存
         break;
 
+      case CloudBackendType.beecountCloud:
+        await sp.setString(_kBeeCountCloudCfg, encodeCloudConfig(cfg));
+        break;
+
       case CloudBackendType.supabase:
         await sp.setString(_kSupabaseCfg, encodeCloudConfig(cfg));
         break;
@@ -172,6 +206,18 @@ class CloudServiceStore {
       case CloudBackendType.local:
         await sp.setString(_kActiveType, 'local');
         return true;
+
+      case CloudBackendType.beecountCloud:
+        final raw = sp.getString(_kBeeCountCloudCfg);
+        if (raw == null) return false;
+        try {
+          final cfg = decodeCloudConfig(raw);
+          if (!cfg.valid) return false;
+          await sp.setString(_kActiveType, 'beecount_cloud');
+          return true;
+        } catch (e) {
+          return false;
+        }
 
       case CloudBackendType.supabase:
         final raw = sp.getString(_kSupabaseCfg);

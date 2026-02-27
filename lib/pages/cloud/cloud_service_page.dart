@@ -8,7 +8,6 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_cloud_sync/flutter_cloud_sync.dart' hide SyncStatus;
 import 'package:flutter_cloud_sync_icloud/flutter_cloud_sync_icloud.dart';
 import '../../providers/sync_providers.dart';
-import '../../providers/cloud_mode_providers.dart';
 import '../../services/system/logger_service.dart';
 import '../../widgets/ui/ui.dart';
 import '../../widgets/biz/section_card.dart';
@@ -16,8 +15,12 @@ import '../../styles/tokens.dart';
 import '../../l10n/app_localizations.dart';
 
 // GitHub配置教程链接
-const _kSupabaseGuideUrl = 'https://github.com/TNT-Likely/BeeCount/wiki/Supabase-%E4%BA%91%E5%90%8C%E6%AD%A5%E9%85%8D%E7%BD%AE';
-const _kWebdavGuideUrl = 'https://github.com/TNT-Likely/BeeCount/wiki/WebDAV-%E4%BA%91%E5%90%8C%E6%AD%A5%E9%85%8D%E7%BD%AE';
+const _kSupabaseGuideUrl =
+    'https://github.com/TNT-Likely/BeeCount/wiki/Supabase-%E4%BA%91%E5%90%8C%E6%AD%A5%E9%85%8D%E7%BD%AE';
+const _kWebdavGuideUrl =
+    'https://github.com/TNT-Likely/BeeCount/wiki/WebDAV-%E4%BA%91%E5%90%8C%E6%AD%A5%E9%85%8D%E7%BD%AE';
+
+enum CloudCapabilityGroup { collaborative, backup, local }
 
 class CloudServicePage extends ConsumerStatefulWidget {
   const CloudServicePage({super.key});
@@ -29,6 +32,8 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
   bool _testingConnection = false;
   final Map<String, bool> _connectionTestResults = {};
   bool _hasAutoTested = false;
+  CloudCapabilityGroup _selectedGroup = CloudCapabilityGroup.collaborative;
+  bool _hasSyncedInitialGroup = false;
 
   @override
   void initState() {
@@ -56,6 +61,7 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
   @override
   Widget build(BuildContext context) {
     final activeAsync = ref.watch(activeCloudConfigProvider);
+    final beecountCloudAsync = ref.watch(beecountCloudConfigProvider);
     final supabaseAsync = ref.watch(supabaseConfigProvider);
     final webdavAsync = ref.watch(webdavConfigProvider);
     final s3Async = ref.watch(s3ConfigProvider);
@@ -83,11 +89,15 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Icon(Icons.wifi_find),
-                        onPressed: _testingConnection ? null : () => _testConnection(active),
-                        tooltip: AppLocalizations.of(context).cloudTestConnection,
+                        onPressed: _testingConnection
+                            ? null
+                            : () => _testConnection(active),
+                        tooltip:
+                            AppLocalizations.of(context).cloudTestConnection,
                       ),
                     ]
                   : null,
@@ -102,158 +112,290 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
           Expanded(
             child: activeAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('${AppLocalizations.of(context).commonError}: $e')),
+              error: (e, _) => Center(
+                  child:
+                      Text('${AppLocalizations.of(context).commonError}: $e')),
               data: (active) {
+                final segmentStyle = ButtonStyle(
+                  side: WidgetStateProperty.all(
+                    BorderSide(
+                      color: BeeTokens.borderStrong(context),
+                    ),
+                  ),
+                  shape: WidgetStateProperty.all(
+                    RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  padding: WidgetStateProperty.all(
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                  ),
+                  visualDensity: VisualDensity.standard,
+                  backgroundColor: WidgetStateProperty.resolveWith((states) {
+                    if (states.contains(WidgetState.selected)) {
+                      return BeeTokens.surfaceSelected(context);
+                    }
+                    return BeeTokens.surface(context);
+                  }),
+                  foregroundColor: WidgetStateProperty.resolveWith((states) {
+                    if (states.contains(WidgetState.selected)) {
+                      return Theme.of(context).colorScheme.primary;
+                    }
+                    return BeeTokens.textSecondary(context);
+                  }),
+                  textStyle: WidgetStateProperty.all(
+                    Theme.of(context).textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                );
                 return ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    // 云端模式提示（已移除）
-                    if (false) ...[
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: BeeTokens.brandSupabase.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: BeeTokens.brandSupabase.withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.info_outline,
-                              color: BeeTokens.brandSupabase,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                '仅云端模式下仅支持 Supabase 云服务',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: BeeTokens.textPrimary(context),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-
                     Text(
                       AppLocalizations.of(context).cloudSelectServiceType,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: BeeTokens.textSecondary(context),
+                            fontWeight: FontWeight.w600,
+                            color: BeeTokens.textSecondary(context),
+                          ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (!_hasSyncedInitialGroup)
+                      Builder(
+                        builder: (_) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (!mounted || _hasSyncedInitialGroup) return;
+                            setState(() {
+                              _selectedGroup = _groupForType(active.type);
+                              _hasSyncedInitialGroup = true;
+                            });
+                          });
+                          return const SizedBox.shrink();
+                        },
+                      ),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: BeeTokens.surfaceCapsule(context),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: BeeTokens.divider(context),
+                        ),
+                      ),
+                      padding: const EdgeInsets.all(4),
+                      child: SegmentedButton<CloudCapabilityGroup>(
+                        showSelectedIcon: false,
+                        style: segmentStyle,
+                        segments: [
+                          ButtonSegment(
+                            value: CloudCapabilityGroup.collaborative,
+                            label: Text(
+                              AppLocalizations.of(context)
+                                  .cloudGroupCollaborative,
+                            ),
+                            icon: const Icon(Icons.hub_outlined),
+                          ),
+                          ButtonSegment(
+                            value: CloudCapabilityGroup.backup,
+                            label: Text(
+                              AppLocalizations.of(context).cloudGroupBackup,
+                            ),
+                            icon: const Icon(Icons.backup_outlined),
+                          ),
+                          ButtonSegment(
+                            value: CloudCapabilityGroup.local,
+                            label: Text(
+                              AppLocalizations.of(context).cloudGroupLocal,
+                            ),
+                            icon: const Icon(Icons.phone_android),
+                          ),
+                        ],
+                        selected: {_selectedGroup},
+                        onSelectionChanged: (selection) {
+                          final next = selection.first;
+                          if (next == _selectedGroup) return;
+                          setState(() => _selectedGroup = next);
+                        },
                       ),
                     ),
                     const SizedBox(height: 12),
-
-                    // 多设备同步警告
-                    if (active.type != CloudBackendType.local) ...[
-                      _buildMultiDeviceWarning(context),
-                      const SizedBox(height: 12),
-                    ],
-
-                    // 1. 本地存储 Card (云端模式下禁用)
-                    _buildServiceCard(
-                      context: context,
-                      icon: Icons.phone_android,
-                      iconColor: BeeTokens.brandLocal,
-                      title: AppLocalizations.of(context).cloudLocalStorageTitle,
-                      subtitle: AppLocalizations.of(context).cloudLocalStorageSubtitle,
-                      isSelected: active.type == CloudBackendType.local,
-                      isDisabled: false,
-                      onTap: () => _switchService(CloudBackendType.local),
-                    ),
-
-                    // 2. iCloud Card (仅 iOS，云端模式下禁用)
-                    if (!kIsWeb && Platform.isIOS) ...[
-                      const SizedBox(height: 12),
-                      _buildICloudCard(context, active, isDisabled: false),
-                    ],
-
+                    _buildCapabilityHint(_selectedGroup),
                     const SizedBox(height: 12),
+                    ...(() {
+                      final cards = <Widget>[];
+                      void addCard(Widget card) {
+                        if (cards.isNotEmpty) {
+                          cards.add(const SizedBox(height: 12));
+                        }
+                        cards.add(card);
+                      }
 
-                    // 3. 自定义 WebDAV Card (云端模式下禁用)
-                    webdavAsync.when(
-                      loading: () => const SizedBox(height: 100, child: Center(child: CircularProgressIndicator())),
-                      error: (e, _) => const SizedBox.shrink(),
-                      data: (webdavCfg) => _buildServiceCard(
-                        context: context,
-                        icon: Icons.folder_shared,
-                        iconColor: BeeTokens.brandWebdav,
-                        title: AppLocalizations.of(context).cloudCustomWebdavTitle,
-                        subtitle: webdavCfg?.valid == true
-                            ? webdavCfg!.obfuscatedUrl()
-                            : AppLocalizations.of(context).cloudCustomWebdavSubtitle,
-                        isSelected: active.type == CloudBackendType.webdav,
-                        isConfigured: webdavCfg?.valid == true,
-                        isDisabled: false,
-                        onTap: () => webdavCfg?.valid == true
-                            ? _switchService(CloudBackendType.webdav)
-                            : _configureService(CloudBackendType.webdav),
-                        onConfigure: webdavCfg?.valid == true
-                            ? () => _configureService(CloudBackendType.webdav)
-                            : null,
-                        onShowGuide: _showWebdavHelpDialog,
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    // 4. S3 Protocol Storage Card (云端模式下禁用)
-                    s3Async.when(
-                      loading: () => const SizedBox(height: 100, child: Center(child: CircularProgressIndicator())),
-                      error: (e, _) => const SizedBox.shrink(),
-                      data: (s3Cfg) => _buildServiceCard(
-                        context: context,
-                        icon: Icons.storage,
-                        iconColor: BeeTokens.brandS3,
-                        title: AppLocalizations.of(context).cloudCustomS3Title,
-                        subtitle: s3Cfg?.valid == true
-                            ? s3Cfg!.obfuscatedUrl()
-                            : AppLocalizations.of(context).cloudCustomS3Subtitle,
-                        isSelected: active.type == CloudBackendType.s3,
-                        isConfigured: s3Cfg?.valid == true,
-                        isDisabled: false,
-                        onTap: () => s3Cfg?.valid == true
-                            ? _switchService(CloudBackendType.s3)
-                            : _configureService(CloudBackendType.s3),
-                        onConfigure: s3Cfg?.valid == true
-                            ? () => _configureService(CloudBackendType.s3)
-                            : null,
-                        onShowGuide: _showS3HelpDialog,
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    // 5. 自定义 Supabase Card (云端模式唯一可用)
-                    supabaseAsync.when(
-                      loading: () => const SizedBox(height: 100, child: Center(child: CircularProgressIndicator())),
-                      error: (e, _) => const SizedBox.shrink(),
-                      data: (supabaseCfg) => _buildServiceCard(
-                        context: context,
-                        icon: Icons.cloud,
-                        iconColor: BeeTokens.brandSupabase,
-                        title: AppLocalizations.of(context).cloudCustomSupabaseTitle,
-                        subtitle: supabaseCfg?.valid == true
-                            ? supabaseCfg!.obfuscatedUrl()
-                            : AppLocalizations.of(context).cloudCustomSupabaseSubtitle,
-                        isSelected: active.type == CloudBackendType.supabase,
-                        isConfigured: supabaseCfg?.valid == true,
-                        isDisabled: false, // Supabase 始终可用
-                        onTap: () => supabaseCfg?.valid == true
-                            ? _switchService(CloudBackendType.supabase)
-                            : _configureService(CloudBackendType.supabase),
-                        onConfigure: supabaseCfg?.valid == true
-                            ? () => _configureService(CloudBackendType.supabase)
-                            : null,
-                        onShowGuide: _showSupabaseHelpDialog,
-                      ),
-                    ),
+                      switch (_selectedGroup) {
+                        case CloudCapabilityGroup.local:
+                          addCard(
+                            _buildServiceCard(
+                              context: context,
+                              icon: Icons.phone_android,
+                              iconColor: BeeTokens.brandLocal,
+                              title: AppLocalizations.of(context)
+                                  .cloudLocalStorageTitle,
+                              subtitle: AppLocalizations.of(context)
+                                  .cloudLocalStorageSubtitle,
+                              isSelected: active.type == CloudBackendType.local,
+                              isDisabled: false,
+                              onTap: () =>
+                                  _switchService(CloudBackendType.local),
+                            ),
+                          );
+                          break;
+                        case CloudCapabilityGroup.collaborative:
+                          addCard(
+                            beecountCloudAsync.when(
+                              loading: () => const SizedBox(
+                                height: 100,
+                                child: Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              ),
+                              error: (e, _) => const SizedBox.shrink(),
+                              data: (cfg) => _buildServiceCard(
+                                context: context,
+                                icon: Icons.cloud_done_outlined,
+                                iconColor: BeeTokens.brandSupabase,
+                                title: 'BeeCount Cloud',
+                                subtitle: cfg?.valid == true
+                                    ? cfg!.obfuscatedUrl()
+                                    : 'BeeCount Cloud v1 自建服务（Docker 独立部署）',
+                                isSelected: active.type ==
+                                    CloudBackendType.beecountCloud,
+                                isConfigured: cfg?.valid == true,
+                                isDisabled: false,
+                                onTap: () => cfg?.valid == true
+                                    ? _switchService(
+                                        CloudBackendType.beecountCloud)
+                                    : _configureService(
+                                        CloudBackendType.beecountCloud),
+                                onConfigure: cfg?.valid == true
+                                    ? () => _configureService(
+                                        CloudBackendType.beecountCloud)
+                                    : null,
+                              ),
+                            ),
+                          );
+                          break;
+                        case CloudCapabilityGroup.backup:
+                          if (!kIsWeb && Platform.isIOS) {
+                            addCard(
+                              _buildICloudCard(context, active,
+                                  isDisabled: false),
+                            );
+                          }
+                          addCard(
+                            webdavAsync.when(
+                              loading: () => const SizedBox(
+                                height: 100,
+                                child: Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              ),
+                              error: (e, _) => const SizedBox.shrink(),
+                              data: (webdavCfg) => _buildServiceCard(
+                                context: context,
+                                icon: Icons.folder_shared,
+                                iconColor: BeeTokens.brandWebdav,
+                                title: AppLocalizations.of(context)
+                                    .cloudCustomWebdavTitle,
+                                subtitle: webdavCfg?.valid == true
+                                    ? webdavCfg!.obfuscatedUrl()
+                                    : AppLocalizations.of(context)
+                                        .cloudCustomWebdavSubtitle,
+                                isSelected:
+                                    active.type == CloudBackendType.webdav,
+                                isConfigured: webdavCfg?.valid == true,
+                                isDisabled: false,
+                                onTap: () => webdavCfg?.valid == true
+                                    ? _switchService(CloudBackendType.webdav)
+                                    : _configureService(
+                                        CloudBackendType.webdav),
+                                onConfigure: webdavCfg?.valid == true
+                                    ? () => _configureService(
+                                        CloudBackendType.webdav)
+                                    : null,
+                                onShowGuide: _showWebdavHelpDialog,
+                              ),
+                            ),
+                          );
+                          addCard(
+                            s3Async.when(
+                              loading: () => const SizedBox(
+                                height: 100,
+                                child: Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              ),
+                              error: (e, _) => const SizedBox.shrink(),
+                              data: (s3Cfg) => _buildServiceCard(
+                                context: context,
+                                icon: Icons.storage,
+                                iconColor: BeeTokens.brandS3,
+                                title: AppLocalizations.of(context)
+                                    .cloudCustomS3Title,
+                                subtitle: s3Cfg?.valid == true
+                                    ? s3Cfg!.obfuscatedUrl()
+                                    : AppLocalizations.of(context)
+                                        .cloudCustomS3Subtitle,
+                                isSelected: active.type == CloudBackendType.s3,
+                                isConfigured: s3Cfg?.valid == true,
+                                isDisabled: false,
+                                onTap: () => s3Cfg?.valid == true
+                                    ? _switchService(CloudBackendType.s3)
+                                    : _configureService(CloudBackendType.s3),
+                                onConfigure: s3Cfg?.valid == true
+                                    ? () =>
+                                        _configureService(CloudBackendType.s3)
+                                    : null,
+                                onShowGuide: _showS3HelpDialog,
+                              ),
+                            ),
+                          );
+                          addCard(
+                            supabaseAsync.when(
+                              loading: () => const SizedBox(
+                                height: 100,
+                                child: Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              ),
+                              error: (e, _) => const SizedBox.shrink(),
+                              data: (supabaseCfg) => _buildServiceCard(
+                                context: context,
+                                icon: Icons.cloud,
+                                iconColor: BeeTokens.brandSupabase,
+                                title: AppLocalizations.of(context)
+                                    .cloudCustomSupabaseTitle,
+                                subtitle: supabaseCfg?.valid == true
+                                    ? supabaseCfg!.obfuscatedUrl()
+                                    : AppLocalizations.of(context)
+                                        .cloudCustomSupabaseSubtitle,
+                                isSelected:
+                                    active.type == CloudBackendType.supabase,
+                                isConfigured: supabaseCfg?.valid == true,
+                                isDisabled: false,
+                                onTap: () => supabaseCfg?.valid == true
+                                    ? _switchService(CloudBackendType.supabase)
+                                    : _configureService(
+                                        CloudBackendType.supabase),
+                                onConfigure: supabaseCfg?.valid == true
+                                    ? () => _configureService(
+                                        CloudBackendType.supabase)
+                                    : null,
+                                onShowGuide: _showSupabaseHelpDialog,
+                              ),
+                            ),
+                          );
+                          break;
+                      }
+                      return cards;
+                    })(),
                   ],
                 );
               },
@@ -267,23 +409,19 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
   Widget _buildConnectionStatus(CloudServiceConfig config) {
     final testResult = _connectionTestResults[config.id];
     final Color statusColor;
-    final IconData statusIcon;
     final String statusText;
 
     if (testResult == null) {
       // 未测试
       statusColor = BeeTokens.warning(context);
-      statusIcon = Icons.help_outline;
       statusText = AppLocalizations.of(context).cloudStatusNotTested;
     } else if (testResult) {
       // 测试成功
       statusColor = BeeTokens.success(context);
-      statusIcon = Icons.check_circle_outline;
       statusText = AppLocalizations.of(context).cloudStatusNormal;
     } else {
       // 测试失败
       statusColor = BeeTokens.error(context);
-      statusIcon = Icons.error_outline;
       statusText = AppLocalizations.of(context).cloudStatusFailed;
     }
 
@@ -295,8 +433,8 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
             Text(
               '${AppLocalizations.of(context).commonCurrent}: ${_getTypeName(config.type)}',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
             const SizedBox(width: 12),
             Container(
@@ -335,8 +473,8 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
         Text(
           config.obfuscatedUrl(),
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: BeeTokens.textSecondary(context),
-          ),
+                color: BeeTokens.textSecondary(context),
+              ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -344,108 +482,82 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
     );
   }
 
-  Widget _buildMultiDeviceWarning(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-
-    return GestureDetector(
-      onTap: () => _showMultiDeviceDetailDialog(context),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: BeeTokens.warning(context).withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: BeeTokens.warning(context).withValues(alpha: 0.3),
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.warning_amber_rounded,
-              color: BeeTokens.warning(context),
-              size: 24,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.cloudMultiDeviceWarningTitle,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: BeeTokens.textPrimary(context),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    l10n.cloudMultiDeviceWarningMessage,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: BeeTokens.textSecondary(context),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(
-              Icons.info_outline,
-              color: BeeTokens.warning(context),
-              size: 20,
-            ),
-          ],
-        ),
-      ),
-    );
+  CloudCapabilityGroup _groupForType(CloudBackendType type) {
+    switch (type) {
+      case CloudBackendType.local:
+        return CloudCapabilityGroup.local;
+      case CloudBackendType.beecountCloud:
+        return CloudCapabilityGroup.collaborative;
+      case CloudBackendType.supabase:
+      case CloudBackendType.webdav:
+      case CloudBackendType.icloud:
+      case CloudBackendType.s3:
+        return CloudCapabilityGroup.backup;
+    }
   }
 
-  void _showMultiDeviceDetailDialog(BuildContext context) {
+  Widget _buildCapabilityHint(CloudCapabilityGroup group) {
     final l10n = AppLocalizations.of(context);
+    final isCollaborative = group == CloudCapabilityGroup.collaborative;
+    final isBackup = group == CloudCapabilityGroup.backup;
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: BeeTokens.surfaceElevated(context),
-        title: Row(
-          children: [
-            Icon(
-              Icons.warning_amber_rounded,
-              color: BeeTokens.warning(context),
-              size: 24,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                l10n.cloudMultiDeviceWarningTitle,
-                style: TextStyle(
-                  color: BeeTokens.textPrimary(context),
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
+    final title = isCollaborative
+        ? l10n.cloudCapabilityCollaborativeTitle
+        : isBackup
+            ? l10n.cloudCapabilityBackupTitle
+            : l10n.cloudLocalStorageTitle;
+    final message = isCollaborative
+        ? l10n.cloudCapabilityCollaborativeMessage
+        : isBackup
+            ? l10n.cloudCapabilityBackupMessage
+            : l10n.cloudLocalStorageSubtitle;
+    final accent = isCollaborative
+        ? BeeTokens.success(context)
+        : isBackup
+            ? BeeTokens.warning(context)
+            : Theme.of(context).colorScheme.primary;
+    final icon = isCollaborative
+        ? Icons.hub_outlined
+        : isBackup
+            ? Icons.backup_outlined
+            : Icons.phone_android;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: accent.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: accent, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: BeeTokens.textPrimary(context),
+                  ),
                 ),
-              ),
-            ),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Text(
-            l10n.cloudMultiDeviceWarningDetail,
-            style: TextStyle(
-              color: BeeTokens.textPrimary(context),
-              fontSize: 14,
-              height: 1.5,
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              l10n.commonConfirm,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.primary,
-              ),
+                const SizedBox(height: 4),
+                Text(
+                  message,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: BeeTokens.textSecondary(context),
+                    height: 1.4,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -470,7 +582,9 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
       opacity: isDisabled ? 0.5 : 1.0,
       child: Container(
         decoration: BoxDecoration(
-          border: isSelected ? Border.all(color: BeeTokens.success(context), width: 2) : null,
+          border: isSelected
+              ? Border.all(color: BeeTokens.success(context), width: 2)
+              : null,
           borderRadius: BorderRadius.circular(12),
         ),
         child: SectionCard(
@@ -506,16 +620,21 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
                                 Expanded(
                                   child: Text(
                                     title,
-                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                   ),
                                 ),
                                 if (isDisabled)
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: BeeTokens.textTertiary(context).withValues(alpha: 0.2),
+                                      color: BeeTokens.textTertiary(context)
+                                          .withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
@@ -531,9 +650,12 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
                             const SizedBox(height: 4),
                             Text(
                               subtitle,
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: BeeTokens.textSecondary(context),
-                              ),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: BeeTokens.textSecondary(context),
+                                  ),
                             ),
                           ],
                         ),
@@ -548,13 +670,17 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
                             color: BeeTokens.success(context),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(Icons.check, color: BeeTokens.textOnPrimary(context), size: 18),
+                          child: Icon(Icons.check,
+                              color: BeeTokens.textOnPrimary(context),
+                              size: 18),
                         ),
                     ],
                   ),
 
                   // 底部按钮行
-                  if (!isDisabled && ((isConfigured && onConfigure != null) || onShowGuide != null))
+                  if (!isDisabled &&
+                      ((isConfigured && onConfigure != null) ||
+                          onShowGuide != null))
                     Padding(
                       padding: const EdgeInsets.only(top: 12),
                       child: Row(
@@ -564,9 +690,12 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
                             TextButton.icon(
                               onPressed: onShowGuide,
                               icon: const Icon(Icons.help_outline, size: 16),
-                              label: Text(AppLocalizations.of(context).commonTutorial, style: const TextStyle(fontSize: 12)),
+                              label: Text(
+                                  AppLocalizations.of(context).commonTutorial,
+                                  style: const TextStyle(fontSize: 12)),
                               style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
                                 minimumSize: Size.zero,
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
@@ -576,9 +705,12 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
                             TextButton.icon(
                               onPressed: onConfigure,
                               icon: const Icon(Icons.settings, size: 16),
-                              label: Text(AppLocalizations.of(context).commonConfigure, style: const TextStyle(fontSize: 12)),
+                              label: Text(
+                                  AppLocalizations.of(context).commonConfigure,
+                                  style: const TextStyle(fontSize: 12)),
                               style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
                                 minimumSize: Size.zero,
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
@@ -596,20 +728,25 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
     );
   }
 
-  Widget _buildICloudCard(BuildContext context, CloudServiceConfig active, {bool isDisabled = false}) {
+  Widget _buildICloudCard(BuildContext context, CloudServiceConfig active,
+      {bool isDisabled = false}) {
     final isSelected = active.type == CloudBackendType.icloud;
 
     return Opacity(
       opacity: isDisabled ? 0.5 : 1.0,
       child: Container(
         decoration: BoxDecoration(
-          border: isSelected ? Border.all(color: BeeTokens.success(context), width: 2) : null,
+          border: isSelected
+              ? Border.all(color: BeeTokens.success(context), width: 2)
+              : null,
           borderRadius: BorderRadius.circular(12),
         ),
         child: SectionCard(
           margin: EdgeInsets.zero,
           child: InkWell(
-            onTap: isDisabled ? null : () => _switchService(CloudBackendType.icloud),
+            onTap: isDisabled
+                ? null
+                : () => _switchService(CloudBackendType.icloud),
             borderRadius: BorderRadius.circular(12),
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -625,7 +762,8 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
                           color: BeeTokens.brandIcloud.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Icon(Icons.cloud, color: BeeTokens.brandIcloud, size: 24),
+                        child: Icon(Icons.cloud,
+                            color: BeeTokens.brandIcloud, size: 24),
                       ),
                       const SizedBox(width: 16),
 
@@ -639,16 +777,21 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
                                 Expanded(
                                   child: Text(
                                     'iCloud',
-                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                   ),
                                 ),
                                 if (isDisabled)
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: BeeTokens.textTertiary(context).withValues(alpha: 0.2),
+                                      color: BeeTokens.textTertiary(context)
+                                          .withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
@@ -665,10 +808,14 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
                             Text(
                               isSelected
                                   ? 'iCloud Drive'
-                                  : AppLocalizations.of(context).cloudIcloudSubtitle,
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: BeeTokens.textSecondary(context),
-                              ),
+                                  : AppLocalizations.of(context)
+                                      .cloudIcloudSubtitle,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: BeeTokens.textSecondary(context),
+                                  ),
                             ),
                           ],
                         ),
@@ -683,7 +830,9 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
                             color: BeeTokens.success(context),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(Icons.check, color: BeeTokens.textOnPrimary(context), size: 18),
+                          child: Icon(Icons.check,
+                              color: BeeTokens.textOnPrimary(context),
+                              size: 18),
                         ),
                     ],
                   ),
@@ -698,9 +847,12 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
                           TextButton.icon(
                             onPressed: _showICloudHelpDialog,
                             icon: const Icon(Icons.help_outline, size: 16),
-                            label: Text(AppLocalizations.of(context).commonTutorial, style: const TextStyle(fontSize: 12)),
+                            label: Text(
+                                AppLocalizations.of(context).commonTutorial,
+                                style: const TextStyle(fontSize: 12)),
                             style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
                               minimumSize: Size.zero,
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
@@ -716,7 +868,6 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
       ),
     );
   }
-
 
   void _showSupabaseHelpDialog() {
     final l10n = AppLocalizations.of(context);
@@ -772,7 +923,8 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline, color: BeeTokens.brandSupabase, size: 20),
+                    Icon(Icons.info_outline,
+                        color: BeeTokens.brandSupabase, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -858,7 +1010,8 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline, color: BeeTokens.brandWebdav, size: 20),
+                    Icon(Icons.info_outline,
+                        color: BeeTokens.brandWebdav, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -876,6 +1029,10 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
           ),
         ),
         actions: [
+          TextButton(
+            onPressed: () => _openGuide(_kWebdavGuideUrl),
+            child: Text(l10n.cloudDetailedTutorial),
+          ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
             child: Text(l10n.commonConfirm),
@@ -939,7 +1096,8 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline, color: BeeTokens.brandIcloud, size: 20),
+                    Icon(Icons.info_outline,
+                        color: BeeTokens.brandIcloud, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -1024,7 +1182,8 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline, color: BeeTokens.brandS3, size: 20),
+                    Icon(Icons.info_outline,
+                        color: BeeTokens.brandS3, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -1065,15 +1224,15 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
         ),
         const SizedBox(height: 8),
         ...items.map((item) => Padding(
-          padding: const EdgeInsets.only(left: 8, bottom: 4),
-          child: Text(
-            item,
-            style: TextStyle(
-              fontSize: 13,
-              color: BeeTokens.textSecondary(context),
-            ),
-          ),
-        )),
+              padding: const EdgeInsets.only(left: 8, bottom: 4),
+              child: Text(
+                item,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: BeeTokens.textSecondary(context),
+                ),
+              ),
+            )),
       ],
     );
   }
@@ -1115,8 +1274,10 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
           if (mounted) {
             // 显示更详细的错误信息
             final cloudKitStatus = diagnostics['cloudKitStatus'] ?? 'unknown';
-            final containerAvailable = diagnostics['containerAvailable'] ?? false;
-            var detailMessage = AppLocalizations.of(context).cloudIcloudNotAvailableMessage;
+            final containerAvailable =
+                diagnostics['containerAvailable'] ?? false;
+            var detailMessage =
+                AppLocalizations.of(context).cloudIcloudNotAvailableMessage;
             if (cloudKitStatus == 'noAccount') {
               detailMessage = '请在设置中登录 iCloud 账号';
             } else if (!containerAvailable) {
@@ -1154,7 +1315,8 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
 
     try {
       // 登出（iCloud 使用系统账号，跳过登出）
-      if (active.type != CloudBackendType.icloud && active.type != CloudBackendType.local) {
+      if (active.type != CloudBackendType.icloud &&
+          active.type != CloudBackendType.local) {
         try {
           final authService = await ref.read(authServiceProvider.future);
           await authService.signOut();
@@ -1165,9 +1327,14 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
 
       // 激活新配置
       final success = await store.activate(type);
-      if (!success && type != CloudBackendType.local && type != CloudBackendType.icloud) {
+      if (!success &&
+          type != CloudBackendType.local &&
+          type != CloudBackendType.icloud) {
         if (mounted) {
-          await AppDialog.error(context, title: AppLocalizations.of(context).cloudSwitchFailedTitle, message: AppLocalizations.of(context).cloudSwitchFailedConfigMissing);
+          await AppDialog.error(context,
+              title: AppLocalizations.of(context).cloudSwitchFailedTitle,
+              message:
+                  AppLocalizations.of(context).cloudSwitchFailedConfigMissing);
         }
         return;
       }
@@ -1176,6 +1343,7 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         ref.invalidate(activeCloudConfigProvider);
+        ref.invalidate(beecountCloudConfigProvider);
         ref.invalidate(supabaseConfigProvider);
         ref.invalidate(webdavConfigProvider);
         ref.invalidate(authServiceProvider);
@@ -1183,23 +1351,94 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
       });
 
       if (mounted) {
-        showToast(context, AppLocalizations.of(context).cloudSwitchedTo(_getTypeName(type)));
+        showToast(context,
+            AppLocalizations.of(context).cloudSwitchedTo(_getTypeName(type)));
       }
     } catch (e) {
       if (mounted) {
-        await AppDialog.error(context, title: AppLocalizations.of(context).cloudSwitchFailedTitle, message: '$e');
+        await AppDialog.error(context,
+            title: AppLocalizations.of(context).cloudSwitchFailedTitle,
+            message: '$e');
       }
     }
   }
 
   Future<void> _configureService(CloudBackendType type) async {
     // 根据类型显示配置对话框
-    if (type == CloudBackendType.supabase) {
+    if (type == CloudBackendType.beecountCloud) {
+      await _showBeeCountCloudConfigDialog();
+    } else if (type == CloudBackendType.supabase) {
       await _showSupabaseConfigDialog();
     } else if (type == CloudBackendType.webdav) {
       await _showWebdavConfigDialog();
     } else if (type == CloudBackendType.s3) {
       await _showS3ConfigDialog();
+    }
+  }
+
+  Future<void> _showBeeCountCloudConfigDialog() async {
+    final existing = await ref.read(beecountCloudConfigProvider.future);
+
+    if (!mounted) return;
+
+    final result = await showDialog<Map<String, dynamic>?>(
+      context: context,
+      builder: (dialogContext) => _BeeCountCloudConfigDialog(
+        initialBaseUrl: existing?.beecountCloudBaseUrl ?? '',
+        initialApiPrefix: existing?.beecountCloudApiPrefix ?? '/api/v1',
+      ),
+    );
+
+    if (result != null) {
+      final baseUrl = (result['baseUrl'] as String).trim();
+      final apiPrefix = (result['apiPrefix'] as String).trim();
+
+      if (baseUrl.isEmpty) {
+        if (mounted) {
+          await AppDialog.error(
+            context,
+            title: AppLocalizations.of(context).cloudConfigInvalidTitle,
+            message: '请输入 BeeCount Cloud 服务地址',
+          );
+        }
+        return;
+      }
+
+      final cfg = CloudServiceConfig(
+        type: CloudBackendType.beecountCloud,
+        name: 'BeeCount Cloud',
+        beecountCloudBaseUrl: baseUrl,
+        beecountCloudApiPrefix: apiPrefix.isEmpty ? '/api/v1' : apiPrefix,
+        beecountCloudEmail: existing?.beecountCloudEmail,
+        beecountCloudPassword: existing?.beecountCloudPassword,
+      );
+
+      if (!cfg.valid) {
+        if (mounted) {
+          await AppDialog.error(
+            context,
+            title: AppLocalizations.of(context).cloudConfigInvalidTitle,
+            message: AppLocalizations.of(context).cloudConfigInvalidMessage,
+          );
+        }
+        return;
+      }
+
+      try {
+        await ref.read(cloudServiceStoreProvider).saveOnly(cfg);
+        ref.invalidate(beecountCloudConfigProvider);
+        ref.invalidate(activeCloudConfigProvider);
+        if (mounted)
+          showToast(context, AppLocalizations.of(context).cloudConfigSaved);
+      } catch (e) {
+        if (mounted) {
+          await AppDialog.error(
+            context,
+            title: AppLocalizations.of(context).cloudSaveFailed,
+            message: e.toString(),
+          );
+        }
+      }
     }
   }
 
@@ -1224,7 +1463,9 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
 
       if (url.isEmpty || key.isEmpty) {
         if (mounted) {
-          await AppDialog.error(context, title: AppLocalizations.of(context).cloudConfigInvalidTitle, message: AppLocalizations.of(context).cloudConfigInvalidMessage);
+          await AppDialog.error(context,
+              title: AppLocalizations.of(context).cloudConfigInvalidTitle,
+              message: AppLocalizations.of(context).cloudConfigInvalidMessage);
         }
         return;
       }
@@ -1234,12 +1475,15 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
         name: AppLocalizations.of(context).cloudCustomSupabaseTitle,
         supabaseUrl: url,
         supabaseAnonKey: key,
-        supabaseBucket: bucket.isEmpty ? 'beecount-backups' : bucket,  // 业务层提供默认值
+        supabaseBucket:
+            bucket.isEmpty ? 'beecount-backups' : bucket, // 业务层提供默认值
       );
 
       if (!cfg.valid) {
         if (mounted) {
-          await AppDialog.error(context, title: AppLocalizations.of(context).cloudConfigInvalidTitle, message: AppLocalizations.of(context).cloudConfigInvalidMessage);
+          await AppDialog.error(context,
+              title: AppLocalizations.of(context).cloudConfigInvalidTitle,
+              message: AppLocalizations.of(context).cloudConfigInvalidMessage);
         }
         return;
       }
@@ -1249,10 +1493,13 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
         ref.invalidate(supabaseConfigProvider);
         // 刷新激活配置，确保同步服务使用最新配置
         ref.invalidate(activeCloudConfigProvider);
-        if (mounted) showToast(context, AppLocalizations.of(context).cloudConfigSaved);
+        if (mounted)
+          showToast(context, AppLocalizations.of(context).cloudConfigSaved);
       } catch (e) {
         if (mounted) {
-          await AppDialog.error(context, title: AppLocalizations.of(context).cloudSaveFailed, message: e.toString());
+          await AppDialog.error(context,
+              title: AppLocalizations.of(context).cloudSaveFailed,
+              message: e.toString());
         }
       }
     }
@@ -1281,7 +1528,9 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
 
       if (url.isEmpty || username.isEmpty || password.isEmpty) {
         if (mounted) {
-          await AppDialog.error(context, title: AppLocalizations.of(context).cloudConfigInvalidTitle, message: AppLocalizations.of(context).cloudConfigInvalidMessage);
+          await AppDialog.error(context,
+              title: AppLocalizations.of(context).cloudConfigInvalidTitle,
+              message: AppLocalizations.of(context).cloudConfigInvalidMessage);
         }
         return;
       }
@@ -1297,7 +1546,9 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
 
       if (!cfg.valid) {
         if (mounted) {
-          await AppDialog.error(context, title: AppLocalizations.of(context).cloudConfigInvalidTitle, message: AppLocalizations.of(context).cloudConfigInvalidMessage);
+          await AppDialog.error(context,
+              title: AppLocalizations.of(context).cloudConfigInvalidTitle,
+              message: AppLocalizations.of(context).cloudConfigInvalidMessage);
         }
         return;
       }
@@ -1307,10 +1558,13 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
         ref.invalidate(webdavConfigProvider);
         // 刷新激活配置，确保同步服务使用最新配置
         ref.invalidate(activeCloudConfigProvider);
-        if (mounted) showToast(context, AppLocalizations.of(context).cloudConfigSaved);
+        if (mounted)
+          showToast(context, AppLocalizations.of(context).cloudConfigSaved);
       } catch (e) {
         if (mounted) {
-          await AppDialog.error(context, title: AppLocalizations.of(context).cloudSaveFailed, message: e.toString());
+          await AppDialog.error(context,
+              title: AppLocalizations.of(context).cloudSaveFailed,
+              message: e.toString());
         }
       }
     }
@@ -1343,9 +1597,14 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
       final useSSL = result['useSSL'] as bool;
       final port = result['port'] as int?;
 
-      if (endpoint.isEmpty || accessKey.isEmpty || secretKey.isEmpty || bucket.isEmpty) {
+      if (endpoint.isEmpty ||
+          accessKey.isEmpty ||
+          secretKey.isEmpty ||
+          bucket.isEmpty) {
         if (mounted) {
-          await AppDialog.error(context, title: AppLocalizations.of(context).cloudConfigInvalidTitle, message: AppLocalizations.of(context).cloudConfigInvalidMessage);
+          await AppDialog.error(context,
+              title: AppLocalizations.of(context).cloudConfigInvalidTitle,
+              message: AppLocalizations.of(context).cloudConfigInvalidMessage);
         }
         return;
       }
@@ -1367,7 +1626,9 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
 
       if (!cfg.valid) {
         if (mounted) {
-          await AppDialog.error(context, title: AppLocalizations.of(context).cloudConfigInvalidTitle, message: AppLocalizations.of(context).cloudConfigInvalidMessage);
+          await AppDialog.error(context,
+              title: AppLocalizations.of(context).cloudConfigInvalidTitle,
+              message: AppLocalizations.of(context).cloudConfigInvalidMessage);
         }
         return;
       }
@@ -1377,10 +1638,13 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
         ref.invalidate(s3ConfigProvider);
         // 刷新激活配置，确保同步服务使用最新配置
         ref.invalidate(activeCloudConfigProvider);
-        if (mounted) showToast(context, AppLocalizations.of(context).cloudConfigSaved);
+        if (mounted)
+          showToast(context, AppLocalizations.of(context).cloudConfigSaved);
       } catch (e) {
         if (mounted) {
-          await AppDialog.error(context, title: AppLocalizations.of(context).cloudSaveFailed, message: e.toString());
+          await AppDialog.error(context,
+              title: AppLocalizations.of(context).cloudSaveFailed,
+              message: e.toString());
         }
       }
     }
@@ -1390,6 +1654,8 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
     switch (type) {
       case CloudBackendType.local:
         return AppLocalizations.of(context).cloudLocalStorageTitle;
+      case CloudBackendType.beecountCloud:
+        return 'BeeCount Cloud';
       case CloudBackendType.supabase:
         return 'Supabase';
       case CloudBackendType.webdav:
@@ -1402,7 +1668,8 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
   }
 
   // 测试连接
-  Future<void> _testConnection(CloudServiceConfig config, {bool showDialog = true}) async {
+  Future<void> _testConnection(CloudServiceConfig config,
+      {bool showDialog = true}) async {
     if (!config.valid || config.type == CloudBackendType.local) return;
 
     setState(() => _testingConnection = true);
@@ -1413,6 +1680,19 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
       try {
         switch (config.type) {
           case CloudBackendType.local:
+            break;
+
+          case CloudBackendType.beecountCloud:
+            final testUrl = Uri.parse('${config.beecountCloudBaseUrl}/healthz');
+            final response =
+                await http.get(testUrl).timeout(const Duration(seconds: 10));
+
+            if (response.statusCode == 200) {
+              connectionSuccess = true;
+            } else {
+              throw Exception(AppLocalizations.of(context)
+                  .cloudErrorServerStatus('${response.statusCode}'));
+            }
             break;
 
           case CloudBackendType.supabase:
@@ -1428,10 +1708,13 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
 
             if (response.statusCode == 200 || response.statusCode == 404) {
               connectionSuccess = true;
-            } else if (response.statusCode == 401 || response.statusCode == 403) {
-              throw Exception(AppLocalizations.of(context).cloudErrorAuthFailed);
+            } else if (response.statusCode == 401 ||
+                response.statusCode == 403) {
+              throw Exception(
+                  AppLocalizations.of(context).cloudErrorAuthFailed);
             } else {
-              throw Exception(AppLocalizations.of(context).cloudErrorServerStatus('${response.statusCode}'));
+              throw Exception(AppLocalizations.of(context)
+                  .cloudErrorServerStatus('${response.statusCode}'));
             }
             break;
 
@@ -1445,7 +1728,8 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
             final request = http.Request('OPTIONS', testUrl);
             request.headers['Authorization'] = 'Basic $credentials';
 
-            final streamedResponse = await request.send().timeout(const Duration(seconds: 10));
+            final streamedResponse =
+                await request.send().timeout(const Duration(seconds: 10));
             final response = await http.Response.fromStream(streamedResponse);
 
             if (response.statusCode == 200 || response.statusCode == 204) {
@@ -1453,16 +1737,21 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
               if (davHeader != null || response.headers.containsKey('allow')) {
                 connectionSuccess = true;
               } else {
-                throw Exception(AppLocalizations.of(context).cloudErrorWebdavNotSupported);
+                throw Exception(
+                    AppLocalizations.of(context).cloudErrorWebdavNotSupported);
               }
             } else if (response.statusCode == 401) {
-              throw Exception(AppLocalizations.of(context).cloudErrorAuthFailedCredentials);
+              throw Exception(
+                  AppLocalizations.of(context).cloudErrorAuthFailedCredentials);
             } else if (response.statusCode == 403) {
-              throw Exception(AppLocalizations.of(context).cloudErrorAccessDenied);
+              throw Exception(
+                  AppLocalizations.of(context).cloudErrorAccessDenied);
             } else if (response.statusCode == 404) {
-              throw Exception(AppLocalizations.of(context).cloudErrorPathNotFound(testUrl.path));
+              throw Exception(AppLocalizations.of(context)
+                  .cloudErrorPathNotFound(testUrl.path));
             } else {
-              throw Exception(AppLocalizations.of(context).cloudErrorServerStatus('${response.statusCode}'));
+              throw Exception(AppLocalizations.of(context)
+                  .cloudErrorServerStatus('${response.statusCode}'));
             }
             break;
 
@@ -1490,7 +1779,8 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
               final cleanedConfig = CloudServiceConfig(
                 type: config.type,
                 name: config.name,
-                s3Endpoint: config.s3Endpoint?.replaceFirst(RegExp(r'^https?://'), ''),
+                s3Endpoint:
+                    config.s3Endpoint?.replaceFirst(RegExp(r'^https?://'), ''),
                 s3Region: config.s3Region,
                 s3AccessKey: config.s3AccessKey,
                 s3SecretKey: config.s3SecretKey,
@@ -1499,14 +1789,17 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
                 s3Port: config.s3Port,
               );
 
-              logger.info('CloudServicePage', 'S3 连接测试开始: endpoint=${cleanedConfig.s3Endpoint}, bucket=${cleanedConfig.s3Bucket}');
+              logger.info('CloudServicePage',
+                  'S3 连接测试开始: endpoint=${cleanedConfig.s3Endpoint}, bucket=${cleanedConfig.s3Bucket}');
 
               final services = await createCloudServices(cleanedConfig);
 
-              logger.info('CloudServicePage', 'S3 provider 创建结果: ${services.provider != null ? "成功" : "失败"}');
+              logger.info('CloudServicePage',
+                  'S3 provider 创建结果: ${services.provider != null ? "成功" : "失败"}');
 
               if (services.provider == null) {
-                throw Exception('S3 provider 初始化失败 - createCloudServices 返回 null');
+                throw Exception(
+                    'S3 provider 初始化失败 - createCloudServices 返回 null');
               }
 
               // 实际测试连接：尝试列出 bucket 中的文件
@@ -1521,7 +1814,8 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
               // 提取最有用的错误信息
               String errorMsg = e.toString();
               if (errorMsg.contains('CloudConfigurationException:')) {
-                errorMsg = errorMsg.replaceFirst('CloudConfigurationException: ', '');
+                errorMsg =
+                    errorMsg.replaceFirst('CloudConfigurationException: ', '');
               } else if (errorMsg.contains('Exception:')) {
                 errorMsg = errorMsg.replaceFirst('Exception: ', '');
               }
@@ -1553,7 +1847,8 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
         } else {
           await AppDialog.error(context,
               title: AppLocalizations.of(context).cloudTestFailedTitle,
-              message: errorDetail ?? AppLocalizations.of(context).cloudTestFailedMessage);
+              message: errorDetail ??
+                  AppLocalizations.of(context).cloudTestFailedMessage);
         }
       }
     } catch (e) {
@@ -1569,6 +1864,86 @@ class _CloudServicePageState extends ConsumerState<CloudServicePage> {
     } finally {
       if (mounted) setState(() => _testingConnection = false);
     }
+  }
+}
+
+class _BeeCountCloudConfigDialog extends StatefulWidget {
+  const _BeeCountCloudConfigDialog({
+    required this.initialBaseUrl,
+    required this.initialApiPrefix,
+  });
+
+  final String initialBaseUrl;
+  final String initialApiPrefix;
+
+  @override
+  State<_BeeCountCloudConfigDialog> createState() =>
+      _BeeCountCloudConfigDialogState();
+}
+
+class _BeeCountCloudConfigDialogState
+    extends State<_BeeCountCloudConfigDialog> {
+  late final TextEditingController baseUrlController;
+  late final TextEditingController apiPrefixController;
+
+  @override
+  void initState() {
+    super.initState();
+    baseUrlController = TextEditingController(text: widget.initialBaseUrl);
+    apiPrefixController = TextEditingController(text: widget.initialApiPrefix);
+  }
+
+  @override
+  void dispose() {
+    baseUrlController.dispose();
+    apiPrefixController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('配置 BeeCount Cloud'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: baseUrlController,
+              decoration: const InputDecoration(
+                labelText: '服务地址',
+                hintText: 'http://127.0.0.1:8080',
+                helperText: 'BeeCount-Platform beecount-cloud 服务地址',
+              ),
+              keyboardType: TextInputType.url,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: apiPrefixController,
+              decoration: const InputDecoration(
+                labelText: 'API 前缀',
+                hintText: '/api/v1',
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(null),
+          child: Text(AppLocalizations.of(context).commonCancel),
+        ),
+        FilledButton(
+          onPressed: () {
+            Navigator.of(context).pop({
+              'baseUrl': baseUrlController.text.trim(),
+              'apiPrefix': apiPrefixController.text.trim(),
+            });
+          },
+          child: Text(AppLocalizations.of(context).commonSave),
+        ),
+      ],
+    );
   }
 }
 
@@ -1630,7 +2005,8 @@ class _SupabaseConfigDialogState extends State<_SupabaseConfigDialog> {
               controller: keyController,
               decoration: InputDecoration(
                 labelText: AppLocalizations.of(context).cloudAnonKeyLabel,
-                hintText: AppLocalizations.of(context).cloudSupabaseAnonKeyHintLong,
+                hintText:
+                    AppLocalizations.of(context).cloudSupabaseAnonKeyHintLong,
               ),
               keyboardType: TextInputType.text,
               minLines: 1,
@@ -1640,7 +2016,8 @@ class _SupabaseConfigDialogState extends State<_SupabaseConfigDialog> {
             TextField(
               controller: bucketController,
               decoration: InputDecoration(
-                labelText: AppLocalizations.of(context).cloudSupabaseBucketLabel,
+                labelText:
+                    AppLocalizations.of(context).cloudSupabaseBucketLabel,
                 hintText: AppLocalizations.of(context).cloudSupabaseBucketHint,
               ),
               keyboardType: TextInputType.text,
@@ -1730,17 +2107,21 @@ class _WebdavConfigDialogState extends State<_WebdavConfigDialog> {
             TextField(
               controller: usernameController,
               decoration: InputDecoration(
-                labelText: AppLocalizations.of(context).cloudWebdavUsernameLabel,
+                labelText:
+                    AppLocalizations.of(context).cloudWebdavUsernameLabel,
               ),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: passwordController,
               decoration: InputDecoration(
-                labelText: AppLocalizations.of(context).cloudWebdavPasswordLabel,
+                labelText:
+                    AppLocalizations.of(context).cloudWebdavPasswordLabel,
                 suffixIcon: IconButton(
                   icon: Icon(
-                    obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                    obscurePassword
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
                     size: 20,
                   ),
                   onPressed: () {
@@ -1756,9 +2137,11 @@ class _WebdavConfigDialogState extends State<_WebdavConfigDialog> {
             TextField(
               controller: pathController,
               decoration: InputDecoration(
-                labelText: AppLocalizations.of(context).cloudWebdavRemotePathLabel,
+                labelText:
+                    AppLocalizations.of(context).cloudWebdavRemotePathLabel,
                 hintText: AppLocalizations.of(context).cloudWebdavPathHint,
-                helperText: AppLocalizations.of(context).cloudWebdavRemotePathHelperText,
+                helperText: AppLocalizations.of(context)
+                    .cloudWebdavRemotePathHelperText,
               ),
             ),
           ],
@@ -1827,7 +2210,8 @@ class _S3ConfigDialogState extends State<_S3ConfigDialog> {
     accessKeyController = TextEditingController(text: widget.initialAccessKey);
     secretKeyController = TextEditingController(text: widget.initialSecretKey);
     bucketController = TextEditingController(text: widget.initialBucket);
-    portController = TextEditingController(text: widget.initialPort?.toString() ?? '');
+    portController =
+        TextEditingController(text: widget.initialPort?.toString() ?? '');
     useSSL = widget.initialUseSSL;
   }
 
@@ -1882,7 +2266,9 @@ class _S3ConfigDialogState extends State<_S3ConfigDialog> {
                 hintText: AppLocalizations.of(context).cloudS3SecretKeyHint,
                 suffixIcon: IconButton(
                   icon: Icon(
-                    obscureSecretKey ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                    obscureSecretKey
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
                     size: 20,
                   ),
                   onPressed: () {

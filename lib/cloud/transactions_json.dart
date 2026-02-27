@@ -1,12 +1,18 @@
 import 'dart:convert';
 import '../data/db.dart';
 import '../data/repositories/base_repository.dart';
+import '../data/repositories/local/local_repository.dart';
 import '../services/data_import_service.dart';
 import '../services/system/logger_service.dart';
 
 /// 账本交易数据的 JSON 导入导出工具
 ///
 /// 用于云同步时序列化和反序列化交易数据
+
+enum ImportMode {
+  merge,
+  replace,
+}
 
 // --- 字符串清理 ---
 
@@ -140,9 +146,10 @@ Future<String> exportTransactionsJson(BeeDatabase db, int ledgerId) async {
 
     // 记录分类缺失的交易（用于排查数据问题）
     if (t.categoryId != null && catInfo == null) {
-      logger.warning('TransactionsJson',
-        '交易 ${t.id} 引用了不存在的分类 ${t.categoryId}, '
-        'amount=${t.amount}, note=${t.note}, happenedAt=${t.happenedAt}');
+      logger.warning(
+          'TransactionsJson',
+          '交易 ${t.id} 引用了不存在的分类 ${t.categoryId}, '
+              'amount=${t.amount}, note=${t.note}, happenedAt=${t.happenedAt}');
     }
 
     final item = <String, dynamic>{
@@ -180,7 +187,8 @@ Future<String> exportTransactionsJson(BeeDatabase db, int ledgerId) async {
   }).toList();
 
   // v1.20.0: 导出附件元数据
-  final attachmentsMap = <int, List<Map<String, dynamic>>>{}; // transactionId -> attachments
+  final attachmentsMap =
+      <int, List<Map<String, dynamic>>>{}; // transactionId -> attachments
   if (txIds.isNotEmpty) {
     final allAttachments = await (db.select(db.transactionAttachments)
           ..where((a) => a.transactionId.isIn(txIds)))
@@ -288,7 +296,8 @@ Future<String> exportTransactionsJson(BeeDatabase db, int ledgerId) async {
     'items': items,
   };
 
-  logger.debug('TransactionsJson', '导出完成: ${items.length} 条交易, ${categoryItems.length} 个分类');
+  logger.debug('TransactionsJson',
+      '导出完成: ${items.length} 条交易, ${categoryItems.length} 个分类');
   return jsonEncode(payload);
 }
 
@@ -352,7 +361,11 @@ ImportData parseJsonToImportData(String jsonStr) {
       List<String>? tagNames;
       final tagsStr = it['tags'] as String?;
       if (tagsStr != null && tagsStr.trim().isNotEmpty) {
-        tagNames = tagsStr.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+        tagNames = tagsStr
+            .split(',')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .toList();
       }
 
       // 解析附件元数据
@@ -381,8 +394,10 @@ ImportData parseJsonToImportData(String jsonStr) {
         note: it['note'] as String?,
         // 账户信息：转账用 fromAccountName/toAccountName，其他用 accountName
         accountName: type != 'transfer' ? it['accountName'] as String? : null,
-        fromAccountName: type == 'transfer' ? it['fromAccountName'] as String? : null,
-        toAccountName: type == 'transfer' ? it['toAccountName'] as String? : null,
+        fromAccountName:
+            type == 'transfer' ? it['fromAccountName'] as String? : null,
+        toAccountName:
+            type == 'transfer' ? it['toAccountName'] as String? : null,
         tagNames: tagNames,
         attachments: attachments,
       ));
@@ -413,18 +428,89 @@ Future<({int inserted})> importTransactionsJson(
   int ledgerId,
   String jsonStr, {
   void Function(int done, int total)? onProgress,
+  ImportMode mode = ImportMode.merge,
 }) async {
   // 1. 解析 JSON 为统一格式
   final importData = parseJsonToImportData(jsonStr);
 
-  // 2. 使用统一导入服务
-  final result = await dataImportService.importData(
-    repo,
-    ledgerId,
-    importData,
-    defaultCurrency: importData.currency ?? 'CNY',
-    onProgress: onProgress,
-  );
+  Future<({int inserted})> doImport() async {
+    final result = await dataImportService.importData(
+      repo,
+      ledgerId,
+      importData,
+      defaultCurrency: importData.currency ?? 'CNY',
+      onProgress: onProgress,
+    );
+    return (inserted: result.inserted);
+  }
 
-  return (inserted: result.inserted,);
+  if (mode != ImportMode.replace) {
+    return doImport();
+  }
+
+  // replace 模式优先走本地原子事务，避免“先空后有”的可见闪烁
+  if (repo is LocalRepository) {
+    return repo.db.transaction(() async {
+      await _replaceLedgerTransactions(repo, ledgerId);
+      return doImport();
+    });
+  }
+
+  // 非本地仓库保持兼容逻辑
+  await _replaceLedgerTransactions(repo, ledgerId);
+  return doImport();
+}
+
+Future<void> _replaceLedgerTransactions(
+    BaseRepository repo, int ledgerId) async {
+  if (repo is LocalRepository) {
+    await repo.db.customStatement(
+      '''
+      DELETE FROM transaction_tags
+      WHERE transaction_id IN (
+        SELECT id FROM transactions WHERE ledger_id = ?
+      )
+      ''',
+      [ledgerId],
+    );
+    await repo.db.customStatement(
+      '''
+      DELETE FROM transaction_attachments
+      WHERE transaction_id IN (
+        SELECT id FROM transactions WHERE ledger_id = ?
+      )
+      ''',
+      [ledgerId],
+    );
+    await repo.db.customStatement(
+      'DELETE FROM transactions WHERE ledger_id = ?',
+      [ledgerId],
+    );
+    logger.info('TransactionsJson', 'replace 模式: 账本 $ledgerId 已批量清理旧交易');
+    return;
+  }
+
+  final existing = await repo.getTransactionsByLedger(ledgerId);
+  if (existing.isEmpty) {
+    return;
+  }
+
+  final txIds = existing.map((row) => row.id).toList(growable: false);
+  logger.info(
+      'TransactionsJson', 'replace 模式: 账本 $ledgerId 清理旧交易 ${txIds.length} 条');
+
+  await repo.clearLedgerTransactions(ledgerId);
+
+  for (final txId in txIds) {
+    try {
+      await repo.updateTransactionTags(transactionId: txId, tagIds: const []);
+    } catch (_) {
+      // 忽略不存在或已清理的标签关联
+    }
+    try {
+      await repo.deleteAttachmentsByTransaction(txId);
+    } catch (_) {
+      // 忽略不存在或已清理的附件关联
+    }
+  }
 }

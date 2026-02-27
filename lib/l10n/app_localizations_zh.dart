@@ -1326,6 +1326,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get mineDownloadRefreshedNoChanges => '已从云端刷新，无新增记录';
+
+  @override
   String get mineLoginTitle => '登录 / 注册';
 
   @override
@@ -2243,13 +2246,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cloudSelectServiceType => '选择云服务类型';
 
   @override
-  String get cloudMultiDeviceWarningTitle => '多设备同步提示';
+  String get cloudGroupCollaborative => '协同云';
 
   @override
-  String get cloudMultiDeviceWarningMessage => '当前暂不支持多设备协同编辑。如需在新设备使用，请先清空新设备的本地数据，然后从云端下载账本。';
+  String get cloudGroupBackup => '备份云';
 
   @override
-  String get cloudMultiDeviceWarningDetail => '多设备同步说明：\n\n1. 目前不支持多设备同时编辑同一账本\n2. 如果在设备A编辑后，切换到设备B使用：\n   • 需要在设备B上清空所有账本\n   • 然后从云端下载最新数据\n3. 未来版本将支持真正的多设备协同';
+  String get cloudGroupLocal => '本地';
+
+  @override
+  String get cloudCapabilityCollaborativeTitle => '协同云能力';
+
+  @override
+  String get cloudCapabilityCollaborativeMessage => '支持多用户、多设备协同同步与编辑（以服务端权限与版本能力为准）。';
+
+  @override
+  String get cloudCapabilityBackupTitle => '备份云能力';
+
+  @override
+  String get cloudCapabilityBackupMessage => '适合备份与跨设备迁移，不保证多设备并发协同编辑。';
 
   @override
   String get cloudWebdavUrlLabel => 'WebDAV 服务器地址';
@@ -2315,7 +2330,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get authRememberAccount => '记住账号密码';
 
   @override
-  String get authRememberAccountHint => '下次登录时自动填充（仅Supabase）';
+  String get authRememberAccountHint => '下次登录时自动填充（Supabase/BeeCount Cloud）';
 
   @override
   String get cloudConfigSaved => '配置已保存';
@@ -2351,10 +2366,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get authInvalidEmail => '请输入有效的邮箱地址';
 
   @override
+  String get authPasswordRequired => '请输入密码';
+
+  @override
   String get authPasswordRequirementShort => '密码需包含字母和数字，长度至少 6 位';
 
   @override
   String get authPasswordMismatch => '两次输入的密码不一致';
+
+  @override
+  String get authBeeCountCloudLoginOnlyHint => 'BeeCount Cloud 账号由云服务侧管理，此处仅支持登录。';
 
   @override
   String get authResendVerification => '重发验证邮件';
@@ -5404,6 +5425,420 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aiModelInputHelper => '留空则使用默认模型';
+
+  @override
+  String get cloudCollabCurrentRoleTitle => '当前协作角色';
+
+  @override
+  String get cloudCollabCurrentRoleSubtitle => '当前账本中的角色与权限';
+
+  @override
+  String get cloudCollabRoleLoading => '加载中...';
+
+  @override
+  String get cloudCollabRoleOwner => 'Owner';
+
+  @override
+  String get cloudCollabRoleEditor => 'Editor';
+
+  @override
+  String get cloudCollabRoleViewer => 'Viewer';
+
+  @override
+  String get cloudCollabRoleViewerLegacy => 'Viewer（历史只读）';
+
+  @override
+  String get cloudCollabRoleUnknown => '未知';
+
+  @override
+  String get cloudCollabRoleNotReady => '权限未就绪';
+
+  @override
+  String get cloudCollabExperimentalBetaTitle => '实验功能';
+
+  @override
+  String get cloudCollabExperimentalBetaSubtitle => '协作编辑仍在实验阶段，写入后请手动核对同步结果。';
+
+  @override
+  String get cloudCollabExperimentalWriteHint => '实验功能：协作写入可能不稳定，操作后请核对同步结果。';
+
+  @override
+  String get cloudCollabSharedTag => '共享';
+
+  @override
+  String get cloudCollabManageEntryTitle => '共享账本管理';
+
+  @override
+  String get cloudCollabManageEntrySubtitle => '角色与成员查看（后台管理）';
+
+  @override
+  String get cloudCollabManagePageTitle => '共享账本管理';
+
+  @override
+  String get cloudCollabManagePageSubtitle => '管理当前账本协作与权限';
+
+  @override
+  String get cloudCollabMembersEntryTitle => '共享成员';
+
+  @override
+  String get cloudCollabMembersEntrySubtitle => '查看成员与角色';
+
+  @override
+  String get cloudCollabInvitesEntryTitle => '邀请码管理';
+
+  @override
+  String get cloudCollabInvitesEntrySubtitle => '创建与管理邀请码';
+
+  @override
+  String get cloudCollabDevicesEntryTitle => '设备会话';
+
+  @override
+  String get cloudCollabDevicesEntrySubtitle => '查看并远程下线设备';
+
+  @override
+  String get cloudCollabJoinByCodeTitle => '通过邀请码加入';
+
+  @override
+  String get cloudCollabJoinByCodeSubtitle => '加入其他共享账本';
+
+  @override
+  String get cloudCollabJoinByCodeHint => '例如 abcDEF123';
+
+  @override
+  String get cloudCollabJoinSuccessTitle => '加入成功';
+
+  @override
+  String get cloudCollabJoinSuccessMessage => '已加入共享账本，请返回账本列表查看。';
+
+  @override
+  String get cloudCollabLeaveTitle => '退出共享账本';
+
+  @override
+  String get cloudCollabLeaveSubtitle => '仅非 Owner 成员可退出';
+
+  @override
+  String get cloudCollabLeaveOwnerBlocked => 'Owner 不能退出当前账本。';
+
+  @override
+  String get cloudCollabLeaveConfirm => '确认退出当前共享账本吗？';
+
+  @override
+  String get cloudCollabLeaveDoneTitle => '已退出';
+
+  @override
+  String get cloudCollabLeaveDoneMessage => '你已退出当前共享账本。';
+
+  @override
+  String get cloudCollabMembersPageTitle => '共享成员';
+
+  @override
+  String get cloudCollabMembersPageSubtitle => '查看当前账本成员角色';
+
+  @override
+  String get cloudCollabLegacyViewerHint => '历史 Viewer 成员仅做兼容保留，维持只读。';
+
+  @override
+  String get cloudCollabManagedInBackendTitle => '后台管理';
+
+  @override
+  String get cloudCollabManagedInBackendHint => '成员增删与共享配置请在 BeeCount Web 后台完成。';
+
+  @override
+  String get cloudCollabNoMembers => '当前账本暂无成员';
+
+  @override
+  String cloudCollabJoinedAt(String time) {
+    return '加入时间：$time';
+  }
+
+  @override
+  String get cloudCollabRoleUpdateSuccess => '角色已更新';
+
+  @override
+  String get cloudCollabUpgradeViewerToEditor => '升级为 Editor';
+
+  @override
+  String get cloudCollabInvitesPageTitle => '邀请码管理';
+
+  @override
+  String get cloudCollabInvitesPageSubtitle => '创建并管理共享邀请码';
+
+  @override
+  String get cloudCollabNoInvites => '当前暂无邀请码';
+
+  @override
+  String get cloudCollabOwnerOnlyHint => '仅 Owner 可管理邀请码。';
+
+  @override
+  String get cloudCollabInviteRoleTitle => '邀请角色';
+
+  @override
+  String get cloudCollabInviteRoleHint => '仅 editor';
+
+  @override
+  String get cloudCollabRoleInvalidTitle => '角色无效';
+
+  @override
+  String get cloudCollabRoleInvalidMessage => '仅支持 editor。';
+
+  @override
+  String get cloudCollabInviteMaxUsesTitle => '可使用次数';
+
+  @override
+  String get cloudCollabInviteMaxUsesHint => '输入正整数';
+
+  @override
+  String get cloudCollabInviteMaxUsesInvalidTitle => '次数无效';
+
+  @override
+  String get cloudCollabInviteMaxUsesInvalidMessage => '请输入大于 0 的整数。';
+
+  @override
+  String get cloudCollabInviteExpiresHoursTitle => '过期时长（小时）';
+
+  @override
+  String get cloudCollabInviteExpiresHoursHint => '输入正整数';
+
+  @override
+  String get cloudCollabInviteExpiresHoursInvalidTitle => '过期时长无效';
+
+  @override
+  String get cloudCollabInviteExpiresHoursInvalidMessage => '请输入大于 0 的整数。';
+
+  @override
+  String get cloudCollabInviteCreatedTitle => '邀请码已创建';
+
+  @override
+  String cloudCollabInviteCreatedDetail(String inviteCode, String inviteId, String role, String expiresAt) {
+    return '邀请码：$inviteCode\n邀请ID：$inviteId\n角色：$role\n过期时间：$expiresAt';
+  }
+
+  @override
+  String get cloudCollabCopyInviteCode => '复制邀请码';
+
+  @override
+  String get cloudCollabInviteCodeCopied => '邀请码已复制';
+
+  @override
+  String get cloudCollabInviteStatusActive => '有效';
+
+  @override
+  String get cloudCollabInviteStatusExpired => '已过期';
+
+  @override
+  String get cloudCollabInviteStatusExhausted => '已用尽';
+
+  @override
+  String get cloudCollabInviteStatusRevoked => '已撤销';
+
+  @override
+  String cloudCollabInviteUsed(String text) {
+    return '使用次数：$text';
+  }
+
+  @override
+  String cloudCollabInviteExpiresAt(String time) {
+    return '过期时间：$time';
+  }
+
+  @override
+  String get cloudCollabInviteRevokeTitle => '撤销邀请码';
+
+  @override
+  String cloudCollabInviteRevokeMessage(String inviteId) {
+    return '确认撤销邀请码 $inviteId 吗？';
+  }
+
+  @override
+  String get cloudCollabInviteRevoked => '邀请码已撤销';
+
+  @override
+  String get cloudCollabDevicesPageTitle => '设备会话';
+
+  @override
+  String get cloudCollabDevicesPageSubtitle => '管理当前账号活跃设备';
+
+  @override
+  String get cloudCollabDevicesViewAllSessions => '显示全部会话';
+
+  @override
+  String get cloudCollabDevicesViewModeHint => '默认展示近 30 天去重设备，可切换查看全部会话。';
+
+  @override
+  String get cloudCollabNoDevices => '当前没有活跃设备';
+
+  @override
+  String get cloudCollabUnknownDeviceName => '未知设备';
+
+  @override
+  String get cloudCollabDeviceCurrentTag => '当前设备';
+
+  @override
+  String get cloudCollabCurrentDeviceCannotRevoke => '当前设备不能远程下线。';
+
+  @override
+  String cloudCollabDeviceAppVersion(String version) {
+    return '应用：$version';
+  }
+
+  @override
+  String cloudCollabDeviceOsVersion(String version) {
+    return '系统：$version';
+  }
+
+  @override
+  String cloudCollabDeviceModel(String model) {
+    return '型号：$model';
+  }
+
+  @override
+  String cloudCollabDeviceLastIp(String ip) {
+    return 'IP：$ip';
+  }
+
+  @override
+  String cloudCollabDeviceSessionCount(String count) {
+    return '会话数：$count';
+  }
+
+  @override
+  String cloudCollabDeviceLastSeen(String time) {
+    return '最近活跃：$time';
+  }
+
+  @override
+  String cloudCollabDeviceCreatedAt(String time) {
+    return '创建时间：$time';
+  }
+
+  @override
+  String get cloudCollabDeviceRevokeTitle => '远程下线设备';
+
+  @override
+  String cloudCollabDeviceRevokeMessage(String name, String id) {
+    return '确认下线设备 $name（$id）吗？';
+  }
+
+  @override
+  String cloudCollabDeviceRevokeMultipleMessage(String name, String count) {
+    return '确认下线设备 $name 的 $count 个会话吗？';
+  }
+
+  @override
+  String get cloudCollabDeviceRevoked => '设备已下线';
+
+  @override
+  String get cloudCollabManageBlockedTitle => '权限不足';
+
+  @override
+  String get cloudCollabManageBlockedMessage => '仅 Owner 可以管理该共享账本。';
+
+  @override
+  String get cloudCollabUnavailableMessage => '云协作功能暂不可用。';
+
+  @override
+  String get cloudCollabScopeDeniedTitle => '协作权限未开启';
+
+  @override
+  String get cloudCollabScopeDeniedHint => '服务端尚未开启 ALLOW_APP_RW_SCOPES，当前设备会话与协作读取不可用。';
+
+  @override
+  String get cloudCollabScopeDeniedAction => '请在服务端 .env 或部署环境中设置 ALLOW_APP_RW_SCOPES=true，重启服务后重新登录 App。';
+
+  @override
+  String get cloudCollabEntryMovedHint => '账本协作入口已迁移到“账本管理”页面。';
+
+  @override
+  String get cloudCollabMediaRetryHint => '手动上传/下载会同时重试缺失的附件与分类图标文件。';
+
+  @override
+  String get cloudCollabMediaRetryPartialTitle => '媒体补齐部分完成';
+
+  @override
+  String cloudCollabMediaRetryPartialMessage(String downloaded, String failed) {
+    return '已补齐 $downloaded 个媒体文件，仍有 $failed 个失败，可稍后再次手动同步。';
+  }
+
+  @override
+  String cloudCollabMediaRetrySuccess(String count) {
+    return '已补齐 $count 个缺失媒体文件。';
+  }
+
+  @override
+  String get cloudCollabMediaRetryFailedTitle => '媒体重试失败';
+
+  @override
+  String cloudCollabMediaRetryFailedMessage(String error) {
+    return '媒体补齐重试失败：$error';
+  }
+
+  @override
+  String get cloudCollabUnknownMember => '未知成员';
+
+  @override
+  String get cloudCollabMemberStatusActive => '活跃';
+
+  @override
+  String get cloudCollabMemberStatusLeft => '已退出';
+
+  @override
+  String cloudCollabMembersCount(String count) {
+    return '$count 位成员';
+  }
+
+  @override
+  String get cloudCollabCreatorLabel => '创建者';
+
+  @override
+  String get cloudCollabCreatorLoading => '正在加载创建者...';
+
+  @override
+  String get cloudCollabWriteDeniedMessage => '当前角色无权在该共享账本中写入。';
+
+  @override
+  String get cloudCollabEditDeniedMessage => '当前角色无权编辑该交易。';
+
+  @override
+  String get cloudCollabManageDeniedMessage => '当前角色无权管理该共享账本。';
+
+  @override
+  String get cloudCollabDeleteDeniedMessage => '当前角色无权删除该交易。';
+
+  @override
+  String cloudCollabUploadQueuePending(String count) {
+    return '待上传 $count 条变更';
+  }
+
+  @override
+  String cloudCollabUploadQueueFailed(String count) {
+    return '$count 条变更上传失败，点击上传重试';
+  }
+
+  @override
+  String cloudCollabUploadQueueFailedToast(String count) {
+    return '自动上传失败 $count 条，请在云同步页点击上传重试。';
+  }
+
+  @override
+  String get cloudCollabAvatarUploadSuccess => '头像已同步到云端。';
+
+  @override
+  String get cloudCollabAvatarUploadFailed => '头像上传失败，可在云同步页重试。';
+
+  @override
+  String get cloudCollabAvatarRetryTitle => '重试头像上传';
+
+  @override
+  String get cloudCollabAvatarRetrySubtitle => '点击重试将当前头像同步到 BeeCount Cloud。';
+
+  @override
+  String get cloudCollabDiagnosticsTitle => '协作诊断信息';
+
+  @override
+  String get cloudCollabDiagnosticsSubtitle => '复制账本/权限/deviceId 信息用于自部署排障。';
+
+  @override
+  String get cloudCollabDiagnosticsCopied => '诊断信息已复制。';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -6730,6 +7165,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   }
 
   @override
+  String get mineDownloadRefreshedNoChanges => '已從雲端刷新，無新增記錄';
+
+  @override
   String get mineLoginTitle => '登入 / 註冊';
 
   @override
@@ -7647,13 +8085,25 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get cloudSelectServiceType => '選擇雲端服務類型';
 
   @override
-  String get cloudMultiDeviceWarningTitle => '多設備同步提示';
+  String get cloudGroupCollaborative => '協同雲';
 
   @override
-  String get cloudMultiDeviceWarningMessage => '目前暫不支援多設備協同編輯。如需在新設備使用，請先清空新設備的本機資料，然後從雲端下載帳本。';
+  String get cloudGroupBackup => '備份雲';
 
   @override
-  String get cloudMultiDeviceWarningDetail => '多設備同步說明：\n\n1. 目前不支援多設備同時編輯同一帳本\n2. 如果在設備A編輯後，切換到設備B使用：\n   • 需要在設備B上清空所有帳本\n   • 然後從雲端下載最新資料\n3. 未來版本將支援真正的多設備協同';
+  String get cloudGroupLocal => '本機';
+
+  @override
+  String get cloudCapabilityCollaborativeTitle => '協同雲能力';
+
+  @override
+  String get cloudCapabilityCollaborativeMessage => '支援多使用者、多設備協同同步與編輯（以服務端權限與版本能力為準）。';
+
+  @override
+  String get cloudCapabilityBackupTitle => '備份雲能力';
+
+  @override
+  String get cloudCapabilityBackupMessage => '適合備份與跨設備遷移，不保證多設備並發協同編輯。';
 
   @override
   String get cloudWebdavUrlLabel => 'WebDAV 伺服器地址';
@@ -7719,7 +8169,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get authRememberAccount => '記住帳號密碼';
 
   @override
-  String get authRememberAccountHint => '下次登入時自動填入（僅Supabase）';
+  String get authRememberAccountHint => '下次登入時自動填入（Supabase/BeeCount Cloud）';
 
   @override
   String get cloudConfigSaved => '設定已儲存';
@@ -7755,10 +8205,16 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get authInvalidEmail => '請輸入有效的電子郵件地址';
 
   @override
+  String get authPasswordRequired => '請輸入密碼';
+
+  @override
   String get authPasswordRequirementShort => '密碼需包含字母和數字，長度至少 6 位';
 
   @override
   String get authPasswordMismatch => '兩次輸入的密碼不一致';
+
+  @override
+  String get authBeeCountCloudLoginOnlyHint => 'BeeCount Cloud 帳號由雲端服務端管理，此處僅支援登入。';
 
   @override
   String get authResendVerification => '重發驗證電子郵件';
@@ -10808,4 +11264,418 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get aiModelInputHelper => '留空則使用預設模型';
+
+  @override
+  String get cloudCollabCurrentRoleTitle => '目前協作角色';
+
+  @override
+  String get cloudCollabCurrentRoleSubtitle => '目前帳本中的角色與權限';
+
+  @override
+  String get cloudCollabRoleLoading => '載入中...';
+
+  @override
+  String get cloudCollabRoleOwner => 'Owner';
+
+  @override
+  String get cloudCollabRoleEditor => 'Editor';
+
+  @override
+  String get cloudCollabRoleViewer => 'Viewer';
+
+  @override
+  String get cloudCollabRoleViewerLegacy => 'Viewer（歷史唯讀）';
+
+  @override
+  String get cloudCollabRoleUnknown => '未知';
+
+  @override
+  String get cloudCollabRoleNotReady => '權限未就緒';
+
+  @override
+  String get cloudCollabExperimentalBetaTitle => '實驗功能';
+
+  @override
+  String get cloudCollabExperimentalBetaSubtitle => '協作編輯仍在實驗階段，寫入後請手動確認同步結果。';
+
+  @override
+  String get cloudCollabExperimentalWriteHint => '實驗功能：協作寫入可能不穩定，操作後請確認同步結果。';
+
+  @override
+  String get cloudCollabSharedTag => '共享';
+
+  @override
+  String get cloudCollabManageEntryTitle => '共享帳本管理';
+
+  @override
+  String get cloudCollabManageEntrySubtitle => '角色與成員查看（後台管理）';
+
+  @override
+  String get cloudCollabManagePageTitle => '共享帳本管理';
+
+  @override
+  String get cloudCollabManagePageSubtitle => '管理目前帳本協作與權限';
+
+  @override
+  String get cloudCollabMembersEntryTitle => '共享成員';
+
+  @override
+  String get cloudCollabMembersEntrySubtitle => '查看成員與角色';
+
+  @override
+  String get cloudCollabInvitesEntryTitle => '邀請碼管理';
+
+  @override
+  String get cloudCollabInvitesEntrySubtitle => '建立與管理邀請碼';
+
+  @override
+  String get cloudCollabDevicesEntryTitle => '裝置工作階段';
+
+  @override
+  String get cloudCollabDevicesEntrySubtitle => '查看並遠端下線裝置';
+
+  @override
+  String get cloudCollabJoinByCodeTitle => '透過邀請碼加入';
+
+  @override
+  String get cloudCollabJoinByCodeSubtitle => '加入其他共享帳本';
+
+  @override
+  String get cloudCollabJoinByCodeHint => '例如 abcDEF123';
+
+  @override
+  String get cloudCollabJoinSuccessTitle => '加入成功';
+
+  @override
+  String get cloudCollabJoinSuccessMessage => '已加入共享帳本，請返回帳本列表查看。';
+
+  @override
+  String get cloudCollabLeaveTitle => '退出共享帳本';
+
+  @override
+  String get cloudCollabLeaveSubtitle => '僅非 Owner 成員可退出';
+
+  @override
+  String get cloudCollabLeaveOwnerBlocked => 'Owner 不能退出目前帳本。';
+
+  @override
+  String get cloudCollabLeaveConfirm => '確認退出目前共享帳本嗎？';
+
+  @override
+  String get cloudCollabLeaveDoneTitle => '已退出';
+
+  @override
+  String get cloudCollabLeaveDoneMessage => '你已退出目前共享帳本。';
+
+  @override
+  String get cloudCollabMembersPageTitle => '共享成員';
+
+  @override
+  String get cloudCollabMembersPageSubtitle => '查看目前帳本成員角色';
+
+  @override
+  String get cloudCollabLegacyViewerHint => '歷史 Viewer 成員僅做相容保留，維持唯讀。';
+
+  @override
+  String get cloudCollabManagedInBackendTitle => '後台管理';
+
+  @override
+  String get cloudCollabManagedInBackendHint => '成員增刪與共享設定請在 BeeCount Web 後台完成。';
+
+  @override
+  String get cloudCollabNoMembers => '目前帳本暫無成員';
+
+  @override
+  String cloudCollabJoinedAt(String time) {
+    return '加入時間：$time';
+  }
+
+  @override
+  String get cloudCollabRoleUpdateSuccess => '角色已更新';
+
+  @override
+  String get cloudCollabUpgradeViewerToEditor => '升級為 Editor';
+
+  @override
+  String get cloudCollabInvitesPageTitle => '邀請碼管理';
+
+  @override
+  String get cloudCollabInvitesPageSubtitle => '建立並管理共享邀請碼';
+
+  @override
+  String get cloudCollabNoInvites => '目前暫無邀請碼';
+
+  @override
+  String get cloudCollabOwnerOnlyHint => '僅 Owner 可管理邀請碼。';
+
+  @override
+  String get cloudCollabInviteRoleTitle => '邀請角色';
+
+  @override
+  String get cloudCollabInviteRoleHint => '僅 editor';
+
+  @override
+  String get cloudCollabRoleInvalidTitle => '角色無效';
+
+  @override
+  String get cloudCollabRoleInvalidMessage => '僅支援 editor。';
+
+  @override
+  String get cloudCollabInviteMaxUsesTitle => '可使用次數';
+
+  @override
+  String get cloudCollabInviteMaxUsesHint => '輸入正整數';
+
+  @override
+  String get cloudCollabInviteMaxUsesInvalidTitle => '次數無效';
+
+  @override
+  String get cloudCollabInviteMaxUsesInvalidMessage => '請輸入大於 0 的整數。';
+
+  @override
+  String get cloudCollabInviteExpiresHoursTitle => '過期時長（小時）';
+
+  @override
+  String get cloudCollabInviteExpiresHoursHint => '輸入正整數';
+
+  @override
+  String get cloudCollabInviteExpiresHoursInvalidTitle => '過期時長無效';
+
+  @override
+  String get cloudCollabInviteExpiresHoursInvalidMessage => '請輸入大於 0 的整數。';
+
+  @override
+  String get cloudCollabInviteCreatedTitle => '邀請碼已建立';
+
+  @override
+  String cloudCollabInviteCreatedDetail(String inviteCode, String inviteId, String role, String expiresAt) {
+    return '邀請碼：$inviteCode\n邀請ID：$inviteId\n角色：$role\n過期時間：$expiresAt';
+  }
+
+  @override
+  String get cloudCollabCopyInviteCode => '複製邀請碼';
+
+  @override
+  String get cloudCollabInviteCodeCopied => '邀請碼已複製';
+
+  @override
+  String get cloudCollabInviteStatusActive => '有效';
+
+  @override
+  String get cloudCollabInviteStatusExpired => '已過期';
+
+  @override
+  String get cloudCollabInviteStatusExhausted => '已用盡';
+
+  @override
+  String get cloudCollabInviteStatusRevoked => '已撤銷';
+
+  @override
+  String cloudCollabInviteUsed(String text) {
+    return '使用次數：$text';
+  }
+
+  @override
+  String cloudCollabInviteExpiresAt(String time) {
+    return '過期時間：$time';
+  }
+
+  @override
+  String get cloudCollabInviteRevokeTitle => '撤銷邀請碼';
+
+  @override
+  String cloudCollabInviteRevokeMessage(String inviteId) {
+    return '確認撤銷邀請碼 $inviteId 嗎？';
+  }
+
+  @override
+  String get cloudCollabInviteRevoked => '邀請碼已撤銷';
+
+  @override
+  String get cloudCollabDevicesPageTitle => '裝置工作階段';
+
+  @override
+  String get cloudCollabDevicesPageSubtitle => '管理目前帳號活躍裝置';
+
+  @override
+  String get cloudCollabDevicesViewAllSessions => '顯示全部工作階段';
+
+  @override
+  String get cloudCollabDevicesViewModeHint => '預設顯示近 30 天去重裝置，可切換檢視全部工作階段。';
+
+  @override
+  String get cloudCollabNoDevices => '目前沒有活躍裝置';
+
+  @override
+  String get cloudCollabUnknownDeviceName => '未知裝置';
+
+  @override
+  String get cloudCollabDeviceCurrentTag => '目前裝置';
+
+  @override
+  String get cloudCollabCurrentDeviceCannotRevoke => '目前裝置不能遠端下線。';
+
+  @override
+  String cloudCollabDeviceAppVersion(String version) {
+    return '應用：$version';
+  }
+
+  @override
+  String cloudCollabDeviceOsVersion(String version) {
+    return '系統：$version';
+  }
+
+  @override
+  String cloudCollabDeviceModel(String model) {
+    return '型號：$model';
+  }
+
+  @override
+  String cloudCollabDeviceLastIp(String ip) {
+    return 'IP：$ip';
+  }
+
+  @override
+  String cloudCollabDeviceSessionCount(String count) {
+    return '工作階段數：$count';
+  }
+
+  @override
+  String cloudCollabDeviceLastSeen(String time) {
+    return '最近活躍：$time';
+  }
+
+  @override
+  String cloudCollabDeviceCreatedAt(String time) {
+    return '建立時間：$time';
+  }
+
+  @override
+  String get cloudCollabDeviceRevokeTitle => '遠端下線裝置';
+
+  @override
+  String cloudCollabDeviceRevokeMessage(String name, String id) {
+    return '確認下線裝置 $name（$id）嗎？';
+  }
+
+  @override
+  String cloudCollabDeviceRevokeMultipleMessage(String name, String count) {
+    return '確認下線裝置 $name 的 $count 個工作階段嗎？';
+  }
+
+  @override
+  String get cloudCollabDeviceRevoked => '裝置已下線';
+
+  @override
+  String get cloudCollabManageBlockedTitle => '權限不足';
+
+  @override
+  String get cloudCollabManageBlockedMessage => '僅 Owner 可以管理此共享帳本。';
+
+  @override
+  String get cloudCollabUnavailableMessage => '雲端協作功能暫時不可用。';
+
+  @override
+  String get cloudCollabScopeDeniedTitle => '協作權限未開啟';
+
+  @override
+  String get cloudCollabScopeDeniedHint => '伺服器尚未開啟 ALLOW_APP_RW_SCOPES，目前裝置工作階段與協作讀取接口不可用。';
+
+  @override
+  String get cloudCollabScopeDeniedAction => '請在伺服器 .env 或部署環境設定 ALLOW_APP_RW_SCOPES=true，重啟服務後重新登入 App。';
+
+  @override
+  String get cloudCollabEntryMovedHint => '帳本協作入口已移至「帳本管理」頁面。';
+
+  @override
+  String get cloudCollabMediaRetryHint => '手動上傳/下載會同時重試缺失的附件與分類圖示檔案。';
+
+  @override
+  String get cloudCollabMediaRetryPartialTitle => '媒體補齊部分完成';
+
+  @override
+  String cloudCollabMediaRetryPartialMessage(String downloaded, String failed) {
+    return '已補齊 $downloaded 個媒體檔案，仍有 $failed 個失敗，可稍後再次手動同步。';
+  }
+
+  @override
+  String cloudCollabMediaRetrySuccess(String count) {
+    return '已補齊 $count 個缺失媒體檔案。';
+  }
+
+  @override
+  String get cloudCollabMediaRetryFailedTitle => '媒體重試失敗';
+
+  @override
+  String cloudCollabMediaRetryFailedMessage(String error) {
+    return '媒體補齊重試失敗：$error';
+  }
+
+  @override
+  String get cloudCollabUnknownMember => '未知成員';
+
+  @override
+  String get cloudCollabMemberStatusActive => '活躍';
+
+  @override
+  String get cloudCollabMemberStatusLeft => '已離開';
+
+  @override
+  String cloudCollabMembersCount(String count) {
+    return '$count 位成員';
+  }
+
+  @override
+  String get cloudCollabCreatorLabel => '建立者';
+
+  @override
+  String get cloudCollabCreatorLoading => '正在載入建立者...';
+
+  @override
+  String get cloudCollabWriteDeniedMessage => '目前角色無權在此共享帳本寫入。';
+
+  @override
+  String get cloudCollabEditDeniedMessage => '目前角色無權編輯此交易。';
+
+  @override
+  String get cloudCollabManageDeniedMessage => '目前角色無權管理此共享帳本。';
+
+  @override
+  String get cloudCollabDeleteDeniedMessage => '目前角色無權刪除此交易。';
+
+  @override
+  String cloudCollabUploadQueuePending(String count) {
+    return '待上傳 $count 筆變更';
+  }
+
+  @override
+  String cloudCollabUploadQueueFailed(String count) {
+    return '$count 筆變更上傳失敗，點擊上傳重試';
+  }
+
+  @override
+  String cloudCollabUploadQueueFailedToast(String count) {
+    return '自動上傳失敗 $count 筆，請到雲端同步頁點擊上傳重試。';
+  }
+
+  @override
+  String get cloudCollabAvatarUploadSuccess => '頭像已同步至雲端。';
+
+  @override
+  String get cloudCollabAvatarUploadFailed => '頭像上傳失敗，可在雲端同步頁重試。';
+
+  @override
+  String get cloudCollabAvatarRetryTitle => '重試頭像上傳';
+
+  @override
+  String get cloudCollabAvatarRetrySubtitle => '點擊重試將目前頭像同步到 BeeCount Cloud。';
+
+  @override
+  String get cloudCollabDiagnosticsTitle => '協作診斷資訊';
+
+  @override
+  String get cloudCollabDiagnosticsSubtitle => '複製帳本/權限/deviceId 資訊用於自部署排障。';
+
+  @override
+  String get cloudCollabDiagnosticsCopied => '診斷資訊已複製。';
 }

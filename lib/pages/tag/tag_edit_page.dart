@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/db.dart';
 import '../../l10n/app_localizations.dart';
-import '../../providers/tag_providers.dart';
-import '../../providers/database_providers.dart';
+import '../../providers.dart';
 import '../../services/data/tag_seed_service.dart';
 import '../../styles/tokens.dart';
+import '../../utils/transaction_edit_utils.dart';
 import '../../widgets/ui/ui.dart';
 import '../../widgets/biz/section_card.dart';
 import '../../widgets/biz/tag_chip.dart';
@@ -230,6 +230,14 @@ class _TagEditPageState extends ConsumerState<TagEditPage> {
   }
 
   Future<void> _submit() async {
+    final ledgerId = ref.read(currentLedgerIdProvider);
+    final allowed = await TransactionEditUtils.canManageLedger(
+      context,
+      ref,
+      ledgerId: ledgerId,
+    );
+    if (!allowed) return;
+
     if (!_formKey.currentState!.validate()) {
       return;
     }

@@ -6,6 +6,7 @@ import '../../widgets/ui/ui.dart';
 import '../../widgets/category_icon.dart';
 import '../../providers/theme_providers.dart';
 import 'amount_text.dart';
+import 'collab_member_avatar.dart';
 import 'tag_chip.dart';
 
 class TransactionListItem extends ConsumerWidget {
@@ -22,6 +23,9 @@ class TransactionListItem extends ConsumerWidget {
   final VoidCallback? onDelete; // 删除回调
   final String? accountName; // 账户名称，用于显示
   final DateTime? happenedAt; // 交易时间，用于显示时分
+  final String? creatorUserId; // 交易创建者 user_id
+  final String? creatorName; // 仅用于头像占位字母回退，不展示文本
+  final String? creatorAvatarUrl; // 交易创建者头像
 
   // 批量选择模式相关
   final bool isSelectionMode; // 是否处于选择模式
@@ -38,30 +42,32 @@ class TransactionListItem extends ConsumerWidget {
   final VoidCallback? onAttachmentTap; // 点击附件图标回调
 
   const TransactionListItem({
-      super.key,
-      required this.icon,
-      this.category,
-      required this.title,
-      required this.amount,
-      required this.isExpense,
-      this.isTransfer = false,
-      this.hide,
-      this.onTap,
-      this.onCategoryTap,
-      this.categoryName,
-      this.onDelete,
-      this.accountName,
-      this.happenedAt,
-      this.isSelectionMode = false,
-      this.isSelected = false,
-      this.onSelectionChanged,
-      this.showFullDate = false,
-      this.tags,
-      this.onTagTap,
-      this.attachmentCount = 0,
-      this.onAttachmentTap,
+    super.key,
+    required this.icon,
+    this.category,
+    required this.title,
+    required this.amount,
+    required this.isExpense,
+    this.isTransfer = false,
+    this.hide,
+    this.onTap,
+    this.onCategoryTap,
+    this.categoryName,
+    this.onDelete,
+    this.accountName,
+    this.happenedAt,
+    this.creatorUserId,
+    this.creatorName,
+    this.creatorAvatarUrl,
+    this.isSelectionMode = false,
+    this.isSelected = false,
+    this.onSelectionChanged,
+    this.showFullDate = false,
+    this.tags,
+    this.onTagTap,
+    this.attachmentCount = 0,
+    this.onAttachmentTap,
   });
-
 
   /// 检查是否有次要信息需要显示（时间、账户或附件）
   bool _hasSecondaryInfo(WidgetRef ref) {
@@ -71,9 +77,16 @@ class TransactionListItem extends ConsumerWidget {
     // 显示时间（设置开启 + 有数据 + 不是00:00:00）
     final showTime = ref.watch(showTransactionTimeProvider) &&
         happenedAt != null &&
-        (happenedAt!.hour != 0 || happenedAt!.minute != 0 || happenedAt!.second != 0);
+        (happenedAt!.hour != 0 ||
+            happenedAt!.minute != 0 ||
+            happenedAt!.second != 0);
 
-    return showTime || accountName != null || attachmentCount > 0;
+    final showCreator = (creatorUserId ?? '').trim().isNotEmpty ||
+        (creatorAvatarUrl ?? '').trim().isNotEmpty;
+    return showTime ||
+        accountName != null ||
+        attachmentCount > 0 ||
+        showCreator;
   }
 
   /// 构建次要信息小部件（时间 · 账户 + 附件图标）
@@ -89,7 +102,9 @@ class TransactionListItem extends ConsumerWidget {
           '${happenedAt!.hour.toString().padLeft(2, '0')}:${happenedAt!.minute.toString().padLeft(2, '0')}',
         );
       } else if (ref.watch(showTransactionTimeProvider) &&
-          (happenedAt!.hour != 0 || happenedAt!.minute != 0 || happenedAt!.second != 0)) {
+          (happenedAt!.hour != 0 ||
+              happenedAt!.minute != 0 ||
+              happenedAt!.second != 0)) {
         // 完整时间模式（HH:mm:ss）
         parts.add(
           '${happenedAt!.hour.toString().padLeft(2, '0')}:${happenedAt!.minute.toString().padLeft(2, '0')}:${happenedAt!.second.toString().padLeft(2, '0')}',
@@ -103,9 +118,9 @@ class TransactionListItem extends ConsumerWidget {
     }
 
     final textStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
-      color: BeeTokens.textTertiary(context),
-      fontSize: 11,
-    );
+          color: BeeTokens.textTertiary(context),
+          fontSize: 11,
+        );
 
     // 构建附件图标部件（可点击）
     Widget buildAttachmentWidget() {
@@ -134,21 +149,57 @@ class TransactionListItem extends ConsumerWidget {
       return widget;
     }
 
-    // 如果只有附件，没有其他信息
-    if (parts.isEmpty && attachmentCount > 0) {
-      return buildAttachmentWidget();
+    final children = <Widget>[];
+    if (parts.isNotEmpty) {
+      children.add(Text(parts.join(' · '), style: textStyle));
     }
 
-    // 有其他信息时
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(parts.join(' · '), style: textStyle),
-        if (attachmentCount > 0) ...[
-          Text(' · ', style: textStyle),
-          buildAttachmentWidget(),
-        ],
-      ],
+    final showCreator = (creatorUserId ?? '').trim().isNotEmpty ||
+        (creatorAvatarUrl ?? '').trim().isNotEmpty;
+    if (showCreator) {
+      final normalizedUserId = (creatorUserId ?? '').trim();
+      final normalizedName = (creatorName ?? '').trim().isNotEmpty
+          ? creatorName!.trim()
+          : (normalizedUserId.isNotEmpty
+              ? shortCollabUserId(normalizedUserId)
+              : '?');
+      if (children.isNotEmpty) {
+        children.add(Text('·', style: textStyle));
+      }
+      children.add(
+        Container(
+          padding: const EdgeInsets.all(2),
+          decoration: BoxDecoration(
+            color: BeeTokens.surfaceElevated(context),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: BeeTokens.border(context)),
+          ),
+          child: CollabMemberAvatar(
+            userId:
+                normalizedUserId.isNotEmpty ? normalizedUserId : normalizedName,
+            label: normalizedName,
+            avatarUrl: creatorAvatarUrl,
+            size: 14,
+          ),
+        ),
+      );
+    }
+
+    if (attachmentCount > 0) {
+      if (children.isNotEmpty) {
+        children.add(Text('·', style: textStyle));
+      }
+      children.add(buildAttachmentWidget());
+    }
+
+    if (children.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Wrap(
+      spacing: 4,
+      runSpacing: 2,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: children,
     );
   }
 
@@ -213,9 +264,10 @@ class TransactionListItem extends ConsumerWidget {
                           title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: BeeTokens.textSecondary(context),
-                          ),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: BeeTokens.textSecondary(context),
+                                  ),
                         ),
                       ),
                     // 第三行：时间 · 账户 · 附件
@@ -284,10 +336,11 @@ class TransactionListItem extends ConsumerWidget {
         confirmDismiss: (direction) async {
           // 显示确认对话框
           return await AppDialog.confirm<bool>(
-            context,
-            title: '确认删除',
-            message: '确定要删除这笔交易吗？此操作无法撤销。',
-          ) ?? false;
+                context,
+                title: '确认删除',
+                message: '确定要删除这笔交易吗？此操作无法撤销。',
+              ) ??
+              false;
         },
         onDismissed: (direction) {
           onDelete!();

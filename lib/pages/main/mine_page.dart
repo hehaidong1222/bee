@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:io' show Platform, File;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:beecount/widgets/biz/bee_icon.dart';
+import 'package:intl/intl.dart';
 
 import '../data/import_page.dart';
 import '../data/export_page.dart';
@@ -14,6 +16,7 @@ import '../../widgets/biz/biz.dart';
 import '../../styles/tokens.dart';
 import 'package:flutter_cloud_sync/flutter_cloud_sync.dart' hide SyncStatus;
 import '../../cloud/sync_service.dart';
+import '../../cloud/transactions_sync_manager.dart';
 import '../cloud/cloud_service_page.dart';
 import '../../services/system/logger_service.dart';
 import '../../services/ui/avatar_service.dart';
@@ -46,6 +49,26 @@ import '../donation/donation_page.dart';
 
 class MinePage extends ConsumerWidget {
   const MinePage({super.key});
+
+  String _roleLabel(AppLocalizations l10n, LedgerCollabCapability? capability) {
+    if (capability == null) {
+      return '';
+    }
+    if (capability.status == LedgerCollabCapabilityStatus.notApplicable) {
+      return '';
+    }
+    final normalized = normalizeCollabRole(capability.role);
+    switch (normalized) {
+      case 'owner':
+        return l10n.cloudCollabRoleOwner;
+      case 'editor':
+        return l10n.cloudCollabRoleEditor;
+      case 'viewer':
+        return l10n.cloudCollabRoleViewerLegacy;
+      default:
+        return l10n.cloudCollabRoleNotReady;
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -97,6 +120,8 @@ class MinePage extends ConsumerWidget {
                                 case CloudBackendType.local:
                                   return AppLocalizations.of(sectionContext)
                                       .mineCloudServiceOffline;
+                                case CloudBackendType.beecountCloud:
+                                  return 'BeeCount Cloud';
                                 case CloudBackendType.webdav:
                                   return AppLocalizations.of(sectionContext)
                                       .mineCloudServiceWebDAV;
@@ -153,12 +178,23 @@ class MinePage extends ConsumerWidget {
                                   final isLocalMode = cloudConfig.hasValue &&
                                       cloudConfig.value!.type ==
                                           CloudBackendType.local;
-                                  final isICloudMode = cloudConfig.hasValue &&
+                                  final isSupabaseMode = cloudConfig.hasValue &&
                                       cloudConfig.value!.type ==
-                                          CloudBackendType.icloud;
-                                  // iCloud 使用系统账号，不需要登录；其他云服务需要登录
+                                          CloudBackendType.supabase;
+                                  final isBeeCountCloudMode =
+                                      cloudConfig.hasValue &&
+                                          cloudConfig.value!.type ==
+                                              CloudBackendType.beecountCloud;
+                                  final requiresLogin =
+                                      isSupabaseMode || isBeeCountCloudMode;
+                                  // iCloud/WebDAV/S3 使用配置认证；BeeCount Cloud 需要账号登录。
                                   final canUseCloud = !isLocalMode &&
-                                      (isICloudMode || user != null);
+                                      (!requiresLogin || user != null);
+                                  final collabCapability = sectionRef
+                                      .watch(ledgerCollabCapabilityProvider(
+                                          ledgerId))
+                                      .asData
+                                      ?.value;
                                   final asyncSt = sectionRef
                                       .watch(syncStatusProvider(ledgerId));
                                   final cached = sectionRef
@@ -172,48 +208,97 @@ class MinePage extends ConsumerWidget {
                                   final refreshing = asyncSt.isLoading;
 
                                   if (!isFirstLoad) {
-                                    switch (st.diff) {
-                                      case SyncDiff.notLoggedIn:
-                                        subtitle =
-                                            AppLocalizations.of(sectionContext)
-                                                .mineSyncNotLoggedIn;
-                                        break;
-                                      case SyncDiff.notConfigured:
-                                        subtitle =
-                                            AppLocalizations.of(sectionContext)
-                                                .mineSyncNotConfigured;
-                                        break;
-                                      case SyncDiff.noRemote:
-                                        subtitle =
-                                            AppLocalizations.of(sectionContext)
-                                                .mineSyncNoRemote;
-                                        break;
-                                      case SyncDiff.inSync:
-                                        subtitle =
-                                            AppLocalizations.of(sectionContext)
+                                    if (isBeeCountCloudMode) {
+                                      switch (st.diff) {
+                                        case SyncDiff.notLoggedIn:
+                                          subtitle = AppLocalizations.of(
+                                                  sectionContext)
+                                              .mineSyncNotLoggedIn;
+                                          break;
+                                        case SyncDiff.notConfigured:
+                                          subtitle = AppLocalizations.of(
+                                                  sectionContext)
+                                              .mineSyncNotConfigured;
+                                          break;
+                                        case SyncDiff.error:
+                                          subtitle = AppLocalizations.of(
+                                                  sectionContext)
+                                              .mineSyncError;
+                                          break;
+                                        default:
+                                          if (st.cloudExportedAt != null) {
+                                            subtitle = AppLocalizations.of(
+                                                    sectionContext)
+                                                .mineSyncCloudLatest(DateFormat(
+                                                        'yyyy-MM-dd HH:mm:ss')
+                                                    .format(st.cloudExportedAt!
+                                                        .toLocal()));
+                                          } else {
+                                            subtitle = AppLocalizations.of(
+                                                    sectionContext)
                                                 .mineSyncInSyncSimple;
-                                        showCheckIcon = true;
-                                        break;
-                                      case SyncDiff.localNewer:
-                                        subtitle =
-                                            AppLocalizations.of(sectionContext)
-                                                .mineSyncLocalNewerSimple;
-                                        break;
-                                      case SyncDiff.cloudNewer:
-                                        subtitle =
-                                            AppLocalizations.of(sectionContext)
-                                                .mineSyncCloudNewerSimple;
-                                        break;
-                                      case SyncDiff.different:
-                                        subtitle =
-                                            AppLocalizations.of(sectionContext)
-                                                .mineSyncDifferent;
-                                        break;
-                                      case SyncDiff.error:
-                                        subtitle =
-                                            AppLocalizations.of(sectionContext)
-                                                .mineSyncError;
-                                        break;
+                                          }
+                                          showCheckIcon = true;
+                                          break;
+                                      }
+                                    } else {
+                                      switch (st.diff) {
+                                        case SyncDiff.notLoggedIn:
+                                          subtitle = AppLocalizations.of(
+                                                  sectionContext)
+                                              .mineSyncNotLoggedIn;
+                                          break;
+                                        case SyncDiff.notConfigured:
+                                          subtitle = AppLocalizations.of(
+                                                  sectionContext)
+                                              .mineSyncNotConfigured;
+                                          break;
+                                        case SyncDiff.noRemote:
+                                          subtitle = AppLocalizations.of(
+                                                  sectionContext)
+                                              .mineSyncNoRemote;
+                                          break;
+                                        case SyncDiff.inSync:
+                                          subtitle = AppLocalizations.of(
+                                                  sectionContext)
+                                              .mineSyncInSyncSimple;
+                                          showCheckIcon = true;
+                                          break;
+                                        case SyncDiff.localNewer:
+                                          subtitle = AppLocalizations.of(
+                                                  sectionContext)
+                                              .mineSyncLocalNewerSimple;
+                                          break;
+                                        case SyncDiff.cloudNewer:
+                                          subtitle = AppLocalizations.of(
+                                                  sectionContext)
+                                              .mineSyncCloudNewerSimple;
+                                          break;
+                                        case SyncDiff.different:
+                                          subtitle = AppLocalizations.of(
+                                                  sectionContext)
+                                              .mineSyncDifferent;
+                                          break;
+                                        case SyncDiff.error:
+                                          subtitle = AppLocalizations.of(
+                                                  sectionContext)
+                                              .mineSyncError;
+                                          break;
+                                      }
+                                    }
+                                  }
+
+                                  if (!isFirstLoad &&
+                                      isBeeCountCloudMode &&
+                                      user != null) {
+                                    final roleLabel = _roleLabel(
+                                      AppLocalizations.of(sectionContext),
+                                      collabCapability,
+                                    );
+                                    if (roleLabel.isNotEmpty) {
+                                      subtitle = subtitle.isEmpty
+                                          ? roleLabel
+                                          : '$subtitle · $roleLabel';
                                     }
                                   }
 
@@ -722,6 +807,7 @@ class _MinePageHeader extends ConsumerStatefulWidget {
 class _MinePageHeaderState extends ConsumerState<_MinePageHeader> {
   String? _avatarPath;
   bool _isLoadingAvatar = true;
+  bool _avatarUploadBusy = false;
 
   @override
   void initState() {
@@ -736,6 +822,67 @@ class _MinePageHeaderState extends ConsumerState<_MinePageHeader> {
         _avatarPath = path;
         _isLoadingAvatar = false;
       });
+      if (path != null && path.trim().isNotEmpty) {
+        unawaited(_maybeBootstrapAvatarUpload(path));
+      }
+    }
+  }
+
+  void _refreshCollabAvatarConsumers() {
+    final currentLedgerId = ref.read(currentLedgerIdProvider);
+    ref.read(syncStatusRefreshProvider.notifier).state++;
+    ref.read(ledgerListRefreshProvider.notifier).state++;
+    if (currentLedgerId > 0) {
+      ref
+          .read(syncStatusRefreshByLedgerProvider(currentLedgerId).notifier)
+          .state++;
+      ref
+          .read(ledgerDataRefreshByLedgerProvider(currentLedgerId).notifier)
+          .state++;
+    }
+  }
+
+  Future<void> _maybeBootstrapAvatarUpload(String localPath) async {
+    if (_avatarUploadBusy) {
+      return;
+    }
+    final normalizedLocalPath = localPath.trim();
+    if (normalizedLocalPath.isEmpty) {
+      return;
+    }
+    final pendingAvatarPath = ref.read(pendingAvatarUploadPathProvider);
+    if (pendingAvatarPath != null &&
+        pendingAvatarPath.trim().isNotEmpty &&
+        pendingAvatarPath.trim() == normalizedLocalPath) {
+      unawaited(_uploadAvatarToCloud(normalizedLocalPath));
+      return;
+    }
+    final cloudConfig = await ref.read(activeCloudConfigProvider.future);
+    if (!mounted) return;
+    if (!cloudConfig.valid ||
+        cloudConfig.type != CloudBackendType.beecountCloud) {
+      return;
+    }
+    final authService = await ref.read(authServiceProvider.future);
+    final currentUser = await authService.currentUser;
+    if (!mounted) return;
+    if (currentUser == null || currentUser.id.trim().isEmpty) {
+      return;
+    }
+    final sync = ref.read(syncServiceProvider);
+    if (sync is! TransactionsSyncManager) {
+      return;
+    }
+    try {
+      final profile = await sync.getMyProfile();
+      if (!mounted) return;
+      final hasCloudAvatar = (profile.avatarUrl ?? '').trim().isNotEmpty;
+      if (!hasCloudAvatar) {
+        unawaited(_uploadAvatarToCloud(normalizedLocalPath));
+      }
+    } catch (e, stackTrace) {
+      logger.warning('MinePage', '检查云端头像状态失败: $e');
+      logger.debug('MinePage', '检查云端头像状态堆栈: $stackTrace');
     }
   }
 
@@ -783,17 +930,21 @@ class _MinePageHeaderState extends ConsumerState<_MinePageHeader> {
         final path = await AvatarService.pickAndSaveAvatar();
         if (mounted && path != null) {
           setState(() => _avatarPath = path);
+          unawaited(_uploadAvatarToCloud(path));
         }
       } else if (result == 'camera') {
         final path = await AvatarService.takePhotoAndSaveAvatar();
         if (mounted && path != null) {
           setState(() => _avatarPath = path);
+          unawaited(_uploadAvatarToCloud(path));
         }
       } else if (result == 'delete') {
         await AvatarService.deleteAvatar();
         if (mounted) {
           setState(() => _avatarPath = null);
         }
+        ref.read(pendingAvatarUploadPathProvider.notifier).state = null;
+        ref.read(pendingAvatarUploadErrorProvider.notifier).state = null;
       }
     } catch (e) {
       if (!mounted) return;
@@ -801,11 +952,72 @@ class _MinePageHeaderState extends ConsumerState<_MinePageHeader> {
     }
   }
 
+  String? _guessAvatarMimeType(String filePath) {
+    final lower = filePath.toLowerCase();
+    if (lower.endsWith('.png')) {
+      return 'image/png';
+    }
+    if (lower.endsWith('.webp')) {
+      return 'image/webp';
+    }
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
+      return 'image/jpeg';
+    }
+    return null;
+  }
+
+  Future<void> _uploadAvatarToCloud(String localPath) async {
+    final cloudConfig = await ref.read(activeCloudConfigProvider.future);
+    if (!mounted) return;
+    if (!cloudConfig.valid ||
+        cloudConfig.type != CloudBackendType.beecountCloud) {
+      return;
+    }
+    final sync = ref.read(syncServiceProvider);
+    if (sync is! TransactionsSyncManager) {
+      return;
+    }
+    setState(() {
+      _avatarUploadBusy = true;
+    });
+    try {
+      final file = File(localPath);
+      if (!await file.exists()) {
+        throw StateError('avatar file not found');
+      }
+      final bytes = await file.readAsBytes();
+      await sync.uploadMyAvatar(
+        bytes: bytes,
+        fileName: localPath.split('/').last,
+        mimeType: _guessAvatarMimeType(localPath),
+      );
+      _refreshCollabAvatarConsumers();
+      ref.read(pendingAvatarUploadPathProvider.notifier).state = null;
+      ref.read(pendingAvatarUploadErrorProvider.notifier).state = null;
+      if (mounted) {
+        showToast(context,
+            AppLocalizations.of(context).cloudCollabAvatarUploadSuccess);
+      }
+    } catch (e) {
+      ref.read(pendingAvatarUploadPathProvider.notifier).state = localPath;
+      ref.read(pendingAvatarUploadErrorProvider.notifier).state = '$e';
+      if (mounted) {
+        showToast(
+          context,
+          AppLocalizations.of(context).cloudCollabAvatarUploadFailed,
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _avatarUploadBusy = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // 头像功能不受云同步限制，任何时候都可以上传
-    final canEditAvatar = true;
-
     // 获取当前账本信息
     final currentLedgerId = ref.watch(currentLedgerIdProvider);
     final countsAsync = ref.watch(countsForLedgerProvider(currentLedgerId));
@@ -839,7 +1051,7 @@ class _MinePageHeaderState extends ConsumerState<_MinePageHeader> {
             children: [
               // 头像/Logo
               GestureDetector(
-                onTap: canEditAvatar ? _showAvatarOptions : null,
+                onTap: _showAvatarOptions,
                 child: Stack(
                   children: [
                     Container(
@@ -892,22 +1104,40 @@ class _MinePageHeaderState extends ConsumerState<_MinePageHeader> {
                                   )),
                       ),
                     ),
-                    if (canEditAvatar)
-                      Positioned(
-                        right: 0,
-                        bottom: 0,
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        width: 24.0.scaled(context, ref),
+                        height: 24.0.scaled(context, ref),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        child: Icon(
+                          Icons.camera_alt,
+                          size: 12.0.scaled(context, ref),
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    if (_avatarUploadBusy)
+                      Positioned.fill(
                         child: Container(
-                          width: 24.0.scaled(context, ref),
-                          height: 24.0.scaled(context, ref),
                           decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary,
+                            color: Colors.black.withValues(alpha: 0.3),
                             shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
                           ),
-                          child: Icon(
-                            Icons.camera_alt,
-                            size: 12.0.scaled(context, ref),
-                            color: Colors.white,
+                          child: Center(
+                            child: SizedBox(
+                              width: 20.0.scaled(context, ref),
+                              height: 20.0.scaled(context, ref),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Theme.of(context).colorScheme.onPrimary,
+                              ),
+                            ),
                           ),
                         ),
                       ),

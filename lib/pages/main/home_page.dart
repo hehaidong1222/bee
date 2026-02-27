@@ -41,6 +41,9 @@ class _HomePageState extends ConsumerState<HomePage> {
   // StreamBuilder 刷新计数器
   int _streamBuilderKey = 0;
   int? _lastLedgerId;
+  List<({Transaction t, Category? category})>? _lastNonEmptyTransactions;
+  ProviderSubscription<int>? _scrollToTopSubscription;
+  ProviderSubscription<int>? _switchToStreamSubscription;
 
   // 月初提醒状态
   bool _showLastMonthReminder = false;
@@ -55,6 +58,22 @@ class _HomePageState extends ConsumerState<HomePage> {
   void initState() {
     super.initState();
     _listController = FlutterListViewController();
+    _scrollToTopSubscription = ref.listenManual<int>(
+      homeScrollToTopProvider,
+      (previous, next) {
+        if (previous != next) {
+          _transactionListKey.currentState?.jumpToTop();
+        }
+      },
+    );
+    _switchToStreamSubscription = ref.listenManual<int>(
+      homeSwitchToStreamProvider,
+      (previous, next) {
+        if (previous != next) {
+          _transactionListKey.currentState?.switchToStreamMode();
+        }
+      },
+    );
     _checkLastMonthReminder();
     _checkAnnualReportReminder();
   }
@@ -134,6 +153,10 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   @override
   void dispose() {
+    _scrollToTopSubscription?.close();
+    _scrollToTopSubscription = null;
+    _switchToStreamSubscription?.close();
+    _switchToStreamSubscription = null;
     _debounceTimer?.cancel();
     _listController.dispose();
     super.dispose();
@@ -465,6 +488,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     // 预加载数据（含标签、附件、账户，仅前 N 条）
     final cachedFullData = ref.watch(cachedTransactionsProvider);
     final ledgerId = ref.watch(currentLedgerIdProvider);
+    ref.watch(ledgerDataRefreshByLedgerProvider(ledgerId));
+    final remoteApplying =
+        ref.watch(remoteApplyInProgressByLedgerProvider(ledgerId));
     final month = ref.watch(selectedMonthProvider);
     final hide = ref.watch(hideAmountsProvider);
     final aiEnabledAsync = ref.watch(aiAssistantEnabledProvider);
@@ -473,6 +499,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     // 检测账本切换，强制刷新 StreamBuilder 并清空缓存
     if (_lastLedgerId != null && _lastLedgerId != ledgerId) {
       _streamBuilderKey++;
+      _lastNonEmptyTransactions = null;
       // 清空缓存，避免显示旧账本数据
       Future.microtask(() {
         ref.read(cachedTransactionsProvider.notifier).state = null;
@@ -482,28 +509,12 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
     _lastLedgerId = ledgerId;
 
-    // 监听滚动到顶部的信号
-    ref.listen<int>(homeScrollToTopProvider, (previous, next) {
-      if (previous != next) {
-        // 滚动到列表顶部
-        _transactionListKey.currentState?.jumpToTop();
-      }
-    });
-
-    // 监听切换到 Stream 模式的信号
-    ref.listen<int>(homeSwitchToStreamProvider, (previous, next) {
-      if (previous != next) {
-        _transactionListKey.currentState?.switchToStreamMode();
-      }
-    });
-
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor, // ⭐ 自适应背景色
       body: Column(
         children: [
           Consumer(builder: (context, ref, _) {
             ref.watch(headerStyleProvider);
-            final hide = ref.watch(hideAmountsProvider);
             return PrimaryHeader(
               title: '',
               showTitleSection: false,
@@ -731,24 +742,38 @@ class _HomePageState extends ConsumerState<HomePage> {
                 final streamData = snapshot.data;
                 final hasStreamData =
                     streamData != null && streamData.isNotEmpty;
+                if (hasStreamData && !remoteApplying) {
+                  _lastNonEmptyTransactions = streamData;
+                }
 
-                // 如果 Stream 没数据，从预加载数据构建基础列表
+                final preloadedFallback = cachedFullData
+                        ?.map((item) => (t: item.t, category: item.category))
+                        .toList() ??
+                    const <({Transaction t, Category? category})>[];
+                if (_lastNonEmptyTransactions == null &&
+                    preloadedFallback.isNotEmpty) {
+                  _lastNonEmptyTransactions = preloadedFallback;
+                }
+                final holdPrevious = remoteApplying &&
+                    (_lastNonEmptyTransactions?.isNotEmpty ?? false);
+
+                // 远端 replace 应用期间冻结列表，忽略中间态流事件，避免“整页亮闪”
                 final transactions = hasStreamData
-                    ? streamData
-                    : (cachedFullData
-                            ?.map(
-                                (item) => (t: item.t, category: item.category))
-                            .toList() ??
-                        []);
+                    ? (holdPrevious ? _lastNonEmptyTransactions! : streamData)
+                    : (holdPrevious
+                        ? _lastNonEmptyTransactions!
+                        : preloadedFallback);
+                final detailsForList = holdPrevious ? null : cachedFullData;
 
                 return TransactionList(
                   key: _transactionListKey,
                   transactions: transactions,
                   // 传入预加载数据供详情使用（标签、附件、账户）
-                  transactionsWithDetails: cachedFullData,
+                  transactionsWithDetails: detailsForList,
                   hideAmounts: hide,
                   enableVisibilityTracking: true,
                   onDateVisibilityChanged: _onHeaderVisibilityChanged,
+                  isRemoteApplying: remoteApplying,
                   controller: _listController,
                   emptyWidget: AppEmpty(
                     text: AppLocalizations.of(context).homeNoRecords,

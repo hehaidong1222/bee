@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import 'package:drift/drift.dart' as drift;
+
 import '../../db.dart';
 import '../base_repository.dart';
 import '../budget_repository.dart';
@@ -11,6 +15,7 @@ import 'local_ai_repository.dart';
 import 'local_tag_repository.dart';
 import 'local_budget_repository.dart';
 import 'local_attachment_repository.dart';
+import 'local_mutation_event.dart';
 
 /// LocalRepository 本地数据库实现
 /// 基于 Drift 本地数据库实现所有 Repository 接口
@@ -31,6 +36,9 @@ class LocalRepository extends BaseRepository {
   late final LocalTagRepository _tagRepo;
   late final LocalBudgetRepository _budgetRepo;
   late final LocalAttachmentRepository _attachmentRepo;
+  final StreamController<LocalMutationEvent> _mutationController =
+      StreamController<LocalMutationEvent>.broadcast();
+  int _mutationMuteDepth = 0;
 
   LocalRepository(this.db) {
     _ledgerRepo = LocalLedgerRepository(db);
@@ -43,6 +51,64 @@ class LocalRepository extends BaseRepository {
     _tagRepo = LocalTagRepository(db);
     _budgetRepo = LocalBudgetRepository(db);
     _attachmentRepo = LocalAttachmentRepository(db);
+  }
+
+  Stream<LocalMutationEvent> get mutationEvents => _mutationController.stream;
+
+  bool get isMutationSuppressed => _mutationMuteDepth > 0;
+
+  Future<T> runWithMutationSuppressed<T>(Future<T> Function() action) async {
+    _mutationMuteDepth++;
+    try {
+      return await action();
+    } finally {
+      _mutationMuteDepth--;
+    }
+  }
+
+  void _emitMutation(LocalMutationEvent event) {
+    if (isMutationSuppressed) return;
+    _mutationController.add(event);
+  }
+
+  Future<int?> _queryIntBySql(
+    String sql, {
+    required List<drift.Variable> variables,
+    required String column,
+  }) async {
+    final row =
+        await db.customSelect(sql, variables: variables).getSingleOrNull();
+    final raw = row?.data[column];
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    if (raw is String) return int.tryParse(raw);
+    return null;
+  }
+
+  Future<String?> _querySyncIdByTable(String table, int id) async {
+    final row = await db.customSelect(
+      'SELECT sync_id FROM $table WHERE id = ? LIMIT 1',
+      variables: [drift.Variable.withInt(id)],
+    ).getSingleOrNull();
+    final raw = row?.data['sync_id']?.toString().trim();
+    if (raw == null || raw.isEmpty) return null;
+    return raw;
+  }
+
+  Future<int?> _queryTransactionLedgerId(int transactionId) {
+    return _queryIntBySql(
+      'SELECT ledger_id FROM transactions WHERE id = ? LIMIT 1',
+      variables: [drift.Variable.withInt(transactionId)],
+      column: 'ledger_id',
+    );
+  }
+
+  Future<int?> _queryAccountLedgerId(int accountId) {
+    return _queryIntBySql(
+      'SELECT ledger_id FROM accounts WHERE id = ? LIMIT 1',
+      variables: [drift.Variable.withInt(accountId)],
+      column: 'ledger_id',
+    );
   }
 
   // ============================================
@@ -65,11 +131,13 @@ class LocalRepository extends BaseRepository {
   Future<int> ledgerCount() => _ledgerRepo.ledgerCount();
 
   @override
-  Future<({int dayCount, int txCount})> getCountsForLedger({required int ledgerId}) =>
+  Future<({int dayCount, int txCount})> getCountsForLedger(
+          {required int ledgerId}) =>
       _ledgerRepo.getCountsForLedger(ledgerId: ledgerId);
 
   @override
-  Future<({int dayCount, int txCount})> getCountsAll() => _ledgerRepo.getCountsAll();
+  Future<({int dayCount, int txCount})> getCountsAll() =>
+      _ledgerRepo.getCountsAll();
 
   @override
   Future<({double balance, int transactionCount})> getLedgerStats({
@@ -84,19 +152,61 @@ class LocalRepository extends BaseRepository {
       );
 
   @override
-  Future<int> createLedger({required String name, String currency = 'CNY'}) =>
-      _ledgerRepo.createLedger(name: name, currency: currency);
+  Future<int> createLedger(
+      {required String name, String currency = 'CNY'}) async {
+    final id = await _ledgerRepo.createLedger(name: name, currency: currency);
+    _emitMutation(
+      LocalMutationEvent(
+        entityType: LocalMutationEntityType.ledger,
+        action: LocalMutationAction.create,
+        entityId: id,
+        ledgerId: id,
+      ),
+    );
+    return id;
+  }
 
   @override
-  Future<void> updateLedgerName({required int id, required String name}) =>
-      _ledgerRepo.updateLedgerName(id: id, name: name);
+  Future<void> updateLedgerName({required int id, required String name}) async {
+    await _ledgerRepo.updateLedgerName(id: id, name: name);
+    _emitMutation(
+      LocalMutationEvent(
+        entityType: LocalMutationEntityType.ledger,
+        action: LocalMutationAction.update,
+        entityId: id,
+        ledgerId: id,
+      ),
+    );
+  }
 
   @override
-  Future<void> updateLedger({required int id, String? name, String? currency}) =>
-      _ledgerRepo.updateLedger(id: id, name: name, currency: currency);
+  Future<void> updateLedger(
+      {required int id, String? name, String? currency}) async {
+    await _ledgerRepo.updateLedger(id: id, name: name, currency: currency);
+    _emitMutation(
+      LocalMutationEvent(
+        entityType: LocalMutationEntityType.ledger,
+        action: LocalMutationAction.update,
+        entityId: id,
+        ledgerId: id,
+      ),
+    );
+  }
 
   @override
-  Future<void> deleteLedger(int id) => _ledgerRepo.deleteLedger(id);
+  Future<void> deleteLedger(int id) async {
+    final syncId = await _querySyncIdByTable('ledgers', id);
+    await _ledgerRepo.deleteLedger(id);
+    _emitMutation(
+      LocalMutationEvent(
+        entityType: LocalMutationEntityType.ledger,
+        action: LocalMutationAction.delete,
+        entityId: id,
+        ledgerId: id,
+        entitySyncId: syncId,
+      ),
+    );
+  }
 
   @override
   Future<int> getMaxLedgerId() => _ledgerRepo.getMaxLedgerId();
@@ -121,46 +231,56 @@ class LocalRepository extends BaseRepository {
   // ============================================
 
   @override
-  Stream<List<Transaction>> watchRecentTransactions({required int ledgerId, int limit = 20}) =>
-      _transactionRepo.watchRecentTransactions(ledgerId: ledgerId, limit: limit);
+  Stream<List<Transaction>> watchRecentTransactions(
+          {required int ledgerId, int limit = 20}) =>
+      _transactionRepo.watchRecentTransactions(
+          ledgerId: ledgerId, limit: limit);
 
   @override
-  Stream<List<Transaction>> watchTransactionsInMonth({required int ledgerId, required DateTime month}) =>
-      _transactionRepo.watchTransactionsInMonth(ledgerId: ledgerId, month: month);
+  Stream<List<Transaction>> watchTransactionsInMonth(
+          {required int ledgerId, required DateTime month}) =>
+      _transactionRepo.watchTransactionsInMonth(
+          ledgerId: ledgerId, month: month);
 
   @override
-  Stream<List<({Transaction t, Category? category})>> watchTransactionsWithCategoryAll({int? ledgerId}) =>
-      _transactionRepo.watchTransactionsWithCategoryAll(ledgerId: ledgerId);
+  Stream<List<({Transaction t, Category? category})>>
+      watchTransactionsWithCategoryAll({int? ledgerId}) =>
+          _transactionRepo.watchTransactionsWithCategoryAll(ledgerId: ledgerId);
 
   @override
-  Stream<List<({Transaction t, Category? category})>> watchTransactionsWithCategoryInMonth({
+  Stream<List<({Transaction t, Category? category})>>
+      watchTransactionsWithCategoryInMonth({
     required int ledgerId,
     required DateTime month,
   }) =>
-      _transactionRepo.watchTransactionsWithCategoryInMonth(ledgerId: ledgerId, month: month);
+          _transactionRepo.watchTransactionsWithCategoryInMonth(
+              ledgerId: ledgerId, month: month);
 
   @override
-  Stream<List<({Transaction t, Category? category})>> watchTransactionsWithCategoryInYear({
+  Stream<List<({Transaction t, Category? category})>>
+      watchTransactionsWithCategoryInYear({
     required int ledgerId,
     required int year,
   }) =>
-      _transactionRepo.watchTransactionsWithCategoryInYear(ledgerId: ledgerId, year: year);
+          _transactionRepo.watchTransactionsWithCategoryInYear(
+              ledgerId: ledgerId, year: year);
 
   @override
-  Stream<List<({Transaction t, Category? category})>> watchTransactionsForCategoryInRange({
+  Stream<List<({Transaction t, Category? category})>>
+      watchTransactionsForCategoryInRange({
     required int ledgerId,
     required DateTime start,
     required DateTime end,
     int? categoryId,
     required String type,
   }) =>
-      _transactionRepo.watchTransactionsForCategoryInRange(
-        ledgerId: ledgerId,
-        start: start,
-        end: end,
-        categoryId: categoryId,
-        type: type,
-      );
+          _transactionRepo.watchTransactionsForCategoryInRange(
+            ledgerId: ledgerId,
+            start: start,
+            end: end,
+            categoryId: categoryId,
+            type: type,
+          );
 
   @override
   Future<int> addTransaction({
@@ -172,17 +292,27 @@ class LocalRepository extends BaseRepository {
     int? toAccountId,
     required DateTime happenedAt,
     String? note,
-  }) =>
-      _transactionRepo.addTransaction(
+  }) async {
+    final id = await _transactionRepo.addTransaction(
+      ledgerId: ledgerId,
+      type: type,
+      amount: amount,
+      categoryId: categoryId,
+      accountId: accountId,
+      toAccountId: toAccountId,
+      happenedAt: happenedAt,
+      note: note,
+    );
+    _emitMutation(
+      LocalMutationEvent(
+        entityType: LocalMutationEntityType.transaction,
+        action: LocalMutationAction.create,
+        entityId: id,
         ledgerId: ledgerId,
-        type: type,
-        amount: amount,
-        categoryId: categoryId,
-        accountId: accountId,
-        toAccountId: toAccountId,
-        happenedAt: happenedAt,
-        note: note,
-      );
+      ),
+    );
+    return id;
+  }
 
   @override
   Future<int> insertTransactionsBatch(List<TransactionsCompanion> items) =>
@@ -197,37 +327,68 @@ class LocalRepository extends BaseRepository {
     String? note,
     DateTime? happenedAt,
     dynamic accountId,
-  }) =>
-      _transactionRepo.updateTransaction(
-        id: id,
-        type: type,
-        amount: amount,
-        categoryId: categoryId,
-        note: note,
-        happenedAt: happenedAt,
-        accountId: accountId,
+  }) async {
+    final ledgerId = await _queryTransactionLedgerId(id);
+    await _transactionRepo.updateTransaction(
+      id: id,
+      type: type,
+      amount: amount,
+      categoryId: categoryId,
+      note: note,
+      happenedAt: happenedAt,
+      accountId: accountId,
+    );
+    if (ledgerId != null) {
+      _emitMutation(
+        LocalMutationEvent(
+          entityType: LocalMutationEntityType.transaction,
+          action: LocalMutationAction.update,
+          entityId: id,
+          ledgerId: ledgerId,
+        ),
       );
+    }
+  }
 
   @override
-  Future<void> deleteTransaction(int id) => _transactionRepo.deleteTransaction(id);
+  Future<void> deleteTransaction(int id) async {
+    final ledgerId = await _queryTransactionLedgerId(id);
+    final syncId = await _querySyncIdByTable('transactions', id);
+    await _transactionRepo.deleteTransaction(id);
+    if (ledgerId != null) {
+      _emitMutation(
+        LocalMutationEvent(
+          entityType: LocalMutationEntityType.transaction,
+          action: LocalMutationAction.delete,
+          entityId: id,
+          ledgerId: ledgerId,
+          entitySyncId: syncId,
+        ),
+      );
+    }
+  }
 
   @override
-  Future<Transaction?> getTransactionById(int id) => _transactionRepo.getTransactionById(id);
+  Future<Transaction?> getTransactionById(int id) =>
+      _transactionRepo.getTransactionById(id);
 
   @override
   Future<int> insertTransactionCompanion(TransactionsCompanion item) =>
       _transactionRepo.insertTransactionCompanion(item);
 
   @override
-  Stream<List<({Transaction t, Category? category})>> transactionsWithCategoryAll({int? ledgerId}) =>
-      _transactionRepo.transactionsWithCategoryAll(ledgerId: ledgerId);
+  Stream<List<({Transaction t, Category? category})>>
+      transactionsWithCategoryAll({int? ledgerId}) =>
+          _transactionRepo.transactionsWithCategoryAll(ledgerId: ledgerId);
 
   @override
-  Future<List<({Transaction t, Category? category})>> getRecentTransactionsWithCategory({
+  Future<List<({Transaction t, Category? category})>>
+      getRecentTransactionsWithCategory({
     required int ledgerId,
     required int limit,
   }) =>
-      _transactionRepo.getRecentTransactionsWithCategory(ledgerId: ledgerId, limit: limit);
+          _transactionRepo.getRecentTransactionsWithCategory(
+              ledgerId: ledgerId, limit: limit);
 
   @override
   Future<int> countByTypeInRange({
@@ -264,12 +425,24 @@ class LocalRepository extends BaseRepository {
     required int id,
     int? accountId,
     int? toAccountId,
-  }) =>
-      _transactionRepo.updateTransactionFields(
-        id: id,
-        accountId: accountId,
-        toAccountId: toAccountId,
+  }) async {
+    final ledgerId = await _queryTransactionLedgerId(id);
+    await _transactionRepo.updateTransactionFields(
+      id: id,
+      accountId: accountId,
+      toAccountId: toAccountId,
+    );
+    if (ledgerId != null) {
+      _emitMutation(
+        LocalMutationEvent(
+          entityType: LocalMutationEntityType.transaction,
+          action: LocalMutationAction.update,
+          entityId: id,
+          ledgerId: ledgerId,
+        ),
       );
+    }
+  }
 
   @override
   Future<Transaction?> getFirstTransactionByLedger(int ledgerId) =>
@@ -280,8 +453,18 @@ class LocalRepository extends BaseRepository {
       _transactionRepo.getLastTransactionByLedger(ledgerId);
 
   @override
-  Future<void> updateTransactionLedger({required int id, required int ledgerId}) =>
-      _transactionRepo.updateTransactionLedger(id: id, ledgerId: ledgerId);
+  Future<void> updateTransactionLedger(
+      {required int id, required int ledgerId}) async {
+    await _transactionRepo.updateTransactionLedger(id: id, ledgerId: ledgerId);
+    _emitMutation(
+      LocalMutationEvent(
+        entityType: LocalMutationEntityType.transaction,
+        action: LocalMutationAction.update,
+        entityId: id,
+        ledgerId: ledgerId,
+      ),
+    );
+  }
 
   // ==================== 日历功能相关 ====================
 
@@ -293,26 +476,30 @@ class LocalRepository extends BaseRepository {
       _transactionRepo.getDailyTotalsByMonth(ledgerId: ledgerId, month: month);
 
   @override
-  Future<List<({
-    Transaction t,
-    Category? category,
-    List<Tag> tags,
-    List<TransactionAttachment> attachments,
-    Account? account,
-  })>> getTransactionsByDate({
+  Future<
+      List<
+          ({
+            Transaction t,
+            Category? category,
+            List<Tag> tags,
+            List<TransactionAttachment> attachments,
+            Account? account,
+          })>> getTransactionsByDate({
     required int ledgerId,
     required DateTime date,
   }) =>
       _transactionRepo.getTransactionsByDate(ledgerId: ledgerId, date: date);
 
   @override
-  Future<List<({
-    Transaction t,
-    Category? category,
-    List<Tag> tags,
-    List<TransactionAttachment> attachments,
-    Account? account,
-  })>> getTransactionsByDateRange({
+  Future<
+      List<
+          ({
+            Transaction t,
+            Category? category,
+            List<Tag> tags,
+            List<TransactionAttachment> attachments,
+            Account? account,
+          })>> getTransactionsByDateRange({
     required int ledgerId,
     required DateTime startDate,
     required DateTime endDate,
@@ -333,8 +520,26 @@ class LocalRepository extends BaseRepository {
   // ============================================
 
   @override
-  Future<int> createCategory({required String name, required String kind, String? icon, int? sortOrder}) =>
-      _categoryRepo.createCategory(name: name, kind: kind, icon: icon, sortOrder: sortOrder);
+  Future<int> createCategory(
+      {required String name,
+      required String kind,
+      String? icon,
+      int? sortOrder}) async {
+    final id = await _categoryRepo.createCategory(
+      name: name,
+      kind: kind,
+      icon: icon,
+      sortOrder: sortOrder,
+    );
+    _emitMutation(
+      LocalMutationEvent(
+        entityType: LocalMutationEntityType.category,
+        action: LocalMutationAction.create,
+        entityId: id,
+      ),
+    );
+    return id;
+  }
 
   @override
   Future<int> createSubCategory({
@@ -343,21 +548,56 @@ class LocalRepository extends BaseRepository {
     required String kind,
     String? icon,
     int? sortOrder,
-  }) =>
-      _categoryRepo.createSubCategory(
-        parentId: parentId,
-        name: name,
-        kind: kind,
-        icon: icon,
-        sortOrder: sortOrder,
-      );
+  }) async {
+    final id = await _categoryRepo.createSubCategory(
+      parentId: parentId,
+      name: name,
+      kind: kind,
+      icon: icon,
+      sortOrder: sortOrder,
+    );
+    _emitMutation(
+      LocalMutationEvent(
+        entityType: LocalMutationEntityType.category,
+        action: LocalMutationAction.create,
+        entityId: id,
+      ),
+    );
+    return id;
+  }
 
   @override
-  Future<void> updateCategory(int id, {String? name, String? icon, int? parentId, int? level}) =>
-      _categoryRepo.updateCategory(id, name: name, icon: icon, parentId: parentId, level: level);
+  Future<void> updateCategory(int id,
+      {String? name, String? icon, int? parentId, int? level}) async {
+    await _categoryRepo.updateCategory(
+      id,
+      name: name,
+      icon: icon,
+      parentId: parentId,
+      level: level,
+    );
+    _emitMutation(
+      LocalMutationEvent(
+        entityType: LocalMutationEntityType.category,
+        action: LocalMutationAction.update,
+        entityId: id,
+      ),
+    );
+  }
 
   @override
-  Future<void> deleteCategory(int id) => _categoryRepo.deleteCategory(id);
+  Future<void> deleteCategory(int id) async {
+    final syncId = await _querySyncIdByTable('categories', id);
+    await _categoryRepo.deleteCategory(id);
+    _emitMutation(
+      LocalMutationEvent(
+        entityType: LocalMutationEntityType.category,
+        action: LocalMutationAction.delete,
+        entityId: id,
+        entitySyncId: syncId,
+      ),
+    );
+  }
 
   @override
   Future<void> deleteCategoriesByIds(List<int> ids) =>
@@ -384,7 +624,8 @@ class LocalRepository extends BaseRepository {
       _categoryRepo.getUsableCategories(kind);
 
   @override
-  Future<bool> isCategoryNameDuplicate({required String name, int? excludeId}) =>
+  Future<bool> isCategoryNameDuplicate(
+          {required String name, int? excludeId}) =>
       _categoryRepo.isCategoryNameDuplicate(name: name, excludeId: excludeId);
 
   @override
@@ -404,8 +645,9 @@ class LocalRepository extends BaseRepository {
       _categoryRepo.getAllCategoryTransactionCounts();
 
   @override
-  Future<({int totalCount, double totalAmount, double averageAmount})> getCategorySummary(int categoryId) =>
-      _categoryRepo.getCategorySummary(categoryId);
+  Future<({int totalCount, double totalAmount, double averageAmount})>
+      getCategorySummary(int categoryId) =>
+          _categoryRepo.getCategorySummary(categoryId);
 
   @override
   Future<List<Transaction>> getTransactionsByCategory(int categoryId) =>
@@ -424,21 +666,23 @@ class LocalRepository extends BaseRepository {
       );
 
   @override
-  Future<int> migrateCategory({required int fromCategoryId, required int toCategoryId}) =>
+  Future<int> migrateCategory(
+          {required int fromCategoryId, required int toCategoryId}) =>
       _categoryRepo.migrateCategory(
         fromCategoryId: fromCategoryId,
         toCategoryId: toCategoryId,
       );
 
   @override
-  Future<({int migratedTransactions, int migratedSubCategories})> migrateCategoryTransactions({
+  Future<({int migratedTransactions, int migratedSubCategories})>
+      migrateCategoryTransactions({
     required int fromCategoryId,
     required int toCategoryId,
   }) =>
-      _categoryRepo.migrateCategoryTransactions(
-        fromCategoryId: fromCategoryId,
-        toCategoryId: toCategoryId,
-      );
+          _categoryRepo.migrateCategoryTransactions(
+            fromCategoryId: fromCategoryId,
+            toCategoryId: toCategoryId,
+          );
 
   @override
   Future<({int transactionCount, bool canMigrate})> getCategoryMigrationInfo({
@@ -451,8 +695,19 @@ class LocalRepository extends BaseRepository {
       );
 
   @override
-  Future<void> updateCategorySortOrders(List<({int id, int sortOrder})> updates) =>
-      _categoryRepo.updateCategorySortOrders(updates);
+  Future<void> updateCategorySortOrders(
+      List<({int id, int sortOrder})> updates) async {
+    await _categoryRepo.updateCategorySortOrders(updates);
+    for (final item in updates) {
+      _emitMutation(
+        LocalMutationEvent(
+          entityType: LocalMutationEntityType.category,
+          action: LocalMutationAction.update,
+          entityId: item.id,
+        ),
+      );
+    }
+  }
 
   @override
   Future<String> getCategoryFullName(int categoryId) =>
@@ -463,7 +718,8 @@ class LocalRepository extends BaseRepository {
       _categoryRepo.watchCategory(categoryId);
 
   @override
-  Stream<List<Transaction>> watchTransactionsByCategory(int categoryId, {int? ledgerId}) =>
+  Stream<List<Transaction>> watchTransactionsByCategory(int categoryId,
+          {int? ledgerId}) =>
       _categoryRepo.watchTransactionsByCategory(categoryId, ledgerId: ledgerId);
 
   @override
@@ -471,8 +727,8 @@ class LocalRepository extends BaseRepository {
       _categoryRepo.watchCategoryWithSubs(categoryId);
 
   @override
-  Stream<List<({Category category, int transactionCount})>> watchCategoriesWithCount() =>
-      _categoryRepo.watchCategoriesWithCount();
+  Stream<List<({Category category, int transactionCount})>>
+      watchCategoriesWithCount() => _categoryRepo.watchCategoriesWithCount();
 
   @override
   Future<List<Category>> getAllCategories() => _categoryRepo.getAllCategories();
@@ -492,21 +748,38 @@ class LocalRepository extends BaseRepository {
     String? icon,
     String? customIconPath,
     String? communityIconId,
-  }) =>
-      _categoryRepo.updateCategoryIcon(
-        id,
-        iconType: iconType,
-        icon: icon,
-        customIconPath: customIconPath,
-        communityIconId: communityIconId,
-      );
+  }) async {
+    await _categoryRepo.updateCategoryIcon(
+      id,
+      iconType: iconType,
+      icon: icon,
+      customIconPath: customIconPath,
+      communityIconId: communityIconId,
+    );
+    _emitMutation(
+      LocalMutationEvent(
+        entityType: LocalMutationEntityType.category,
+        action: LocalMutationAction.update,
+        entityId: id,
+      ),
+    );
+  }
 
   @override
-  Future<void> clearCategoryCustomIcon(int id, {String? materialIcon}) =>
-      _categoryRepo.clearCategoryCustomIcon(id, materialIcon: materialIcon);
+  Future<void> clearCategoryCustomIcon(int id, {String? materialIcon}) async {
+    await _categoryRepo.clearCategoryCustomIcon(id, materialIcon: materialIcon);
+    _emitMutation(
+      LocalMutationEvent(
+        entityType: LocalMutationEntityType.category,
+        action: LocalMutationAction.update,
+        entityId: id,
+      ),
+    );
+  }
 
   @override
-  Future<List<String>> getCustomIconPaths() => _categoryRepo.getCustomIconPaths();
+  Future<List<String>> getCustomIconPaths() =>
+      _categoryRepo.getCustomIconPaths();
 
   @override
   Future<Category> getTransferCategory() => _categoryRepo.getTransferCategory();
@@ -526,7 +799,8 @@ class LocalRepository extends BaseRepository {
   Future<List<Account>> getAllAccounts() => _accountRepo.getAllAccounts();
 
   @override
-  Future<Account?> getAccount(int accountId) => _accountRepo.getAccount(accountId);
+  Future<Account?> getAccount(int accountId) =>
+      _accountRepo.getAccount(accountId);
 
   @override
   Future<List<Account>> getAvailableAccountsForLedger(int ledgerId) =>
@@ -547,14 +821,24 @@ class LocalRepository extends BaseRepository {
     String type = 'cash',
     String currency = 'CNY',
     double initialBalance = 0.0,
-  }) =>
-      _accountRepo.createAccount(
+  }) async {
+    final id = await _accountRepo.createAccount(
+      ledgerId: ledgerId,
+      name: name,
+      type: type,
+      currency: currency,
+      initialBalance: initialBalance,
+    );
+    _emitMutation(
+      LocalMutationEvent(
+        entityType: LocalMutationEntityType.account,
+        action: LocalMutationAction.create,
+        entityId: id,
         ledgerId: ledgerId,
-        name: name,
-        type: type,
-        currency: currency,
-        initialBalance: initialBalance,
-      );
+      ),
+    );
+    return id;
+  }
 
   @override
   Future<void> updateAccount(
@@ -563,17 +847,44 @@ class LocalRepository extends BaseRepository {
     String? type,
     String? currency,
     double? initialBalance,
-  }) =>
-      _accountRepo.updateAccount(
-        id,
-        name: name,
-        type: type,
-        currency: currency,
-        initialBalance: initialBalance,
+  }) async {
+    final ledgerId = await _queryAccountLedgerId(id);
+    await _accountRepo.updateAccount(
+      id,
+      name: name,
+      type: type,
+      currency: currency,
+      initialBalance: initialBalance,
+    );
+    if (ledgerId != null) {
+      _emitMutation(
+        LocalMutationEvent(
+          entityType: LocalMutationEntityType.account,
+          action: LocalMutationAction.update,
+          entityId: id,
+          ledgerId: ledgerId,
+        ),
       );
+    }
+  }
 
   @override
-  Future<void> deleteAccount(int id) => _accountRepo.deleteAccount(id);
+  Future<void> deleteAccount(int id) async {
+    final ledgerId = await _queryAccountLedgerId(id);
+    final syncId = await _querySyncIdByTable('accounts', id);
+    await _accountRepo.deleteAccount(id);
+    if (ledgerId != null) {
+      _emitMutation(
+        LocalMutationEvent(
+          entityType: LocalMutationEntityType.account,
+          action: LocalMutationAction.delete,
+          entityId: id,
+          ledgerId: ledgerId,
+          entitySyncId: syncId,
+        ),
+      );
+    }
+  }
 
   @override
   Future<double> getAccountBalance(int accountId) =>
@@ -604,23 +915,25 @@ class LocalRepository extends BaseRepository {
       _accountRepo.getAccountIncome(accountId);
 
   @override
-  Future<({double balance, double expense, double income})> getAccountStats(int accountId) =>
+  Future<({double balance, double expense, double income})> getAccountStats(
+          int accountId) =>
       _accountRepo.getAccountStats(accountId);
 
   @override
-  Future<Map<int, ({double balance, double expense, double income})>> getAllAccountStats() =>
-      _accountRepo.getAllAccountStats();
+  Future<Map<int, ({double balance, double expense, double income})>>
+      getAllAccountStats() => _accountRepo.getAllAccountStats();
 
   @override
-  Future<({double totalBalance, double totalExpense, double totalIncome})> getAllAccountsTotalStats() =>
-      _accountRepo.getAllAccountsTotalStats();
+  Future<({double totalBalance, double totalExpense, double totalIncome})>
+      getAllAccountsTotalStats() => _accountRepo.getAllAccountsTotalStats();
 
   @override
   Future<Map<int, int>> getAccountUsageInLedgers(int accountId) =>
       _accountRepo.getAccountUsageInLedgers(accountId);
 
   @override
-  Future<int> migrateAccount({required int fromAccountId, required int toAccountId}) =>
+  Future<int> migrateAccount(
+          {required int fromAccountId, required int toAccountId}) =>
       _accountRepo.migrateAccount(
         fromAccountId: fromAccountId,
         toAccountId: toAccountId,
@@ -651,33 +964,42 @@ class LocalRepository extends BaseRepository {
   // ============================================
 
   @override
-  Future<List<({int? id, String name, String? icon, double total})>> totalsByCategory({
+  Future<List<({int? id, String name, String? icon, double total})>>
+      totalsByCategory({
     required int ledgerId,
     required String type,
     required DateTime start,
     required DateTime end,
   }) =>
-      _statisticsRepo.totalsByCategory(
-        ledgerId: ledgerId,
-        type: type,
-        start: start,
-        end: end,
-      );
-
-  @override
-  Future<List<({int? id, String name, String? icon, int? parentId, int level, double total})>>
-      totalsByCategoryWithHierarchy({
-    required int ledgerId,
-    required String type,
-    required DateTime start,
-    required DateTime end,
-  }) =>
-          _statisticsRepo.totalsByCategoryWithHierarchy(
+          _statisticsRepo.totalsByCategory(
             ledgerId: ledgerId,
             type: type,
             start: start,
             end: end,
           );
+
+  @override
+  Future<
+      List<
+          ({
+            int? id,
+            String name,
+            String? icon,
+            int? parentId,
+            int level,
+            double total
+          })>> totalsByCategoryWithHierarchy({
+    required int ledgerId,
+    required String type,
+    required DateTime start,
+    required DateTime end,
+  }) =>
+      _statisticsRepo.totalsByCategoryWithHierarchy(
+        ledgerId: ledgerId,
+        type: type,
+        start: start,
+        end: end,
+      );
 
   @override
   Future<List<({DateTime day, double total})>> totalsByDay({
@@ -756,11 +1078,13 @@ class LocalRepository extends BaseRepository {
       _recurringTransactionRepo.getAllRecurringTransactions();
 
   @override
-  Future<List<RecurringTransaction>> getRecurringTransactionsByLedger(int ledgerId) =>
+  Future<List<RecurringTransaction>> getRecurringTransactionsByLedger(
+          int ledgerId) =>
       _recurringTransactionRepo.getRecurringTransactionsByLedger(ledgerId);
 
   @override
-  Future<List<RecurringTransaction>> getEnabledRecurringTransactions(int ledgerId) =>
+  Future<List<RecurringTransaction>> getEnabledRecurringTransactions(
+          int ledgerId) =>
       _recurringTransactionRepo.getEnabledRecurringTransactions(ledgerId);
 
   @override
@@ -856,11 +1180,13 @@ class LocalRepository extends BaseRepository {
       _recurringTransactionRepo.watchAllRecurringTransactions();
 
   @override
-  Stream<List<RecurringTransaction>> watchRecurringTransactionsByLedger(int ledgerId) =>
+  Stream<List<RecurringTransaction>> watchRecurringTransactionsByLedger(
+          int ledgerId) =>
       _recurringTransactionRepo.watchRecurringTransactionsByLedger(ledgerId);
 
   @override
-  Future<void> batchInsertRecurringTransactions(List<RecurringTransactionsCompanion> items) =>
+  Future<void> batchInsertRecurringTransactions(
+          List<RecurringTransactionsCompanion> items) =>
       _recurringTransactionRepo.batchInsertRecurringTransactions(items);
 
   // ============================================
@@ -884,32 +1210,28 @@ class LocalRepository extends BaseRepository {
       _aiRepo.updateConversation(conversation);
 
   @override
-  Future<void> deleteConversation(int id) =>
-      _aiRepo.deleteConversation(id);
+  Future<void> deleteConversation(int id) => _aiRepo.deleteConversation(id);
 
   @override
   Stream<List<Message>> watchMessages(int conversationId) =>
       _aiRepo.watchMessages(conversationId);
 
   @override
-  Future<Message?> getMessageById(int id) =>
-      _aiRepo.getMessageById(id);
+  Future<Message?> getMessageById(int id) => _aiRepo.getMessageById(id);
 
   @override
   Future<int> createMessage(MessagesCompanion message) =>
       _aiRepo.createMessage(message);
 
   @override
-  Future<void> updateMessage(Message message) =>
-      _aiRepo.updateMessage(message);
+  Future<void> updateMessage(Message message) => _aiRepo.updateMessage(message);
 
   @override
   Future<void> deleteMessagesByConversation(int conversationId) =>
       _aiRepo.deleteMessagesByConversation(conversationId);
 
   @override
-  Future<void> deleteMessage(int id) =>
-      _aiRepo.deleteMessage(id);
+  Future<void> deleteMessage(int id) => _aiRepo.deleteMessage(id);
 
   @override
   Future<Message?> getMessageByTransactionId(int transactionId) =>
@@ -924,8 +1246,18 @@ class LocalRepository extends BaseRepository {
     required String name,
     String? color,
     int sortOrder = 0,
-  }) =>
-      _tagRepo.createTag(name: name, color: color, sortOrder: sortOrder);
+  }) async {
+    final id = await _tagRepo.createTag(
+        name: name, color: color, sortOrder: sortOrder);
+    _emitMutation(
+      LocalMutationEvent(
+        entityType: LocalMutationEntityType.tag,
+        action: LocalMutationAction.create,
+        entityId: id,
+      ),
+    );
+    return id;
+  }
 
   @override
   Future<void> updateTag(
@@ -933,11 +1265,31 @@ class LocalRepository extends BaseRepository {
     String? name,
     String? color,
     int? sortOrder,
-  }) =>
-      _tagRepo.updateTag(id, name: name, color: color, sortOrder: sortOrder);
+  }) async {
+    await _tagRepo.updateTag(id,
+        name: name, color: color, sortOrder: sortOrder);
+    _emitMutation(
+      LocalMutationEvent(
+        entityType: LocalMutationEntityType.tag,
+        action: LocalMutationAction.update,
+        entityId: id,
+      ),
+    );
+  }
 
   @override
-  Future<void> deleteTag(int id) => _tagRepo.deleteTag(id);
+  Future<void> deleteTag(int id) async {
+    final syncId = await _querySyncIdByTable('tags', id);
+    await _tagRepo.deleteTag(id);
+    _emitMutation(
+      LocalMutationEvent(
+        entityType: LocalMutationEntityType.tag,
+        action: LocalMutationAction.delete,
+        entityId: id,
+        entitySyncId: syncId,
+      ),
+    );
+  }
 
   @override
   Future<Tag?> getTagById(int id) => _tagRepo.getTagById(id);
@@ -956,40 +1308,107 @@ class LocalRepository extends BaseRepository {
   Future<void> addTagToTransaction({
     required int transactionId,
     required int tagId,
-  }) =>
-      _tagRepo.addTagToTransaction(transactionId: transactionId, tagId: tagId);
+  }) async {
+    await _tagRepo.addTagToTransaction(
+        transactionId: transactionId, tagId: tagId);
+    final ledgerId = await _queryTransactionLedgerId(transactionId);
+    if (ledgerId != null) {
+      _emitMutation(
+        LocalMutationEvent(
+          entityType: LocalMutationEntityType.transaction,
+          action: LocalMutationAction.update,
+          entityId: transactionId,
+          ledgerId: ledgerId,
+        ),
+      );
+    }
+  }
 
   @override
   Future<void> addTagsToTransaction({
     required int transactionId,
     required List<int> tagIds,
-  }) =>
-      _tagRepo.addTagsToTransaction(transactionId: transactionId, tagIds: tagIds);
+  }) async {
+    await _tagRepo.addTagsToTransaction(
+        transactionId: transactionId, tagIds: tagIds);
+    final ledgerId = await _queryTransactionLedgerId(transactionId);
+    if (ledgerId != null) {
+      _emitMutation(
+        LocalMutationEvent(
+          entityType: LocalMutationEntityType.transaction,
+          action: LocalMutationAction.update,
+          entityId: transactionId,
+          ledgerId: ledgerId,
+        ),
+      );
+    }
+  }
 
   @override
   Future<void> removeTagFromTransaction({
     required int transactionId,
     required int tagId,
-  }) =>
-      _tagRepo.removeTagFromTransaction(transactionId: transactionId, tagId: tagId);
+  }) async {
+    await _tagRepo.removeTagFromTransaction(
+      transactionId: transactionId,
+      tagId: tagId,
+    );
+    final ledgerId = await _queryTransactionLedgerId(transactionId);
+    if (ledgerId != null) {
+      _emitMutation(
+        LocalMutationEvent(
+          entityType: LocalMutationEntityType.transaction,
+          action: LocalMutationAction.update,
+          entityId: transactionId,
+          ledgerId: ledgerId,
+        ),
+      );
+    }
+  }
 
   @override
-  Future<void> removeAllTagsFromTransaction(int transactionId) =>
-      _tagRepo.removeAllTagsFromTransaction(transactionId);
+  Future<void> removeAllTagsFromTransaction(int transactionId) async {
+    await _tagRepo.removeAllTagsFromTransaction(transactionId);
+    final ledgerId = await _queryTransactionLedgerId(transactionId);
+    if (ledgerId != null) {
+      _emitMutation(
+        LocalMutationEvent(
+          entityType: LocalMutationEntityType.transaction,
+          action: LocalMutationAction.update,
+          entityId: transactionId,
+          ledgerId: ledgerId,
+        ),
+      );
+    }
+  }
 
   @override
   Future<void> updateTransactionTags({
     required int transactionId,
     required List<int> tagIds,
-  }) =>
-      _tagRepo.updateTransactionTags(transactionId: transactionId, tagIds: tagIds);
+  }) async {
+    await _tagRepo.updateTransactionTags(
+        transactionId: transactionId, tagIds: tagIds);
+    final ledgerId = await _queryTransactionLedgerId(transactionId);
+    if (ledgerId != null) {
+      _emitMutation(
+        LocalMutationEvent(
+          entityType: LocalMutationEntityType.transaction,
+          action: LocalMutationAction.update,
+          entityId: transactionId,
+          ledgerId: ledgerId,
+        ),
+      );
+    }
+  }
 
   @override
   Future<List<Tag>> getTagsForTransaction(int transactionId) =>
       _tagRepo.getTagsForTransaction(transactionId);
 
   @override
-  Future<Map<int, List<Tag>>> getTagsForTransactions(List<int> transactionIds) =>
+  Future<Map<int, List<Tag>>> getTagsForTransactions(
+          List<int> transactionIds) =>
       _tagRepo.getTagsForTransactions(transactionIds);
 
   @override
@@ -1018,7 +1437,8 @@ class LocalRepository extends BaseRepository {
     required DateTime start,
     required DateTime end,
   }) =>
-      _tagRepo.getTransactionsByTagInRange(tagId: tagId, start: start, end: end);
+      _tagRepo.getTransactionsByTagInRange(
+          tagId: tagId, start: start, end: end);
 
   @override
   Stream<List<Tag>> watchAllTags() => _tagRepo.watchAllTags();
@@ -1043,8 +1463,19 @@ class LocalRepository extends BaseRepository {
       _tagRepo.isTagNameDuplicate(name: name, excludeId: excludeId);
 
   @override
-  Future<void> updateTagSortOrders(List<({int id, int sortOrder})> updates) =>
-      _tagRepo.updateTagSortOrders(updates);
+  Future<void> updateTagSortOrders(
+      List<({int id, int sortOrder})> updates) async {
+    await _tagRepo.updateTagSortOrders(updates);
+    for (final item in updates) {
+      _emitMutation(
+        LocalMutationEvent(
+          entityType: LocalMutationEntityType.tag,
+          action: LocalMutationAction.update,
+          entityId: item.id,
+        ),
+      );
+    }
+  }
 
   @override
   Future<List<Tag>> getRecentlyUsedTags({int limit = 10}) =>
@@ -1079,13 +1510,15 @@ class LocalRepository extends BaseRepository {
     int? startDay,
     bool? enabled,
   }) =>
-      _budgetRepo.updateBudget(id, amount: amount, startDay: startDay, enabled: enabled);
+      _budgetRepo.updateBudget(id,
+          amount: amount, startDay: startDay, enabled: enabled);
 
   @override
   Future<void> deleteBudget(int id) => _budgetRepo.deleteBudget(id);
 
   @override
-  Future<Budget?> getTotalBudget(int ledgerId) => _budgetRepo.getTotalBudget(ledgerId);
+  Future<Budget?> getTotalBudget(int ledgerId) =>
+      _budgetRepo.getTotalBudget(ledgerId);
 
   @override
   Future<List<Budget>> getCategoryBudgets(int ledgerId) =>
@@ -1096,10 +1529,12 @@ class LocalRepository extends BaseRepository {
       _budgetRepo.getBudgetByCategory(ledgerId, categoryId);
 
   @override
-  Future<List<Budget>> getAllBudgets(int ledgerId) => _budgetRepo.getAllBudgets(ledgerId);
+  Future<List<Budget>> getAllBudgets(int ledgerId) =>
+      _budgetRepo.getAllBudgets(ledgerId);
 
   @override
-  Future<List<Budget>> getAllBudgetsForExport() => _budgetRepo.getAllBudgetsForExport();
+  Future<List<Budget>> getAllBudgetsForExport() =>
+      _budgetRepo.getAllBudgetsForExport();
 
   @override
   Future<BudgetUsage> getBudgetUsage(int budgetId, DateTime month) =>
@@ -1110,11 +1545,13 @@ class LocalRepository extends BaseRepository {
       _budgetRepo.getBudgetOverview(ledgerId, month);
 
   @override
-  Future<List<CategoryBudgetUsage>> getCategoryBudgetUsages(int ledgerId, DateTime month) =>
+  Future<List<CategoryBudgetUsage>> getCategoryBudgetUsages(
+          int ledgerId, DateTime month) =>
       _budgetRepo.getCategoryBudgetUsages(ledgerId, month);
 
   @override
-  Stream<List<Budget>> watchBudgets(int ledgerId) => _budgetRepo.watchBudgets(ledgerId);
+  Stream<List<Budget>> watchBudgets(int ledgerId) =>
+      _budgetRepo.watchBudgets(ledgerId);
 
   // ============================================
   // AttachmentRepository 接口实现 - 委托给 LocalAttachmentRepository
@@ -1145,7 +1582,8 @@ class LocalRepository extends BaseRepository {
       _attachmentRepo.getAttachmentById(id);
 
   @override
-  Future<List<TransactionAttachment>> getAttachmentsByTransaction(int transactionId) =>
+  Future<List<TransactionAttachment>> getAttachmentsByTransaction(
+          int transactionId) =>
       _attachmentRepo.getAttachmentsByTransaction(transactionId);
 
   @override
@@ -1160,7 +1598,8 @@ class LocalRepository extends BaseRepository {
       _attachmentRepo.updateAttachmentSortOrder(id, sortOrder);
 
   @override
-  Future<void> updateAttachmentSortOrders(List<({int id, int sortOrder})> updates) =>
+  Future<void> updateAttachmentSortOrders(
+          List<({int id, int sortOrder})> updates) =>
       _attachmentRepo.updateAttachmentSortOrders(updates);
 
   @override
@@ -1172,11 +1611,13 @@ class LocalRepository extends BaseRepository {
       _attachmentRepo.getAttachmentCountByTransaction(transactionId);
 
   @override
-  Future<Map<int, int>> getAttachmentCountsForTransactions(List<int> transactionIds) =>
+  Future<Map<int, int>> getAttachmentCountsForTransactions(
+          List<int> transactionIds) =>
       _attachmentRepo.getAttachmentCountsForTransactions(transactionIds);
 
   @override
-  Future<Map<int, List<TransactionAttachment>>> getAttachmentsForTransactions(List<int> transactionIds) =>
+  Future<Map<int, List<TransactionAttachment>>> getAttachmentsForTransactions(
+          List<int> transactionIds) =>
       _attachmentRepo.getAttachmentsForTransactions(transactionIds);
 
   @override
@@ -1192,7 +1633,8 @@ class LocalRepository extends BaseRepository {
       _attachmentRepo.deleteAttachmentByFileName(fileName);
 
   @override
-  Stream<List<TransactionAttachment>> watchAttachmentsByTransaction(int transactionId) =>
+  Stream<List<TransactionAttachment>> watchAttachmentsByTransaction(
+          int transactionId) =>
       _attachmentRepo.watchAttachmentsByTransaction(transactionId);
 
   @override

@@ -591,6 +591,7 @@
   "mineDownloadNeedCloudService": "Available in cloud service mode only",
   "mineDownloadComplete": "Complete",
   "mineDownloadResult": "New imports: {inserted}",
+  "mineDownloadRefreshedNoChanges": "Refreshed from cloud, no new records",
   "mineLoginTitle": "Login / Register",
   "mineLoginSubtitle": "Only needed for sync",
   "mineLoggedInEmail": "Logged in",
@@ -901,9 +902,13 @@
   "cloudSupabaseUrlHint": "https://xxx.supabase.co",
   "cloudAnonKeyLabel": "Anon Key",
   "cloudSelectServiceType": "Select Cloud Service Type",
-  "cloudMultiDeviceWarningTitle": "Multi-Device Sync Notice",
-  "cloudMultiDeviceWarningMessage": "Multi-device collaborative editing is not currently supported. To use on a new device, please clear local data first, then download ledgers from cloud.",
-  "cloudMultiDeviceWarningDetail": "Multi-Device Sync Instructions:\n\n1. Simultaneous editing on multiple devices is not supported\n2. To switch from Device A to Device B:\n   • Clear all ledgers on Device B\n   • Download latest data from cloud\n3. True multi-device collaboration will be supported in future versions",
+  "cloudGroupCollaborative": "Collaborative Cloud",
+  "cloudGroupBackup": "Backup Cloud",
+  "cloudGroupLocal": "Local",
+  "cloudCapabilityCollaborativeTitle": "Collaborative Capability",
+  "cloudCapabilityCollaborativeMessage": "Supports multi-user and multi-device collaborative sync and editing (subject to server permissions and version capabilities).",
+  "cloudCapabilityBackupTitle": "Backup Capability",
+  "cloudCapabilityBackupMessage": "Best for backup and cross-device migration; concurrent collaborative editing is not guaranteed.",
   "cloudWebdavUrlLabel": "WebDAV Server URL",
   "cloudWebdavUrlHint": "https://dav.jianguoyun.com/dav/",
   "cloudWebdavUsernameLabel": "Username",
@@ -925,7 +930,7 @@
   "cloudSupabaseBucketLabel": "Storage Bucket Name",
   "cloudSupabaseBucketHint": "Leave blank for default: beecount-backups",
   "authRememberAccount": "Remember account",
-  "authRememberAccountHint": "Auto-fill on next login (Supabase only)",
+  "authRememberAccountHint": "Auto-fill on next login (Supabase/BeeCount Cloud)",
   "cloudConfigSaved": "Configuration saved",
   "cloudTestSuccess": "Connection test successful!",
   "cloudTestFailed": "Connection test failed, please check if the configuration is correct.",
@@ -937,8 +942,10 @@
   "authPasswordRequirement": "Password (at least 6 characters, include letters and numbers)",
   "authConfirmPassword": "Confirm Password",
   "authInvalidEmail": "Please enter a valid email address",
+  "authPasswordRequired": "Please enter password",
   "authPasswordRequirementShort": "Password must contain letters and numbers, at least 6 characters",
   "authPasswordMismatch": "Passwords do not match",
+  "authBeeCountCloudLoginOnlyHint": "BeeCount Cloud accounts are managed by your cloud service; this page supports login only.",
   "authResendVerification": "Resend verification email",
   "authSignupSuccess": "Registration successful",
   "authVerificationEmailSent": "Verification email sent, please go to your email to complete verification before logging in.",
@@ -2411,5 +2418,294 @@
   "aiProviderTestFailed": "Test failed",
   "aiProviderTestAll": "Test All",
   "aiProviderTestAllRetry": "Retry Test",
-  "aiModelInputHelper": "Leave empty to use default model"
+  "aiModelInputHelper": "Leave empty to use default model",
+  "cloudCollabCurrentRoleTitle": "Current Collaboration Role",
+  "cloudCollabCurrentRoleSubtitle": "Role and permissions in this ledger",
+  "cloudCollabRoleLoading": "Loading...",
+  "cloudCollabRoleOwner": "Owner",
+  "cloudCollabRoleEditor": "Editor",
+  "cloudCollabRoleViewer": "Viewer",
+  "cloudCollabRoleViewerLegacy": "Viewer (legacy read-only)",
+  "cloudCollabRoleUnknown": "Unknown",
+  "cloudCollabRoleNotReady": "Permission not ready",
+  "cloudCollabExperimentalBetaTitle": "Experimental Collaboration",
+  "cloudCollabExperimentalBetaSubtitle": "Collaborative editing is in beta. Please verify synced results after write actions.",
+  "cloudCollabExperimentalWriteHint": "Experimental feature: collaborative writes may be unstable. Please verify sync results.",
+  "cloudCollabSharedTag": "Shared",
+  "cloudCollabManageEntryTitle": "Shared Ledger Management",
+  "cloudCollabManageEntrySubtitle": "Role and members (managed in backend)",
+  "cloudCollabManagePageTitle": "Shared Ledger Management",
+  "cloudCollabManagePageSubtitle": "Manage collaboration and permissions for this ledger",
+  "cloudCollabMembersEntryTitle": "Members",
+  "cloudCollabMembersEntrySubtitle": "View member list and roles",
+  "cloudCollabInvitesEntryTitle": "Invite Codes",
+  "cloudCollabInvitesEntrySubtitle": "Create and manage invite codes",
+  "cloudCollabDevicesEntryTitle": "Device Sessions",
+  "cloudCollabDevicesEntrySubtitle": "View and revoke active devices",
+  "cloudCollabJoinByCodeTitle": "Join by Invite Code",
+  "cloudCollabJoinByCodeSubtitle": "Join another shared ledger",
+  "cloudCollabJoinByCodeHint": "e.g. abcDEF123",
+  "cloudCollabJoinSuccessTitle": "Joined",
+  "cloudCollabJoinSuccessMessage": "Joined shared ledger successfully. Go back to ledger list to view it.",
+  "cloudCollabLeaveTitle": "Leave Shared Ledger",
+  "cloudCollabLeaveSubtitle": "Only non-owner members can leave",
+  "cloudCollabLeaveOwnerBlocked": "Owner cannot leave this ledger.",
+  "cloudCollabLeaveConfirm": "Are you sure you want to leave this shared ledger?",
+  "cloudCollabLeaveDoneTitle": "Left",
+  "cloudCollabLeaveDoneMessage": "You have left this shared ledger.",
+  "cloudCollabMembersPageTitle": "Shared Members",
+  "cloudCollabMembersPageSubtitle": "View member roles in current ledger",
+  "cloudCollabLegacyViewerHint": "Legacy viewer members are read-only for compatibility.",
+  "cloudCollabManagedInBackendTitle": "Managed in Backend",
+  "cloudCollabManagedInBackendHint": "Add/remove members and share settings are managed in BeeCount Web.",
+  "cloudCollabNoMembers": "No members in current ledger",
+  "cloudCollabJoinedAt": "Joined: {time}",
+  "@cloudCollabJoinedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabRoleUpdateSuccess": "Role updated",
+  "cloudCollabUpgradeViewerToEditor": "Upgrade to Editor",
+  "cloudCollabInvitesPageTitle": "Invite Codes",
+  "cloudCollabInvitesPageSubtitle": "Create and manage shared invite codes",
+  "cloudCollabNoInvites": "No invite codes",
+  "cloudCollabOwnerOnlyHint": "Only owner can manage invite codes.",
+  "cloudCollabInviteRoleTitle": "Invite Role",
+  "cloudCollabInviteRoleHint": "editor only",
+  "cloudCollabRoleInvalidTitle": "Invalid Role",
+  "cloudCollabRoleInvalidMessage": "Only editor is allowed.",
+  "cloudCollabInviteMaxUsesTitle": "Max Uses",
+  "cloudCollabInviteMaxUsesHint": "Enter a positive integer",
+  "cloudCollabInviteMaxUsesInvalidTitle": "Invalid Max Uses",
+  "cloudCollabInviteMaxUsesInvalidMessage": "Please enter an integer greater than 0.",
+  "cloudCollabInviteExpiresHoursTitle": "Expires In (Hours)",
+  "cloudCollabInviteExpiresHoursHint": "Enter a positive integer",
+  "cloudCollabInviteExpiresHoursInvalidTitle": "Invalid Expiration",
+  "cloudCollabInviteExpiresHoursInvalidMessage": "Please enter an integer greater than 0.",
+  "cloudCollabInviteCreatedTitle": "Invite Code Created",
+  "cloudCollabInviteCreatedDetail": "Invite code: {inviteCode}\nInvite ID: {inviteId}\nRole: {role}\nExpires: {expiresAt}",
+  "@cloudCollabInviteCreatedDetail": {
+    "placeholders": {
+      "inviteCode": {
+        "type": "String"
+      },
+      "inviteId": {
+        "type": "String"
+      },
+      "role": {
+        "type": "String"
+      },
+      "expiresAt": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabCopyInviteCode": "Copy Code",
+  "cloudCollabInviteCodeCopied": "Invite code copied",
+  "cloudCollabInviteStatusActive": "Active",
+  "cloudCollabInviteStatusExpired": "Expired",
+  "cloudCollabInviteStatusExhausted": "Exhausted",
+  "cloudCollabInviteStatusRevoked": "Revoked",
+  "cloudCollabInviteUsed": "Used: {text}",
+  "@cloudCollabInviteUsed": {
+    "placeholders": {
+      "text": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabInviteExpiresAt": "Expires: {time}",
+  "@cloudCollabInviteExpiresAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabInviteRevokeTitle": "Revoke Invite",
+  "cloudCollabInviteRevokeMessage": "Revoke invite {inviteId}?",
+  "@cloudCollabInviteRevokeMessage": {
+    "placeholders": {
+      "inviteId": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabInviteRevoked": "Invite revoked",
+  "cloudCollabDevicesPageTitle": "Device Sessions",
+  "cloudCollabDevicesPageSubtitle": "Manage active devices",
+  "cloudCollabDevicesViewAllSessions": "Show all sessions",
+  "cloudCollabDevicesViewModeHint": "Default view shows deduped devices active in the last 30 days.",
+  "cloudCollabNoDevices": "No active devices",
+  "cloudCollabUnknownDeviceName": "Unknown Device",
+  "cloudCollabDeviceCurrentTag": "Current Device",
+  "cloudCollabCurrentDeviceCannotRevoke": "Current device cannot be revoked.",
+  "cloudCollabDeviceAppVersion": "App: {version}",
+  "@cloudCollabDeviceAppVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabDeviceOsVersion": "OS: {version}",
+  "@cloudCollabDeviceOsVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabDeviceModel": "Model: {model}",
+  "@cloudCollabDeviceModel": {
+    "placeholders": {
+      "model": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabDeviceLastIp": "IP: {ip}",
+  "@cloudCollabDeviceLastIp": {
+    "placeholders": {
+      "ip": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabDeviceSessionCount": "Sessions: {count}",
+  "@cloudCollabDeviceSessionCount": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabDeviceLastSeen": "Last seen: {time}",
+  "@cloudCollabDeviceLastSeen": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabDeviceCreatedAt": "Created: {time}",
+  "@cloudCollabDeviceCreatedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabDeviceRevokeTitle": "Revoke Device",
+  "cloudCollabDeviceRevokeMessage": "Revoke device {name} ({id})?",
+  "@cloudCollabDeviceRevokeMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabDeviceRevokeMultipleMessage": "Revoke {count} sessions for device {name}?",
+  "@cloudCollabDeviceRevokeMultipleMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabDeviceRevoked": "Device revoked",
+  "cloudCollabManageBlockedTitle": "Permission Required",
+  "cloudCollabManageBlockedMessage": "Only owner can manage this shared ledger.",
+  "cloudCollabUnavailableMessage": "Cloud collaboration is unavailable.",
+  "cloudCollabScopeDeniedTitle": "Collaboration Scope Disabled",
+  "cloudCollabScopeDeniedHint": "Server has not enabled ALLOW_APP_RW_SCOPES, so device sessions and collaboration read APIs are unavailable.",
+  "cloudCollabScopeDeniedAction": "Set ALLOW_APP_RW_SCOPES=true in server .env (or deployment env), restart the service, then sign in again in app.",
+  "cloudCollabEntryMovedHint": "Ledger collaboration entry has moved to the Ledger Management page.",
+  "cloudCollabMediaRetryHint": "Manual upload/download also retries missing attachment and category icon files.",
+  "cloudCollabMediaRetryPartialTitle": "Media Sync Partially Completed",
+  "cloudCollabMediaRetryPartialMessage": "Downloaded {downloaded} media files, {failed} files still failed. You can retry manual sync later.",
+  "@cloudCollabMediaRetryPartialMessage": {
+    "placeholders": {
+      "downloaded": {
+        "type": "String"
+      },
+      "failed": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabMediaRetrySuccess": "Recovered {count} missing media files.",
+  "@cloudCollabMediaRetrySuccess": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabMediaRetryFailedTitle": "Media Retry Failed",
+  "cloudCollabMediaRetryFailedMessage": "Failed to retry media sync: {error}",
+  "@cloudCollabMediaRetryFailedMessage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabUnknownMember": "Unknown member",
+  "cloudCollabMemberStatusActive": "active",
+  "cloudCollabMemberStatusLeft": "left",
+  "cloudCollabMembersCount": "{count} members",
+  "@cloudCollabMembersCount": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabCreatorLabel": "Created by",
+  "cloudCollabCreatorLoading": "Loading creator...",
+  "cloudCollabWriteDeniedMessage": "Your current role cannot write in this shared ledger.",
+  "cloudCollabEditDeniedMessage": "Your current role cannot edit this transaction.",
+  "cloudCollabManageDeniedMessage": "Your current role cannot manage this shared ledger.",
+  "cloudCollabDeleteDeniedMessage": "Your current role cannot delete this transaction.",
+  "cloudCollabUploadQueuePending": "{count} changes pending upload",
+  "@cloudCollabUploadQueuePending": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabUploadQueueFailed": "{count} changes failed, tap upload to retry",
+  "@cloudCollabUploadQueueFailed": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabUploadQueueFailedToast": "Auto upload failed for {count} changes, open Cloud Sync to retry.",
+  "@cloudCollabUploadQueueFailedToast": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "cloudCollabAvatarUploadSuccess": "Avatar synced to cloud.",
+  "cloudCollabAvatarUploadFailed": "Avatar upload failed. You can retry in Cloud Sync.",
+  "cloudCollabAvatarRetryTitle": "Retry avatar upload",
+  "cloudCollabAvatarRetrySubtitle": "Tap to retry syncing your avatar to BeeCount Cloud.",
+  "cloudCollabDiagnosticsTitle": "Collaboration diagnostics",
+  "cloudCollabDiagnosticsSubtitle": "Copy ledger/scope/device details for self-host troubleshooting.",
+  "cloudCollabDiagnosticsCopied": "Diagnostics copied."
 }

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_list_view/flutter_list_view.dart';
 import 'package:visibility_detector/visibility_detector.dart';
+import 'package:flutter_cloud_sync/flutter_cloud_sync.dart'
+    show CloudBackendType;
 import '../../data/db.dart';
 import '../../providers.dart';
 import '../../services/system/logger_service.dart';
@@ -40,6 +42,9 @@ class TransactionList extends ConsumerStatefulWidget {
   /// 自定义空状态显示
   final Widget? emptyWidget;
 
+  /// 远端变更应用中（用于空态防闪）
+  final bool isRemoteApplying;
+
   /// 列表控制器（可选，用于精准跳转）
   final FlutterListViewController? controller;
 
@@ -51,6 +56,7 @@ class TransactionList extends ConsumerStatefulWidget {
     this.enableVisibilityTracking = false,
     this.onDateVisibilityChanged,
     this.emptyWidget,
+    this.isRemoteApplying = false,
     this.controller,
   }) : assert(transactionsWithDetails != null || transactions != null,
             'Either transactionsWithDetails or transactions must be provided');
@@ -91,7 +97,8 @@ class TransactionListState extends ConsumerState<TransactionList> {
   Set<int>? _preloadedIds;
   Set<int> get _preloadedIdSet {
     if (_preloadedIds == null && widget.transactionsWithDetails != null) {
-      _preloadedIds = widget.transactionsWithDetails!.map((t) => t.t.id).toSet();
+      _preloadedIds =
+          widget.transactionsWithDetails!.map((t) => t.t.id).toSet();
     }
     return _preloadedIds ?? {};
   }
@@ -166,7 +173,8 @@ class TransactionListState extends ConsumerState<TransactionList> {
     }
 
     final repo = ref.read(repositoryProvider);
-    final countsMap = await repo.getAttachmentCountsForTransactions(transactionIds);
+    final countsMap =
+        await repo.getAttachmentCountsForTransactions(transactionIds);
 
     if (mounted) {
       setState(() {
@@ -327,15 +335,51 @@ class TransactionListState extends ConsumerState<TransactionList> {
       Future.microtask(() => _loadAttachmentCounts());
     }
 
+    final currentLedgerId = ref.watch(currentLedgerIdProvider);
+    final currentLedgerAsync = ref.watch(currentLedgerProvider);
+    final currentLedger = currentLedgerAsync.asData?.value;
+    final activeCloudConfig = ref.watch(activeCloudConfigProvider);
+    final isBeeCountCloudMode = activeCloudConfig.hasValue &&
+        activeCloudConfig.value!.type == CloudBackendType.beecountCloud;
+    final isSharedLedger =
+        (currentLedger?.type ?? '').trim().toLowerCase() == 'shared';
+    final showCreatorIdentity = isBeeCountCloudMode && isSharedLedger;
+    final creatorMap = showCreatorIdentity
+        ? ref
+                .watch(ledgerTransactionCreatorMapProvider(currentLedgerId))
+                .asData
+                ?.value ??
+            const <int, String>{}
+        : const <int, String>{};
+    final memberMap = showCreatorIdentity
+        ? ref
+                .watch(ledgerCollabMemberMapProvider(currentLedgerId))
+                .asData
+                ?.value ??
+            const <String, LedgerCollabMemberSummary>{}
+        : const <String, LedgerCollabMemberSummary>{};
+    final myProfile = showCreatorIdentity
+        ? ref.watch(cloudMyProfileProvider).asData?.value
+        : null;
+
     _buildFlatItems();
 
     // 无数据时展示空状态
     if (_flatItems.isEmpty) {
-      return widget.emptyWidget ??
-        AppEmpty(
-          text: AppLocalizations.of(context).commonEmpty,
-          subtext: AppLocalizations.of(context).homeNoRecords,
+      if (widget.isRemoteApplying) {
+        return const Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
         );
+      }
+      return widget.emptyWidget ??
+          AppEmpty(
+            text: AppLocalizations.of(context).commonEmpty,
+            subtext: AppLocalizations.of(context).homeNoRecords,
+          );
     }
 
     // 使用FlutterListView渲染列表
@@ -380,12 +424,14 @@ class TransactionListState extends ConsumerState<TransactionList> {
             );
 
             // 如果启用可见性跟踪，则包装VisibilityDetector
-            if (widget.enableVisibilityTracking && widget.onDateVisibilityChanged != null) {
+            if (widget.enableVisibilityTracking &&
+                widget.onDateVisibilityChanged != null) {
               header = VisibilityDetector(
                 key: Key('header-$dateKey'),
                 onVisibilityChanged: (VisibilityInfo info) {
                   // 当可见比例大于50%时认为可见
-                  widget.onDateVisibilityChanged!(dateKey, info.visibleFraction > 0.5);
+                  widget.onDateVisibilityChanged!(
+                      dateKey, info.visibleFraction > 0.5);
                 },
                 child: header,
               );
@@ -395,12 +441,14 @@ class TransactionListState extends ConsumerState<TransactionList> {
           } else {
             // 渲染交易项
             final it = item.$2 as ({Transaction t, Category? category});
-            final allItemsInDay = item.$3 as List<({Transaction t, Category? category})>;
+            final allItemsInDay =
+                item.$3 as List<({Transaction t, Category? category})>;
             final isTransfer = it.t.type == 'transfer';
             final isExpense = it.t.type == 'expense';
 
             // 获取分类显示名称
-            final categoryName = CategoryUtils.getDisplayName(it.category?.name, context);
+            final categoryName =
+                CategoryUtils.getDisplayName(it.category?.name, context);
 
             final subtitle = it.t.note ?? '';
 
@@ -408,7 +456,8 @@ class TransactionListState extends ConsumerState<TransactionList> {
             final isLastInGroup = allItemsInDay.last.t.id == it.t.id;
 
             // 获取账户名称（仅在账户功能启用且有账户ID时）
-            final accountFeatureEnabled = ref.watch(accountFeatureEnabledProvider).valueOrNull ?? true;
+            final accountFeatureEnabled =
+                ref.watch(accountFeatureEnabledProvider).valueOrNull ?? true;
             String? accountName;
             String? toAccountName; // 转账目标账户名称
 
@@ -421,17 +470,22 @@ class TransactionListState extends ConsumerState<TransactionList> {
 
               // 非预加载模式下通过 Provider 获取
               if (accountName == null && !_hasFullDetails) {
-                final accountAsync = ref.watch(accountByIdProvider(it.t.accountId!));
+                final accountAsync =
+                    ref.watch(accountByIdProvider(it.t.accountId!));
                 accountName = accountAsync.valueOrNull?.name;
               }
-              if (isTransfer && toAccountName == null && !_hasFullDetails && it.t.toAccountId != null) {
-                final toAccountAsync = ref.watch(accountByIdProvider(it.t.toAccountId!));
+              if (isTransfer &&
+                  toAccountName == null &&
+                  !_hasFullDetails &&
+                  it.t.toAccountId != null) {
+                final toAccountAsync =
+                    ref.watch(accountByIdProvider(it.t.toAccountId!));
                 toAccountName = toAccountAsync.valueOrNull?.name;
               }
             }
 
             return Dismissible(
-              key: Key('tx-${it.t.id}-$index'), // 添加索引避免key冲突
+              key: ValueKey('tx-${it.t.id}'),
               direction: DismissDirection.endToStart,
               background: Container(
                 alignment: Alignment.centerRight,
@@ -440,10 +494,33 @@ class TransactionListState extends ConsumerState<TransactionList> {
                 child: const Icon(Icons.delete, color: Colors.white),
               ),
               confirmDismiss: (direction) async {
+                final ledgerId = ref.read(currentLedgerIdProvider);
+                final l10n = AppLocalizations.of(context);
+                final allowed =
+                    await TransactionEditUtils.canModifyTransactionById(
+                  context,
+                  ref,
+                  ledgerId: ledgerId,
+                  transactionId: it.t.id,
+                  showDeniedMessage: false,
+                );
+                if (!context.mounted) {
+                  return false;
+                }
+                if (!allowed) {
+                  showToast(
+                    context,
+                    l10n.cloudCollabDeleteDeniedMessage,
+                  );
+                  return false;
+                }
+                if (!context.mounted) {
+                  return false;
+                }
                 return await AppDialog.confirm<bool>(
                       context,
-                      title: AppLocalizations.of(context).deleteConfirmTitle,
-                      message: AppLocalizations.of(context).deleteConfirmMessage,
+                      title: l10n.deleteConfirmTitle,
+                      message: l10n.deleteConfirmMessage,
                     ) ??
                     false;
               },
@@ -458,7 +535,8 @@ class TransactionListState extends ConsumerState<TransactionList> {
                 PostProcessor.sync(ref, ledgerId: curLedger);
 
                 if (context.mounted) {
-                  showToast(context, AppLocalizations.of(context).ledgersDeleted);
+                  showToast(
+                      context, AppLocalizations.of(context).ledgersDeleted);
                 }
               },
               child: Column(
@@ -472,30 +550,71 @@ class TransactionListState extends ConsumerState<TransactionList> {
                           .toList();
 
                       // 转账账户信息
-                      final transferAccountInfo = (accountName != null && toAccountName != null)
-                          ? '$accountName → $toAccountName'
-                          : null;
+                      final transferAccountInfo =
+                          (accountName != null && toAccountName != null)
+                              ? '$accountName → $toAccountName'
+                              : null;
 
                       // 获取附件数量（优先使用预加载数据）
-                      final attachmentCount = _getAttachmentCountForTransaction(it.t.id);
+                      final attachmentCount =
+                          _getAttachmentCountForTransaction(it.t.id);
+                      final myUserId = (myProfile?.userId ?? '').trim();
+                      final creatorUserId = showCreatorIdentity
+                          ? ((creatorMap[it.t.id]?.trim().isNotEmpty == true
+                              ? creatorMap[it.t.id]!.trim()
+                              : (myUserId.isNotEmpty ? myUserId : null)))
+                          : null;
+                      final creatorMember = creatorUserId == null
+                          ? null
+                          : memberMap[creatorUserId];
+                      final isCurrentUserCreator = creatorUserId != null &&
+                          myUserId.isNotEmpty &&
+                          creatorUserId == myUserId;
+                      final fallbackCreatorName = isCurrentUserCreator
+                          ? (myProfile?.displayName?.trim().isNotEmpty == true
+                              ? myProfile!.displayName!.trim()
+                              : null)
+                          : null;
+                      final fallbackCreatorAvatarUrl = isCurrentUserCreator
+                          ? (myProfile?.avatarUrl?.trim().isNotEmpty == true
+                              ? myProfile!.avatarUrl
+                              : null)
+                          : null;
+                      final creatorName = showCreatorIdentity
+                          ? (creatorMember?.resolvedDisplayName ??
+                              fallbackCreatorName ??
+                              (creatorUserId?.isNotEmpty == true
+                                  ? shortCollabUserId(creatorUserId!)
+                                  : null))
+                          : null;
+                      final creatorAvatarUrl = showCreatorIdentity
+                          ? (creatorMember?.avatarUrl ??
+                              fallbackCreatorAvatarUrl)
+                          : null;
 
                       return TransactionListItem(
-                        icon: getCategoryIconData(category: it.category, categoryName: categoryName),
+                        icon: getCategoryIconData(
+                            category: it.category, categoryName: categoryName),
                         category: it.category,
                         title: isTransfer
-                          ? (subtitle.isNotEmpty ? subtitle : AppLocalizations.of(context).transferTitle)
-                          : (subtitle.isNotEmpty ? subtitle : categoryName),
+                            ? (subtitle.isNotEmpty
+                                ? subtitle
+                                : AppLocalizations.of(context).transferTitle)
+                            : (subtitle.isNotEmpty ? subtitle : categoryName),
                         categoryName: isTransfer
-                          ? null  // 转账不显示第二行，保持布局一致
-                          : (subtitle.isNotEmpty ? null : categoryName),
+                            ? null // 转账不显示第二行，保持布局一致
+                            : (subtitle.isNotEmpty ? null : categoryName),
                         amount: it.t.amount,
                         isExpense: isExpense,
                         isTransfer: isTransfer,
                         hide: widget.hideAmounts,
                         happenedAt: it.t.happenedAt,
+                        creatorUserId: creatorUserId,
+                        creatorName: creatorName,
+                        creatorAvatarUrl: creatorAvatarUrl,
                         accountName: isTransfer
-                          ? transferAccountInfo  // 转账始终在第三行显示账户信息
-                          : accountName,
+                            ? transferAccountInfo // 转账始终在第三行显示账户信息
+                            : accountName,
                         tags: tagsList.isNotEmpty ? tagsList : null,
                         attachmentCount: attachmentCount,
                         onAttachmentTap: attachmentCount > 0
@@ -503,7 +622,8 @@ class TransactionListState extends ConsumerState<TransactionList> {
                                 switchToStreamMode(); // 用户交互，切换到 Stream 模式
                                 await Navigator.of(context).push(
                                   MaterialPageRoute(
-                                    builder: (_) => AttachmentPreviewPage.fromTransaction(
+                                    builder: (_) =>
+                                        AttachmentPreviewPage.fromTransaction(
                                       transactionId: it.t.id,
                                     ),
                                   ),

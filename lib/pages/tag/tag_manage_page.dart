@@ -11,6 +11,7 @@ import '../../services/data/tag_seed_service.dart';
 import '../../services/export/config_export_service.dart';
 import '../../services/system/logger_service.dart';
 import '../../styles/tokens.dart';
+import '../../utils/transaction_edit_utils.dart';
 import '../../widgets/ui/ui.dart';
 import 'tag_detail_page.dart';
 import 'tag_edit_page.dart';
@@ -24,6 +25,16 @@ class TagManagePage extends ConsumerStatefulWidget {
 }
 
 class _TagManagePageState extends ConsumerState<TagManagePage> {
+  Future<bool> _ensureCanManageTags({bool showDeniedMessage = true}) async {
+    final ledgerId = ref.read(currentLedgerIdProvider);
+    return TransactionEditUtils.canManageLedger(
+      context,
+      ref,
+      ledgerId: ledgerId,
+      showDeniedMessage: showDeniedMessage,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -129,6 +140,9 @@ class _TagManagePageState extends ConsumerState<TagManagePage> {
   }
 
   void _addTag() async {
+    final allowed = await _ensureCanManageTags();
+    if (!allowed) return;
+    if (!mounted) return;
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => const TagEditPage(),
@@ -148,6 +162,9 @@ class _TagManagePageState extends ConsumerState<TagManagePage> {
   }
 
   void _deleteTag(Tag tag, AppLocalizations l10n) async {
+    final allowed = await _ensureCanManageTags();
+    if (!allowed) return;
+    if (!mounted) return;
     final confirmed = await AppDialog.confirm<bool>(
       context,
       title: l10n.tagDeleteConfirmTitle,
@@ -166,6 +183,9 @@ class _TagManagePageState extends ConsumerState<TagManagePage> {
   }
 
   void _generateDefaultTags() async {
+    final allowed = await _ensureCanManageTags();
+    if (!allowed) return;
+    if (!mounted) return;
     final l10n = AppLocalizations.of(context);
 
     final confirmed = await AppDialog.confirm<bool>(
@@ -186,7 +206,8 @@ class _TagManagePageState extends ConsumerState<TagManagePage> {
   }
 
   /// 构建更多菜单
-  Widget _buildMoreMenu(BuildContext context, AppLocalizations l10n, Color primaryColor) {
+  Widget _buildMoreMenu(
+      BuildContext context, AppLocalizations l10n, Color primaryColor) {
     return BeePopupMenu(
       tooltip: l10n.commonMore,
       primaryColor: primaryColor,
@@ -260,7 +281,11 @@ class _TagManagePageState extends ConsumerState<TagManagePage> {
       if (!mounted) return;
 
       // 生成文件并分享
-      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
+      final timestamp = DateTime.now()
+          .toIso8601String()
+          .replaceAll(':', '-')
+          .split('.')
+          .first;
       final fileName = 'beecount_tags_$timestamp.yml';
 
       if (Platform.isAndroid) {
@@ -274,7 +299,10 @@ class _TagManagePageState extends ConsumerState<TagManagePage> {
         await file.writeAsString(yamlContent);
 
         if (!mounted) return;
-        showToast(context, l10n.tagShareSuccess(filePath.replaceAll('/storage/emulated/0/', '')));
+        showToast(
+            context,
+            l10n.tagShareSuccess(
+                filePath.replaceAll('/storage/emulated/0/', '')));
       } else {
         final tempDir = await getTemporaryDirectory();
         final filePath = '${tempDir.path}/$fileName';
@@ -296,6 +324,9 @@ class _TagManagePageState extends ConsumerState<TagManagePage> {
 
   /// 导入标签
   Future<void> _importTags() async {
+    final allowed = await _ensureCanManageTags();
+    if (!allowed) return;
+    if (!mounted) return;
     final l10n = AppLocalizations.of(context);
 
     try {
@@ -409,13 +440,15 @@ class _TagManagePageState extends ConsumerState<TagManagePage> {
 
   /// 清空未使用的标签
   Future<void> _clearUnusedTags() async {
+    final allowed = await _ensureCanManageTags();
+    if (!allowed) return;
+    if (!mounted) return;
     final l10n = AppLocalizations.of(context);
     final tagsWithStats = ref.read(tagsWithStatsProvider).valueOrNull ?? [];
 
     // 找出交易数为0的标签
-    final unusedTags = tagsWithStats
-        .where((item) => item.transactionCount == 0)
-        .toList();
+    final unusedTags =
+        tagsWithStats.where((item) => item.transactionCount == 0).toList();
 
     if (unusedTags.isEmpty) {
       showToast(context, l10n.tagClearUnusedEmpty);
@@ -462,10 +495,11 @@ class _TagManagePageState extends ConsumerState<TagManagePage> {
 
   /// 静默清空未使用的标签（用于覆盖导入）
   Future<void> _clearUnusedTagsSilent() async {
+    final allowed = await _ensureCanManageTags(showDeniedMessage: false);
+    if (!allowed) return;
     final tagsWithStats = ref.read(tagsWithStatsProvider).valueOrNull ?? [];
-    final unusedTags = tagsWithStats
-        .where((item) => item.transactionCount == 0)
-        .toList();
+    final unusedTags =
+        tagsWithStats.where((item) => item.transactionCount == 0).toList();
 
     if (unusedTags.isEmpty) return;
 

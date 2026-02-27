@@ -1326,6 +1326,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get mineDownloadRefreshedNoChanges => 'Refreshed from cloud, no new records';
+
+  @override
   String get mineLoginTitle => 'Login / Register';
 
   @override
@@ -2243,13 +2246,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cloudSelectServiceType => 'Select Cloud Service Type';
 
   @override
-  String get cloudMultiDeviceWarningTitle => 'Multi-Device Sync Notice';
+  String get cloudGroupCollaborative => 'Collaborative Cloud';
 
   @override
-  String get cloudMultiDeviceWarningMessage => 'Multi-device collaborative editing is not currently supported. To use on a new device, please clear local data first, then download ledgers from cloud.';
+  String get cloudGroupBackup => 'Backup Cloud';
 
   @override
-  String get cloudMultiDeviceWarningDetail => 'Multi-Device Sync Instructions:\n\n1. Simultaneous editing on multiple devices is not supported\n2. To switch from Device A to Device B:\n   • Clear all ledgers on Device B\n   • Download latest data from cloud\n3. True multi-device collaboration will be supported in future versions';
+  String get cloudGroupLocal => 'Local';
+
+  @override
+  String get cloudCapabilityCollaborativeTitle => 'Collaborative Capability';
+
+  @override
+  String get cloudCapabilityCollaborativeMessage => 'Supports multi-user and multi-device collaborative sync and editing (subject to server permissions and version capabilities).';
+
+  @override
+  String get cloudCapabilityBackupTitle => 'Backup Capability';
+
+  @override
+  String get cloudCapabilityBackupMessage => 'Best for backup and cross-device migration; concurrent collaborative editing is not guaranteed.';
 
   @override
   String get cloudWebdavUrlLabel => 'WebDAV Server URL';
@@ -2315,7 +2330,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authRememberAccount => 'Remember account';
 
   @override
-  String get authRememberAccountHint => 'Auto-fill on next login (Supabase only)';
+  String get authRememberAccountHint => 'Auto-fill on next login (Supabase/BeeCount Cloud)';
 
   @override
   String get cloudConfigSaved => 'Configuration saved';
@@ -2351,10 +2366,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authInvalidEmail => 'Please enter a valid email address';
 
   @override
+  String get authPasswordRequired => 'Please enter password';
+
+  @override
   String get authPasswordRequirementShort => 'Password must contain letters and numbers, at least 6 characters';
 
   @override
   String get authPasswordMismatch => 'Passwords do not match';
+
+  @override
+  String get authBeeCountCloudLoginOnlyHint => 'BeeCount Cloud accounts are managed by your cloud service; this page supports login only.';
 
   @override
   String get authResendVerification => 'Resend verification email';
@@ -5404,4 +5425,418 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiModelInputHelper => 'Leave empty to use default model';
+
+  @override
+  String get cloudCollabCurrentRoleTitle => 'Current Collaboration Role';
+
+  @override
+  String get cloudCollabCurrentRoleSubtitle => 'Role and permissions in this ledger';
+
+  @override
+  String get cloudCollabRoleLoading => 'Loading...';
+
+  @override
+  String get cloudCollabRoleOwner => 'Owner';
+
+  @override
+  String get cloudCollabRoleEditor => 'Editor';
+
+  @override
+  String get cloudCollabRoleViewer => 'Viewer';
+
+  @override
+  String get cloudCollabRoleViewerLegacy => 'Viewer (legacy read-only)';
+
+  @override
+  String get cloudCollabRoleUnknown => 'Unknown';
+
+  @override
+  String get cloudCollabRoleNotReady => 'Permission not ready';
+
+  @override
+  String get cloudCollabExperimentalBetaTitle => 'Experimental Collaboration';
+
+  @override
+  String get cloudCollabExperimentalBetaSubtitle => 'Collaborative editing is in beta. Please verify synced results after write actions.';
+
+  @override
+  String get cloudCollabExperimentalWriteHint => 'Experimental feature: collaborative writes may be unstable. Please verify sync results.';
+
+  @override
+  String get cloudCollabSharedTag => 'Shared';
+
+  @override
+  String get cloudCollabManageEntryTitle => 'Shared Ledger Management';
+
+  @override
+  String get cloudCollabManageEntrySubtitle => 'Role and members (managed in backend)';
+
+  @override
+  String get cloudCollabManagePageTitle => 'Shared Ledger Management';
+
+  @override
+  String get cloudCollabManagePageSubtitle => 'Manage collaboration and permissions for this ledger';
+
+  @override
+  String get cloudCollabMembersEntryTitle => 'Members';
+
+  @override
+  String get cloudCollabMembersEntrySubtitle => 'View member list and roles';
+
+  @override
+  String get cloudCollabInvitesEntryTitle => 'Invite Codes';
+
+  @override
+  String get cloudCollabInvitesEntrySubtitle => 'Create and manage invite codes';
+
+  @override
+  String get cloudCollabDevicesEntryTitle => 'Device Sessions';
+
+  @override
+  String get cloudCollabDevicesEntrySubtitle => 'View and revoke active devices';
+
+  @override
+  String get cloudCollabJoinByCodeTitle => 'Join by Invite Code';
+
+  @override
+  String get cloudCollabJoinByCodeSubtitle => 'Join another shared ledger';
+
+  @override
+  String get cloudCollabJoinByCodeHint => 'e.g. abcDEF123';
+
+  @override
+  String get cloudCollabJoinSuccessTitle => 'Joined';
+
+  @override
+  String get cloudCollabJoinSuccessMessage => 'Joined shared ledger successfully. Go back to ledger list to view it.';
+
+  @override
+  String get cloudCollabLeaveTitle => 'Leave Shared Ledger';
+
+  @override
+  String get cloudCollabLeaveSubtitle => 'Only non-owner members can leave';
+
+  @override
+  String get cloudCollabLeaveOwnerBlocked => 'Owner cannot leave this ledger.';
+
+  @override
+  String get cloudCollabLeaveConfirm => 'Are you sure you want to leave this shared ledger?';
+
+  @override
+  String get cloudCollabLeaveDoneTitle => 'Left';
+
+  @override
+  String get cloudCollabLeaveDoneMessage => 'You have left this shared ledger.';
+
+  @override
+  String get cloudCollabMembersPageTitle => 'Shared Members';
+
+  @override
+  String get cloudCollabMembersPageSubtitle => 'View member roles in current ledger';
+
+  @override
+  String get cloudCollabLegacyViewerHint => 'Legacy viewer members are read-only for compatibility.';
+
+  @override
+  String get cloudCollabManagedInBackendTitle => 'Managed in Backend';
+
+  @override
+  String get cloudCollabManagedInBackendHint => 'Add/remove members and share settings are managed in BeeCount Web.';
+
+  @override
+  String get cloudCollabNoMembers => 'No members in current ledger';
+
+  @override
+  String cloudCollabJoinedAt(String time) {
+    return 'Joined: $time';
+  }
+
+  @override
+  String get cloudCollabRoleUpdateSuccess => 'Role updated';
+
+  @override
+  String get cloudCollabUpgradeViewerToEditor => 'Upgrade to Editor';
+
+  @override
+  String get cloudCollabInvitesPageTitle => 'Invite Codes';
+
+  @override
+  String get cloudCollabInvitesPageSubtitle => 'Create and manage shared invite codes';
+
+  @override
+  String get cloudCollabNoInvites => 'No invite codes';
+
+  @override
+  String get cloudCollabOwnerOnlyHint => 'Only owner can manage invite codes.';
+
+  @override
+  String get cloudCollabInviteRoleTitle => 'Invite Role';
+
+  @override
+  String get cloudCollabInviteRoleHint => 'editor only';
+
+  @override
+  String get cloudCollabRoleInvalidTitle => 'Invalid Role';
+
+  @override
+  String get cloudCollabRoleInvalidMessage => 'Only editor is allowed.';
+
+  @override
+  String get cloudCollabInviteMaxUsesTitle => 'Max Uses';
+
+  @override
+  String get cloudCollabInviteMaxUsesHint => 'Enter a positive integer';
+
+  @override
+  String get cloudCollabInviteMaxUsesInvalidTitle => 'Invalid Max Uses';
+
+  @override
+  String get cloudCollabInviteMaxUsesInvalidMessage => 'Please enter an integer greater than 0.';
+
+  @override
+  String get cloudCollabInviteExpiresHoursTitle => 'Expires In (Hours)';
+
+  @override
+  String get cloudCollabInviteExpiresHoursHint => 'Enter a positive integer';
+
+  @override
+  String get cloudCollabInviteExpiresHoursInvalidTitle => 'Invalid Expiration';
+
+  @override
+  String get cloudCollabInviteExpiresHoursInvalidMessage => 'Please enter an integer greater than 0.';
+
+  @override
+  String get cloudCollabInviteCreatedTitle => 'Invite Code Created';
+
+  @override
+  String cloudCollabInviteCreatedDetail(String inviteCode, String inviteId, String role, String expiresAt) {
+    return 'Invite code: $inviteCode\nInvite ID: $inviteId\nRole: $role\nExpires: $expiresAt';
+  }
+
+  @override
+  String get cloudCollabCopyInviteCode => 'Copy Code';
+
+  @override
+  String get cloudCollabInviteCodeCopied => 'Invite code copied';
+
+  @override
+  String get cloudCollabInviteStatusActive => 'Active';
+
+  @override
+  String get cloudCollabInviteStatusExpired => 'Expired';
+
+  @override
+  String get cloudCollabInviteStatusExhausted => 'Exhausted';
+
+  @override
+  String get cloudCollabInviteStatusRevoked => 'Revoked';
+
+  @override
+  String cloudCollabInviteUsed(String text) {
+    return 'Used: $text';
+  }
+
+  @override
+  String cloudCollabInviteExpiresAt(String time) {
+    return 'Expires: $time';
+  }
+
+  @override
+  String get cloudCollabInviteRevokeTitle => 'Revoke Invite';
+
+  @override
+  String cloudCollabInviteRevokeMessage(String inviteId) {
+    return 'Revoke invite $inviteId?';
+  }
+
+  @override
+  String get cloudCollabInviteRevoked => 'Invite revoked';
+
+  @override
+  String get cloudCollabDevicesPageTitle => 'Device Sessions';
+
+  @override
+  String get cloudCollabDevicesPageSubtitle => 'Manage active devices';
+
+  @override
+  String get cloudCollabDevicesViewAllSessions => 'Show all sessions';
+
+  @override
+  String get cloudCollabDevicesViewModeHint => 'Default view shows deduped devices active in the last 30 days.';
+
+  @override
+  String get cloudCollabNoDevices => 'No active devices';
+
+  @override
+  String get cloudCollabUnknownDeviceName => 'Unknown Device';
+
+  @override
+  String get cloudCollabDeviceCurrentTag => 'Current Device';
+
+  @override
+  String get cloudCollabCurrentDeviceCannotRevoke => 'Current device cannot be revoked.';
+
+  @override
+  String cloudCollabDeviceAppVersion(String version) {
+    return 'App: $version';
+  }
+
+  @override
+  String cloudCollabDeviceOsVersion(String version) {
+    return 'OS: $version';
+  }
+
+  @override
+  String cloudCollabDeviceModel(String model) {
+    return 'Model: $model';
+  }
+
+  @override
+  String cloudCollabDeviceLastIp(String ip) {
+    return 'IP: $ip';
+  }
+
+  @override
+  String cloudCollabDeviceSessionCount(String count) {
+    return 'Sessions: $count';
+  }
+
+  @override
+  String cloudCollabDeviceLastSeen(String time) {
+    return 'Last seen: $time';
+  }
+
+  @override
+  String cloudCollabDeviceCreatedAt(String time) {
+    return 'Created: $time';
+  }
+
+  @override
+  String get cloudCollabDeviceRevokeTitle => 'Revoke Device';
+
+  @override
+  String cloudCollabDeviceRevokeMessage(String name, String id) {
+    return 'Revoke device $name ($id)?';
+  }
+
+  @override
+  String cloudCollabDeviceRevokeMultipleMessage(String name, String count) {
+    return 'Revoke $count sessions for device $name?';
+  }
+
+  @override
+  String get cloudCollabDeviceRevoked => 'Device revoked';
+
+  @override
+  String get cloudCollabManageBlockedTitle => 'Permission Required';
+
+  @override
+  String get cloudCollabManageBlockedMessage => 'Only owner can manage this shared ledger.';
+
+  @override
+  String get cloudCollabUnavailableMessage => 'Cloud collaboration is unavailable.';
+
+  @override
+  String get cloudCollabScopeDeniedTitle => 'Collaboration Scope Disabled';
+
+  @override
+  String get cloudCollabScopeDeniedHint => 'Server has not enabled ALLOW_APP_RW_SCOPES, so device sessions and collaboration read APIs are unavailable.';
+
+  @override
+  String get cloudCollabScopeDeniedAction => 'Set ALLOW_APP_RW_SCOPES=true in server .env (or deployment env), restart the service, then sign in again in app.';
+
+  @override
+  String get cloudCollabEntryMovedHint => 'Ledger collaboration entry has moved to the Ledger Management page.';
+
+  @override
+  String get cloudCollabMediaRetryHint => 'Manual upload/download also retries missing attachment and category icon files.';
+
+  @override
+  String get cloudCollabMediaRetryPartialTitle => 'Media Sync Partially Completed';
+
+  @override
+  String cloudCollabMediaRetryPartialMessage(String downloaded, String failed) {
+    return 'Downloaded $downloaded media files, $failed files still failed. You can retry manual sync later.';
+  }
+
+  @override
+  String cloudCollabMediaRetrySuccess(String count) {
+    return 'Recovered $count missing media files.';
+  }
+
+  @override
+  String get cloudCollabMediaRetryFailedTitle => 'Media Retry Failed';
+
+  @override
+  String cloudCollabMediaRetryFailedMessage(String error) {
+    return 'Failed to retry media sync: $error';
+  }
+
+  @override
+  String get cloudCollabUnknownMember => 'Unknown member';
+
+  @override
+  String get cloudCollabMemberStatusActive => 'active';
+
+  @override
+  String get cloudCollabMemberStatusLeft => 'left';
+
+  @override
+  String cloudCollabMembersCount(String count) {
+    return '$count members';
+  }
+
+  @override
+  String get cloudCollabCreatorLabel => 'Created by';
+
+  @override
+  String get cloudCollabCreatorLoading => 'Loading creator...';
+
+  @override
+  String get cloudCollabWriteDeniedMessage => 'Your current role cannot write in this shared ledger.';
+
+  @override
+  String get cloudCollabEditDeniedMessage => 'Your current role cannot edit this transaction.';
+
+  @override
+  String get cloudCollabManageDeniedMessage => 'Your current role cannot manage this shared ledger.';
+
+  @override
+  String get cloudCollabDeleteDeniedMessage => 'Your current role cannot delete this transaction.';
+
+  @override
+  String cloudCollabUploadQueuePending(String count) {
+    return '$count changes pending upload';
+  }
+
+  @override
+  String cloudCollabUploadQueueFailed(String count) {
+    return '$count changes failed, tap upload to retry';
+  }
+
+  @override
+  String cloudCollabUploadQueueFailedToast(String count) {
+    return 'Auto upload failed for $count changes, open Cloud Sync to retry.';
+  }
+
+  @override
+  String get cloudCollabAvatarUploadSuccess => 'Avatar synced to cloud.';
+
+  @override
+  String get cloudCollabAvatarUploadFailed => 'Avatar upload failed. You can retry in Cloud Sync.';
+
+  @override
+  String get cloudCollabAvatarRetryTitle => 'Retry avatar upload';
+
+  @override
+  String get cloudCollabAvatarRetrySubtitle => 'Tap to retry syncing your avatar to BeeCount Cloud.';
+
+  @override
+  String get cloudCollabDiagnosticsTitle => 'Collaboration diagnostics';
+
+  @override
+  String get cloudCollabDiagnosticsSubtitle => 'Copy ledger/scope/device details for self-host troubleshooting.';
+
+  @override
+  String get cloudCollabDiagnosticsCopied => 'Diagnostics copied.';
 }

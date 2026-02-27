@@ -7,6 +7,7 @@ import '../../l10n/app_localizations.dart';
 import '../../styles/tokens.dart';
 import '../../services/billing/post_processor.dart';
 import '../../services/attachment_service.dart';
+import '../../utils/transaction_edit_utils.dart';
 import '../biz/amount_editor_sheet.dart';
 import '../ui/ui.dart';
 
@@ -125,10 +126,27 @@ class _TransferFormState extends ConsumerState<TransferForm> {
         onSubmit: (result) async {
           final attachmentService = ref.read(attachmentServiceProvider);
           // 获取虚拟转账分类ID
-          final transferCategory = await ref.read(transferCategoryProvider.future);
+          final transferCategory =
+              await ref.read(transferCategoryProvider.future);
           final transferCategoryId = transferCategory.id;
 
           try {
+            final allowed = widget.editingTransactionId == null
+                ? await TransactionEditUtils.canWriteLedger(
+                    context,
+                    ref,
+                    ledgerId: ledgerId,
+                  )
+                : await TransactionEditUtils.canModifyTransactionById(
+                    context,
+                    ref,
+                    ledgerId: ledgerId,
+                    transactionId: widget.editingTransactionId!,
+                  );
+            if (!allowed) {
+              return;
+            }
+
             if (widget.editingTransactionId != null) {
               // 编辑模式：更新现有转账记录
               await repo.updateTransaction(
@@ -155,7 +173,8 @@ class _TransferFormState extends ConsumerState<TransferForm> {
                 ref.read(tagListRefreshProvider.notifier).state++;
               } else {
                 // 编辑模式：如果没有选择标签，清除原有标签
-                await repo.removeAllTagsFromTransaction(widget.editingTransactionId!);
+                await repo
+                    .removeAllTagsFromTransaction(widget.editingTransactionId!);
                 ref.read(tagListRefreshProvider.notifier).state++;
               }
 
@@ -341,9 +360,8 @@ class _TransferFormState extends ConsumerState<TransferForm> {
       itemCount: accounts.length,
       itemBuilder: (context, index) {
         final account = accounts[index];
-        final isSelected = isFrom
-            ? _fromAccountId == account.id
-            : _toAccountId == account.id;
+        final isSelected =
+            isFrom ? _fromAccountId == account.id : _toAccountId == account.id;
 
         return _buildAccountCard(account, isSelected, isFrom, primary);
       },
