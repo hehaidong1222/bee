@@ -51,6 +51,8 @@ class Categories extends Table {
       const Constant('material'))(); // material / custom / community
   TextColumn get customIconPath => text().nullable()(); // 自定义图标本地路径
   TextColumn get communityIconId => text().nullable()(); // 社区图标ID（预留）
+  // v16: 命名空间隔离 — 共享账本分类绑定到特定账本，null=全局
+  IntColumn get ledgerId => integer().nullable()();
 }
 
 class Transactions extends Table {
@@ -126,6 +128,8 @@ class Tags extends Table {
   TextColumn get color => text().nullable()(); // 颜色值（如 #FF5722）
   IntColumn get sortOrder => integer().withDefault(const Constant(0))(); // 排序
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  // v16: 命名空间隔离 — 共享账本标签绑定到特定账本，null=全局
+  IntColumn get ledgerId => integer().nullable()();
 }
 
 // 交易-标签关联表
@@ -197,13 +201,14 @@ class BeeDatabase extends _$BeeDatabase {
   BeeDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 15; // v15: 协作同步 syncId 与增量队列模型
+  int get schemaVersion => 16; // v16: 分类/标签命名空间隔离（ledger_id）
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (migrator) async {
           await migrator.createAll();
           await CollabSyncMigrationService.initializeFreshSchemaV15(this);
+          // v16 columns are part of table definition, no extra init needed for fresh installs
         },
         onUpgrade: (migrator, from, to) async {
           if (from < 2) {
@@ -482,6 +487,16 @@ class BeeDatabase extends _$BeeDatabase {
             );
             logger.info('DB', 'v15 迁移完成: syncId/queue/state 已就绪');
             print('[DB Migration] v15 迁移完成');
+          }
+          if (from < 16) {
+            print('[DB Migration] 开始迁移到 v16: 分类/标签命名空间隔离');
+            await CollabSyncMigrationService.migrateSchemaV16(
+              this,
+              fromSchema: from,
+              toSchema: 16,
+            );
+            logger.info('DB', 'v16 迁移完成: 分类/标签 ledger_id 已就绪');
+            print('[DB Migration] v16 迁移完成');
           }
         },
       );

@@ -81,9 +81,19 @@ class _AccountEditPageState extends ConsumerState<AccountEditPage> {
 
     final repo = ref.read(repositoryProvider);
     final allAccounts = await repo.getAllAccounts();
+    // 共享账本上下文中只检查同账本内的账户
+    final currentLedger = ref.read(currentLedgerProvider).valueOrNull;
+    final scopedLedgerId =
+        (currentLedger != null && currentLedger.type == 'shared')
+            ? currentLedger.id
+            : null;
     final isDuplicate = allAccounts.any((account) {
       // 如果是编辑模式，排除当前账户本身
       if (isEditing && account.id == widget.account!.id) {
+        return false;
+      }
+      // 共享账本只检查同账本内的账户
+      if (scopedLedgerId != null && account.ledgerId != scopedLedgerId) {
         return false;
       }
       return account.name == name.trim();

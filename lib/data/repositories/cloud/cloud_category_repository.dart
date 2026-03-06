@@ -151,14 +151,24 @@ class CloudCategoryRepository implements CategoryRepository {
   Future<int> upsertCategory({
     required String name,
     required String kind,
+    int? ledgerId,
   }) async {
     // 先查询是否存在
+    final filters = [
+      QueryFilter(column: 'name', operator: 'eq', value: name),
+      QueryFilter(column: 'kind', operator: 'eq', value: kind),
+    ];
+    if (ledgerId != null) {
+      filters.add(
+          QueryFilter(column: 'ledger_id', operator: 'eq', value: ledgerId));
+    } else {
+      filters.add(
+          QueryFilter(column: 'ledger_id', operator: 'is', value: null));
+    }
+
     final existing = await supabase.databaseService!.query(
       table: 'categories',
-      filters: [
-        QueryFilter(column: 'name', operator: 'eq', value: name),
-        QueryFilter(column: 'kind', operator: 'eq', value: kind),
-      ],
+      filters: filters,
       limit: 1,
     );
 
@@ -228,7 +238,9 @@ class CloudCategoryRepository implements CategoryRepository {
   Future<bool> isCategoryNameDuplicate({
     required String name,
     int? excludeId,
+    int? ledgerId,
   }) async {
+    // 云端暂不支持复杂 OR 查询，简单按名称检查
     final filters = [
       QueryFilter(column: 'name', operator: 'eq', value: name),
     ];

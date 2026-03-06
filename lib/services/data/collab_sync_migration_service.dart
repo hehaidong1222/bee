@@ -26,6 +26,50 @@ class CollabSyncMigrationService {
     await _backfillSyncId(db);
   }
 
+  static Future<void> migrateSchemaV16(
+    BeeDatabase db, {
+    required int fromSchema,
+    required int toSchema,
+  }) async {
+    await createPreMigrationBackup(
+      db,
+      fromSchema: fromSchema,
+      toSchema: toSchema,
+    );
+    await _ensureNamespaceColumns(db);
+  }
+
+  /// v16: 给 categories 和 tags 表添加 ledger_id 列，用于命名空间隔离
+  static Future<void> _ensureNamespaceColumns(BeeDatabase db) async {
+    await _ensureColumn(
+      db,
+      table: 'categories',
+      column: 'ledger_id',
+      sql: 'ALTER TABLE categories ADD COLUMN ledger_id INTEGER',
+    );
+    await _ensureColumn(
+      db,
+      table: 'tags',
+      column: 'ledger_id',
+      sql: 'ALTER TABLE tags ADD COLUMN ledger_id INTEGER',
+    );
+
+    // 索引：按 ledger_id 查询
+    await db.customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_categories_ledger_id ON categories(ledger_id)',
+    );
+    await db.customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_tags_ledger_id ON tags(ledger_id)',
+    );
+    // 复合索引：按名称+类型+账本查重
+    await db.customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_categories_name_kind_ledger ON categories(name, kind, ledger_id)',
+    );
+    await db.customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_tags_name_ledger ON tags(name, ledger_id)',
+    );
+  }
+
   static Future<void> initializeFreshSchemaV15(BeeDatabase db) async {
     await _ensureSyncColumns(db);
     await _ensureSyncTables(db);

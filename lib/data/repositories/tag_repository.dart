@@ -124,9 +124,11 @@ abstract class TagRepository {
   // ============================================
 
   /// 检查标签名是否重复
+  /// [ledgerId] 命名空间隔离：null=仅检查全局，非null=检查该账本+全局
   Future<bool> isTagNameDuplicate({
     required String name,
     int? excludeId,
+    int? ledgerId,
   });
 
   /// 批量更新标签排序

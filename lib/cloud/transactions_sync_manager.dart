@@ -1742,8 +1742,9 @@ class TransactionsSyncManager implements SyncService {
             detail: detail,
           );
           await _upsertAccountsFromRead(ledgerId: id, rows: accounts);
-          await _upsertCategoriesFromRead(rows: categories);
-          await _upsertTagsFromRead(rows: tags);
+          await _upsertCategoriesFromRead(
+              rows: categories, scopedLedgerId: id);
+          await _upsertTagsFromRead(rows: tags, scopedLedgerId: id);
           await _upsertTransactionsFromRead(
             ledgerId: id,
             ledgerSyncId: ledgerSyncId,
@@ -1929,10 +1930,14 @@ class TransactionsSyncManager implements SyncService {
         table: 'accounts',
         syncId: syncId,
       );
-      localId ??= await _queryAccountIdByLedgerAndName(
-        ledgerId: ledgerId,
-        name: name,
-      );
+      // BeeCount Cloud 模式下禁用名称回退，避免多用户同名实体错误合并
+      if (localId == null &&
+          config.type != fcs.CloudBackendType.beecountCloud) {
+        localId = await _queryAccountIdByLedgerAndName(
+          ledgerId: ledgerId,
+          name: name,
+        );
+      }
       if (localId == null) {
         localId = await db.into(db.accounts).insert(
               AccountsCompanion.insert(
@@ -1972,6 +1977,7 @@ class TransactionsSyncManager implements SyncService {
 
   Future<void> _upsertCategoriesFromRead({
     required List<fcs.BeeCountCloudReadCategory> rows,
+    int? scopedLedgerId,
   }) async {
     final byKindAndName = <String, int>{};
     final pendingParents = <int, ({String kind, String parentName})>{};
@@ -1993,7 +1999,11 @@ class TransactionsSyncManager implements SyncService {
         table: 'categories',
         syncId: syncId,
       );
-      localId ??= await _queryCategoryIdByKindAndName(kind: kind, name: name);
+      // BeeCount Cloud 模式下禁用名称回退，避免多用户同名实体错误合并
+      if (localId == null &&
+          config.type != fcs.CloudBackendType.beecountCloud) {
+        localId = await _queryCategoryIdByKindAndName(kind: kind, name: name);
+      }
       if (localId == null) {
         localId = await db.into(db.categories).insert(
               CategoriesCompanion.insert(
@@ -2006,6 +2016,7 @@ class TransactionsSyncManager implements SyncService {
                 iconType: drift.Value(iconType),
                 customIconPath: drift.Value(_nullIfBlank(row.customIconPath)),
                 communityIconId: const drift.Value(null),
+                ledgerId: drift.Value(scopedLedgerId),
               ),
             );
       } else {
@@ -2031,6 +2042,14 @@ class TransactionsSyncManager implements SyncService {
         ''',
         [syncId, row.lastChangeId, _nullIfBlank(row.createdByUserId), localId],
       );
+
+      // 共享账本拉取的分类打上 ledger_id 标记
+      if (scopedLedgerId != null) {
+        await db.customStatement(
+          'UPDATE categories SET ledger_id = ? WHERE id = ? AND ledger_id IS NULL',
+          [scopedLedgerId, localId],
+        );
+      }
 
       byKindAndName[_kindNameKey(kind: kind, name: name)] = localId;
       final parentName = row.parentName?.trim() ?? '';
@@ -2059,6 +2078,7 @@ class TransactionsSyncManager implements SyncService {
 
   Future<void> _upsertTagsFromRead({
     required List<fcs.BeeCountCloudReadTag> rows,
+    int? scopedLedgerId,
   }) async {
     for (final row in rows) {
       final syncId = row.id.trim();
@@ -2070,12 +2090,17 @@ class TransactionsSyncManager implements SyncService {
         table: 'tags',
         syncId: syncId,
       );
-      localId ??= await _queryTagIdByName(name: name);
+      // BeeCount Cloud 模式下禁用名称回退，避免多用户同名实体错误合并
+      if (localId == null &&
+          config.type != fcs.CloudBackendType.beecountCloud) {
+        localId = await _queryTagIdByName(name: name);
+      }
       if (localId == null) {
         localId = await db.into(db.tags).insert(
               TagsCompanion.insert(
                 name: name,
                 color: drift.Value(_nullIfBlank(row.color)),
+                ledgerId: drift.Value(scopedLedgerId),
               ),
             );
       } else {
@@ -2095,6 +2120,14 @@ class TransactionsSyncManager implements SyncService {
         ''',
         [syncId, row.lastChangeId, _nullIfBlank(row.createdByUserId), localId],
       );
+
+      // 共享账本拉取的标签打上 ledger_id 标记
+      if (scopedLedgerId != null) {
+        await db.customStatement(
+          'UPDATE tags SET ledger_id = ? WHERE id = ? AND ledger_id IS NULL',
+          [scopedLedgerId, localId],
+        );
+      }
     }
   }
 
@@ -2319,7 +2352,11 @@ class TransactionsSyncManager implements SyncService {
         ? tx.categoryKind!.trim()
         : 'expense';
     if (name.isEmpty) return null;
-    var id = await _queryCategoryIdByKindAndName(kind: kind, name: name);
+    // BeeCount Cloud 模式下禁用名称回退
+    int? id;
+    if (config.type != fcs.CloudBackendType.beecountCloud) {
+      id = await _queryCategoryIdByKindAndName(kind: kind, name: name);
+    }
     id ??= await db.into(db.categories).insert(
           CategoriesCompanion.insert(
             name: name,
@@ -2355,10 +2392,14 @@ class TransactionsSyncManager implements SyncService {
     }
     final normalizedName = name?.trim() ?? '';
     if (normalizedName.isEmpty) return null;
-    var id = await _queryAccountIdByLedgerAndName(
-      ledgerId: ledgerId,
-      name: normalizedName,
-    );
+    // BeeCount Cloud 模式下禁用名称回退
+    int? id;
+    if (config.type != fcs.CloudBackendType.beecountCloud) {
+      id = await _queryAccountIdByLedgerAndName(
+        ledgerId: ledgerId,
+        name: normalizedName,
+      );
+    }
     id ??= await db.into(db.accounts).insert(
           AccountsCompanion.insert(
             ledgerId: ledgerId,
@@ -2391,7 +2432,11 @@ class TransactionsSyncManager implements SyncService {
     for (final tagName in tx.tagsList) {
       final normalizedName = tagName.trim();
       if (normalizedName.isEmpty) continue;
-      var id = await _queryTagIdByName(name: normalizedName);
+      // BeeCount Cloud 模式下禁用名称回退
+      int? id;
+      if (config.type != fcs.CloudBackendType.beecountCloud) {
+        id = await _queryTagIdByName(name: normalizedName);
+      }
       id ??= await db.into(db.tags).insert(
             TagsCompanion.insert(name: normalizedName),
           );

@@ -38,9 +38,11 @@ abstract class CategoryRepository {
   Future<void> deleteCategoriesByIds(List<int> ids);
 
   /// Upsert分类（根据名称和kind查找或创建）
+  /// [ledgerId] 命名空间隔离：非null时按该账本作用域查找
   Future<int> upsertCategory({
     required String name,
     required String kind,
+    int? ledgerId,
   });
 
   /// 根据ID获取分类
@@ -59,9 +61,11 @@ abstract class CategoryRepository {
   Future<List<Category>> getUsableCategories(String kind);
 
   /// 检查分类名称是否重复
+  /// [ledgerId] 命名空间隔离：null=仅检查全局，非null=检查该账本+全局
   Future<bool> isCategoryNameDuplicate({
     required String name,
     int? excludeId,
+    int? ledgerId,
   });
 
   /// 检查分类是否有子分类

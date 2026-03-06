@@ -785,6 +785,12 @@ class $CategoriesTable extends Categories
   late final GeneratedColumn<String> communityIconId = GeneratedColumn<String>(
       'community_icon_id', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _ledgerIdMeta =
+      const VerificationMeta('ledgerId');
+  @override
+  late final GeneratedColumn<int> ledgerId = GeneratedColumn<int>(
+      'ledger_id', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -796,7 +802,8 @@ class $CategoriesTable extends Categories
         level,
         iconType,
         customIconPath,
-        communityIconId
+        communityIconId,
+        ledgerId
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -855,6 +862,10 @@ class $CategoriesTable extends Categories
           communityIconId.isAcceptableOrUnknown(
               data['community_icon_id']!, _communityIconIdMeta));
     }
+    if (data.containsKey('ledger_id')) {
+      context.handle(_ledgerIdMeta,
+          ledgerId.isAcceptableOrUnknown(data['ledger_id']!, _ledgerIdMeta));
+    }
     return context;
   }
 
@@ -884,6 +895,8 @@ class $CategoriesTable extends Categories
           DriftSqlType.string, data['${effectivePrefix}custom_icon_path']),
       communityIconId: attachedDatabase.typeMapping.read(
           DriftSqlType.string, data['${effectivePrefix}community_icon_id']),
+      ledgerId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}ledger_id']),
     );
   }
 
@@ -904,6 +917,7 @@ class Category extends DataClass implements Insertable<Category> {
   final String iconType;
   final String? customIconPath;
   final String? communityIconId;
+  final int? ledgerId;
   const Category(
       {required this.id,
       required this.name,
@@ -914,7 +928,8 @@ class Category extends DataClass implements Insertable<Category> {
       required this.level,
       required this.iconType,
       this.customIconPath,
-      this.communityIconId});
+      this.communityIconId,
+      this.ledgerId});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -935,6 +950,9 @@ class Category extends DataClass implements Insertable<Category> {
     }
     if (!nullToAbsent || communityIconId != null) {
       map['community_icon_id'] = Variable<String>(communityIconId);
+    }
+    if (!nullToAbsent || ledgerId != null) {
+      map['ledger_id'] = Variable<int>(ledgerId);
     }
     return map;
   }
@@ -957,6 +975,9 @@ class Category extends DataClass implements Insertable<Category> {
       communityIconId: communityIconId == null && nullToAbsent
           ? const Value.absent()
           : Value(communityIconId),
+      ledgerId: ledgerId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ledgerId),
     );
   }
 
@@ -974,6 +995,7 @@ class Category extends DataClass implements Insertable<Category> {
       iconType: serializer.fromJson<String>(json['iconType']),
       customIconPath: serializer.fromJson<String?>(json['customIconPath']),
       communityIconId: serializer.fromJson<String?>(json['communityIconId']),
+      ledgerId: serializer.fromJson<int?>(json['ledgerId']),
     );
   }
   @override
@@ -990,6 +1012,7 @@ class Category extends DataClass implements Insertable<Category> {
       'iconType': serializer.toJson<String>(iconType),
       'customIconPath': serializer.toJson<String?>(customIconPath),
       'communityIconId': serializer.toJson<String?>(communityIconId),
+      'ledgerId': serializer.toJson<int?>(ledgerId),
     };
   }
 
@@ -1003,7 +1026,8 @@ class Category extends DataClass implements Insertable<Category> {
           int? level,
           String? iconType,
           Value<String?> customIconPath = const Value.absent(),
-          Value<String?> communityIconId = const Value.absent()}) =>
+          Value<String?> communityIconId = const Value.absent(),
+          Value<int?> ledgerId = const Value.absent()}) =>
       Category(
         id: id ?? this.id,
         name: name ?? this.name,
@@ -1018,6 +1042,7 @@ class Category extends DataClass implements Insertable<Category> {
         communityIconId: communityIconId.present
             ? communityIconId.value
             : this.communityIconId,
+        ledgerId: ledgerId.present ? ledgerId.value : this.ledgerId,
       );
   Category copyWithCompanion(CategoriesCompanion data) {
     return Category(
@@ -1035,6 +1060,7 @@ class Category extends DataClass implements Insertable<Category> {
       communityIconId: data.communityIconId.present
           ? data.communityIconId.value
           : this.communityIconId,
+      ledgerId: data.ledgerId.present ? data.ledgerId.value : this.ledgerId,
     );
   }
 
@@ -1050,14 +1076,15 @@ class Category extends DataClass implements Insertable<Category> {
           ..write('level: $level, ')
           ..write('iconType: $iconType, ')
           ..write('customIconPath: $customIconPath, ')
-          ..write('communityIconId: $communityIconId')
+          ..write('communityIconId: $communityIconId, ')
+          ..write('ledgerId: $ledgerId')
           ..write(')'))
         .toString();
   }
 
   @override
   int get hashCode => Object.hash(id, name, kind, icon, sortOrder, parentId,
-      level, iconType, customIconPath, communityIconId);
+      level, iconType, customIconPath, communityIconId, ledgerId);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1071,7 +1098,8 @@ class Category extends DataClass implements Insertable<Category> {
           other.level == this.level &&
           other.iconType == this.iconType &&
           other.customIconPath == this.customIconPath &&
-          other.communityIconId == this.communityIconId);
+          other.communityIconId == this.communityIconId &&
+          other.ledgerId == this.ledgerId);
 }
 
 class CategoriesCompanion extends UpdateCompanion<Category> {
@@ -1085,6 +1113,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
   final Value<String> iconType;
   final Value<String?> customIconPath;
   final Value<String?> communityIconId;
+  final Value<int?> ledgerId;
   const CategoriesCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
@@ -1096,6 +1125,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     this.iconType = const Value.absent(),
     this.customIconPath = const Value.absent(),
     this.communityIconId = const Value.absent(),
+    this.ledgerId = const Value.absent(),
   });
   CategoriesCompanion.insert({
     this.id = const Value.absent(),
@@ -1108,6 +1138,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     this.iconType = const Value.absent(),
     this.customIconPath = const Value.absent(),
     this.communityIconId = const Value.absent(),
+    this.ledgerId = const Value.absent(),
   })  : name = Value(name),
         kind = Value(kind);
   static Insertable<Category> custom({
@@ -1121,6 +1152,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     Expression<String>? iconType,
     Expression<String>? customIconPath,
     Expression<String>? communityIconId,
+    Expression<int>? ledgerId,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1133,6 +1165,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
       if (iconType != null) 'icon_type': iconType,
       if (customIconPath != null) 'custom_icon_path': customIconPath,
       if (communityIconId != null) 'community_icon_id': communityIconId,
+      if (ledgerId != null) 'ledger_id': ledgerId,
     });
   }
 
@@ -1146,7 +1179,8 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
       Value<int>? level,
       Value<String>? iconType,
       Value<String?>? customIconPath,
-      Value<String?>? communityIconId}) {
+      Value<String?>? communityIconId,
+      Value<int?>? ledgerId}) {
     return CategoriesCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
@@ -1158,6 +1192,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
       iconType: iconType ?? this.iconType,
       customIconPath: customIconPath ?? this.customIconPath,
       communityIconId: communityIconId ?? this.communityIconId,
+      ledgerId: ledgerId ?? this.ledgerId,
     );
   }
 
@@ -1194,6 +1229,9 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     if (communityIconId.present) {
       map['community_icon_id'] = Variable<String>(communityIconId.value);
     }
+    if (ledgerId.present) {
+      map['ledger_id'] = Variable<int>(ledgerId.value);
+    }
     return map;
   }
 
@@ -1209,7 +1247,8 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
           ..write('level: $level, ')
           ..write('iconType: $iconType, ')
           ..write('customIconPath: $customIconPath, ')
-          ..write('communityIconId: $communityIconId')
+          ..write('communityIconId: $communityIconId, ')
+          ..write('ledgerId: $ledgerId')
           ..write(')'))
         .toString();
   }
@@ -3369,8 +3408,15 @@ class $TagsTable extends Tags with TableInfo<$TagsTable, Tag> {
       type: DriftSqlType.dateTime,
       requiredDuringInsert: false,
       defaultValue: currentDateAndTime);
+  static const VerificationMeta _ledgerIdMeta =
+      const VerificationMeta('ledgerId');
   @override
-  List<GeneratedColumn> get $columns => [id, name, color, sortOrder, createdAt];
+  late final GeneratedColumn<int> ledgerId = GeneratedColumn<int>(
+      'ledger_id', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [id, name, color, sortOrder, createdAt, ledgerId];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -3402,6 +3448,10 @@ class $TagsTable extends Tags with TableInfo<$TagsTable, Tag> {
       context.handle(_createdAtMeta,
           createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
     }
+    if (data.containsKey('ledger_id')) {
+      context.handle(_ledgerIdMeta,
+          ledgerId.isAcceptableOrUnknown(data['ledger_id']!, _ledgerIdMeta));
+    }
     return context;
   }
 
@@ -3421,6 +3471,8 @@ class $TagsTable extends Tags with TableInfo<$TagsTable, Tag> {
           .read(DriftSqlType.int, data['${effectivePrefix}sort_order'])!,
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+      ledgerId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}ledger_id']),
     );
   }
 
@@ -3436,12 +3488,14 @@ class Tag extends DataClass implements Insertable<Tag> {
   final String? color;
   final int sortOrder;
   final DateTime createdAt;
+  final int? ledgerId;
   const Tag(
       {required this.id,
       required this.name,
       this.color,
       required this.sortOrder,
-      required this.createdAt});
+      required this.createdAt,
+      this.ledgerId});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -3452,6 +3506,9 @@ class Tag extends DataClass implements Insertable<Tag> {
     }
     map['sort_order'] = Variable<int>(sortOrder);
     map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || ledgerId != null) {
+      map['ledger_id'] = Variable<int>(ledgerId);
+    }
     return map;
   }
 
@@ -3463,6 +3520,9 @@ class Tag extends DataClass implements Insertable<Tag> {
           color == null && nullToAbsent ? const Value.absent() : Value(color),
       sortOrder: Value(sortOrder),
       createdAt: Value(createdAt),
+      ledgerId: ledgerId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ledgerId),
     );
   }
 
@@ -3475,6 +3535,7 @@ class Tag extends DataClass implements Insertable<Tag> {
       color: serializer.fromJson<String?>(json['color']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      ledgerId: serializer.fromJson<int?>(json['ledgerId']),
     );
   }
   @override
@@ -3486,6 +3547,7 @@ class Tag extends DataClass implements Insertable<Tag> {
       'color': serializer.toJson<String?>(color),
       'sortOrder': serializer.toJson<int>(sortOrder),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'ledgerId': serializer.toJson<int?>(ledgerId),
     };
   }
 
@@ -3494,13 +3556,15 @@ class Tag extends DataClass implements Insertable<Tag> {
           String? name,
           Value<String?> color = const Value.absent(),
           int? sortOrder,
-          DateTime? createdAt}) =>
+          DateTime? createdAt,
+          Value<int?> ledgerId = const Value.absent()}) =>
       Tag(
         id: id ?? this.id,
         name: name ?? this.name,
         color: color.present ? color.value : this.color,
         sortOrder: sortOrder ?? this.sortOrder,
         createdAt: createdAt ?? this.createdAt,
+        ledgerId: ledgerId.present ? ledgerId.value : this.ledgerId,
       );
   Tag copyWithCompanion(TagsCompanion data) {
     return Tag(
@@ -3509,6 +3573,7 @@ class Tag extends DataClass implements Insertable<Tag> {
       color: data.color.present ? data.color.value : this.color,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      ledgerId: data.ledgerId.present ? data.ledgerId.value : this.ledgerId,
     );
   }
 
@@ -3519,13 +3584,15 @@ class Tag extends DataClass implements Insertable<Tag> {
           ..write('name: $name, ')
           ..write('color: $color, ')
           ..write('sortOrder: $sortOrder, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('ledgerId: $ledgerId')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, color, sortOrder, createdAt);
+  int get hashCode =>
+      Object.hash(id, name, color, sortOrder, createdAt, ledgerId);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -3534,7 +3601,8 @@ class Tag extends DataClass implements Insertable<Tag> {
           other.name == this.name &&
           other.color == this.color &&
           other.sortOrder == this.sortOrder &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.ledgerId == this.ledgerId);
 }
 
 class TagsCompanion extends UpdateCompanion<Tag> {
@@ -3543,12 +3611,14 @@ class TagsCompanion extends UpdateCompanion<Tag> {
   final Value<String?> color;
   final Value<int> sortOrder;
   final Value<DateTime> createdAt;
+  final Value<int?> ledgerId;
   const TagsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.color = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.ledgerId = const Value.absent(),
   });
   TagsCompanion.insert({
     this.id = const Value.absent(),
@@ -3556,6 +3626,7 @@ class TagsCompanion extends UpdateCompanion<Tag> {
     this.color = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.ledgerId = const Value.absent(),
   }) : name = Value(name);
   static Insertable<Tag> custom({
     Expression<int>? id,
@@ -3563,6 +3634,7 @@ class TagsCompanion extends UpdateCompanion<Tag> {
     Expression<String>? color,
     Expression<int>? sortOrder,
     Expression<DateTime>? createdAt,
+    Expression<int>? ledgerId,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -3570,6 +3642,7 @@ class TagsCompanion extends UpdateCompanion<Tag> {
       if (color != null) 'color': color,
       if (sortOrder != null) 'sort_order': sortOrder,
       if (createdAt != null) 'created_at': createdAt,
+      if (ledgerId != null) 'ledger_id': ledgerId,
     });
   }
 
@@ -3578,13 +3651,15 @@ class TagsCompanion extends UpdateCompanion<Tag> {
       Value<String>? name,
       Value<String?>? color,
       Value<int>? sortOrder,
-      Value<DateTime>? createdAt}) {
+      Value<DateTime>? createdAt,
+      Value<int?>? ledgerId}) {
     return TagsCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
       color: color ?? this.color,
       sortOrder: sortOrder ?? this.sortOrder,
       createdAt: createdAt ?? this.createdAt,
+      ledgerId: ledgerId ?? this.ledgerId,
     );
   }
 
@@ -3606,6 +3681,9 @@ class TagsCompanion extends UpdateCompanion<Tag> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (ledgerId.present) {
+      map['ledger_id'] = Variable<int>(ledgerId.value);
+    }
     return map;
   }
 
@@ -3616,7 +3694,8 @@ class TagsCompanion extends UpdateCompanion<Tag> {
           ..write('name: $name, ')
           ..write('color: $color, ')
           ..write('sortOrder: $sortOrder, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('ledgerId: $ledgerId')
           ..write(')'))
         .toString();
   }
@@ -5231,6 +5310,7 @@ typedef $$CategoriesTableCreateCompanionBuilder = CategoriesCompanion Function({
   Value<String> iconType,
   Value<String?> customIconPath,
   Value<String?> communityIconId,
+  Value<int?> ledgerId,
 });
 typedef $$CategoriesTableUpdateCompanionBuilder = CategoriesCompanion Function({
   Value<int> id,
@@ -5243,6 +5323,7 @@ typedef $$CategoriesTableUpdateCompanionBuilder = CategoriesCompanion Function({
   Value<String> iconType,
   Value<String?> customIconPath,
   Value<String?> communityIconId,
+  Value<int?> ledgerId,
 });
 
 class $$CategoriesTableFilterComposer
@@ -5285,6 +5366,9 @@ class $$CategoriesTableFilterComposer
   ColumnFilters<String> get communityIconId => $composableBuilder(
       column: $table.communityIconId,
       builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get ledgerId => $composableBuilder(
+      column: $table.ledgerId, builder: (column) => ColumnFilters(column));
 }
 
 class $$CategoriesTableOrderingComposer
@@ -5327,6 +5411,9 @@ class $$CategoriesTableOrderingComposer
   ColumnOrderings<String> get communityIconId => $composableBuilder(
       column: $table.communityIconId,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get ledgerId => $composableBuilder(
+      column: $table.ledgerId, builder: (column) => ColumnOrderings(column));
 }
 
 class $$CategoriesTableAnnotationComposer
@@ -5367,6 +5454,9 @@ class $$CategoriesTableAnnotationComposer
 
   GeneratedColumn<String> get communityIconId => $composableBuilder(
       column: $table.communityIconId, builder: (column) => column);
+
+  GeneratedColumn<int> get ledgerId =>
+      $composableBuilder(column: $table.ledgerId, builder: (column) => column);
 }
 
 class $$CategoriesTableTableManager extends RootTableManager<
@@ -5402,6 +5492,7 @@ class $$CategoriesTableTableManager extends RootTableManager<
             Value<String> iconType = const Value.absent(),
             Value<String?> customIconPath = const Value.absent(),
             Value<String?> communityIconId = const Value.absent(),
+            Value<int?> ledgerId = const Value.absent(),
           }) =>
               CategoriesCompanion(
             id: id,
@@ -5414,6 +5505,7 @@ class $$CategoriesTableTableManager extends RootTableManager<
             iconType: iconType,
             customIconPath: customIconPath,
             communityIconId: communityIconId,
+            ledgerId: ledgerId,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -5426,6 +5518,7 @@ class $$CategoriesTableTableManager extends RootTableManager<
             Value<String> iconType = const Value.absent(),
             Value<String?> customIconPath = const Value.absent(),
             Value<String?> communityIconId = const Value.absent(),
+            Value<int?> ledgerId = const Value.absent(),
           }) =>
               CategoriesCompanion.insert(
             id: id,
@@ -5438,6 +5531,7 @@ class $$CategoriesTableTableManager extends RootTableManager<
             iconType: iconType,
             customIconPath: customIconPath,
             communityIconId: communityIconId,
+            ledgerId: ledgerId,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
@@ -6466,6 +6560,7 @@ typedef $$TagsTableCreateCompanionBuilder = TagsCompanion Function({
   Value<String?> color,
   Value<int> sortOrder,
   Value<DateTime> createdAt,
+  Value<int?> ledgerId,
 });
 typedef $$TagsTableUpdateCompanionBuilder = TagsCompanion Function({
   Value<int> id,
@@ -6473,6 +6568,7 @@ typedef $$TagsTableUpdateCompanionBuilder = TagsCompanion Function({
   Value<String?> color,
   Value<int> sortOrder,
   Value<DateTime> createdAt,
+  Value<int?> ledgerId,
 });
 
 class $$TagsTableFilterComposer extends Composer<_$BeeDatabase, $TagsTable> {
@@ -6497,6 +6593,9 @@ class $$TagsTableFilterComposer extends Composer<_$BeeDatabase, $TagsTable> {
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get ledgerId => $composableBuilder(
+      column: $table.ledgerId, builder: (column) => ColumnFilters(column));
 }
 
 class $$TagsTableOrderingComposer extends Composer<_$BeeDatabase, $TagsTable> {
@@ -6521,6 +6620,9 @@ class $$TagsTableOrderingComposer extends Composer<_$BeeDatabase, $TagsTable> {
 
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get ledgerId => $composableBuilder(
+      column: $table.ledgerId, builder: (column) => ColumnOrderings(column));
 }
 
 class $$TagsTableAnnotationComposer
@@ -6546,6 +6648,9 @@ class $$TagsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<int> get ledgerId =>
+      $composableBuilder(column: $table.ledgerId, builder: (column) => column);
 }
 
 class $$TagsTableTableManager extends RootTableManager<
@@ -6576,6 +6681,7 @@ class $$TagsTableTableManager extends RootTableManager<
             Value<String?> color = const Value.absent(),
             Value<int> sortOrder = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
+            Value<int?> ledgerId = const Value.absent(),
           }) =>
               TagsCompanion(
             id: id,
@@ -6583,6 +6689,7 @@ class $$TagsTableTableManager extends RootTableManager<
             color: color,
             sortOrder: sortOrder,
             createdAt: createdAt,
+            ledgerId: ledgerId,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -6590,6 +6697,7 @@ class $$TagsTableTableManager extends RootTableManager<
             Value<String?> color = const Value.absent(),
             Value<int> sortOrder = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
+            Value<int?> ledgerId = const Value.absent(),
           }) =>
               TagsCompanion.insert(
             id: id,
@@ -6597,6 +6705,7 @@ class $$TagsTableTableManager extends RootTableManager<
             color: color,
             sortOrder: sortOrder,
             createdAt: createdAt,
+            ledgerId: ledgerId,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

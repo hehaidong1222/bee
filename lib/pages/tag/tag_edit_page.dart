@@ -246,10 +246,16 @@ class _TagEditPageState extends ConsumerState<TagEditPage> {
     final l10n = AppLocalizations.of(context);
     final repo = ref.read(repositoryProvider);
 
-    // 检查名称是否重复
+    // 检查名称是否重复（共享账本按账本作用域检查）
+    final currentLedger = ref.read(currentLedgerProvider).valueOrNull;
+    final scopedLedgerId =
+        (currentLedger != null && currentLedger.type == 'shared')
+            ? currentLedger.id
+            : null;
     final isDuplicate = await repo.isTagNameDuplicate(
       name: name,
       excludeId: widget.tag?.id,
+      ledgerId: scopedLedgerId,
     );
 
     if (isDuplicate) {

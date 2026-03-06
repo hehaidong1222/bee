@@ -340,10 +340,12 @@ class CloudRepository extends BaseRepository {
   Future<int> upsertCategory({
     required String name,
     required String kind,
+    int? ledgerId,
   }) =>
       _category.upsertCategory(
         name: name,
         kind: kind,
+        ledgerId: ledgerId,
       );
 
   @override
@@ -371,10 +373,12 @@ class CloudRepository extends BaseRepository {
   Future<bool> isCategoryNameDuplicate({
     required String name,
     int? excludeId,
+    int? ledgerId,
   }) =>
       _category.isCategoryNameDuplicate(
         name: name,
         excludeId: excludeId,
+        ledgerId: ledgerId,
       );
 
   @override
@@ -1183,7 +1187,8 @@ class CloudRepository extends BaseRepository {
   }
 
   @override
-  Future<bool> isTagNameDuplicate({required String name, int? excludeId}) async {
+  Future<bool> isTagNameDuplicate(
+      {required String name, int? excludeId, int? ledgerId}) async {
     throw UnimplementedError('标签功能在云端模式下暂不可用');
   }
 

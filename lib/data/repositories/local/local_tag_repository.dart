@@ -438,11 +438,22 @@ class LocalTagRepository implements TagRepository {
   Future<bool> isTagNameDuplicate({
     required String name,
     int? excludeId,
+    int? ledgerId,
   }) async {
     var expression = db.tags.name.equals(name);
 
     if (excludeId != null) {
       expression = expression & db.tags.id.equals(excludeId).not();
+    }
+
+    // 命名空间隔离：
+    // ledgerId != null → 检查该账本 + 全局（ledger_id=? OR ledger_id IS NULL）
+    // ledgerId == null → 仅检查全局（ledger_id IS NULL）
+    if (ledgerId != null) {
+      expression = expression &
+          (db.tags.ledgerId.equals(ledgerId) | db.tags.ledgerId.isNull());
+    } else {
+      expression = expression & db.tags.ledgerId.isNull();
     }
 
     final query = db.select(db.tags)..where((t) => expression);

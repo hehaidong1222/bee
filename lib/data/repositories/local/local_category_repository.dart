@@ -91,13 +91,24 @@ class LocalCategoryRepository implements CategoryRepository {
   Future<int> upsertCategory({
     required String name,
     required String kind,
+    int? ledgerId,
   }) async {
+    d.Expression<bool> condition =
+        db.categories.name.equals(name) & db.categories.kind.equals(kind);
+    if (ledgerId != null) {
+      condition = condition & db.categories.ledgerId.equals(ledgerId);
+    } else {
+      condition = condition & db.categories.ledgerId.isNull();
+    }
     final existing = await (db.select(db.categories)
-          ..where((c) => c.name.equals(name) & c.kind.equals(kind)))
+          ..where((c) => condition))
         .getSingleOrNull();
     if (existing != null) return existing.id;
     return db.into(db.categories).insert(CategoriesCompanion.insert(
-        name: name, kind: kind, icon: const d.Value(null)));
+        name: name,
+        kind: kind,
+        icon: const d.Value(null),
+        ledgerId: d.Value(ledgerId)));
   }
 
   @override
@@ -136,11 +147,23 @@ class LocalCategoryRepository implements CategoryRepository {
   Future<bool> isCategoryNameDuplicate({
     required String name,
     int? excludeId,
+    int? ledgerId,
   }) async {
     var expression = db.categories.name.equals(name);
 
     if (excludeId != null) {
       expression = expression & db.categories.id.equals(excludeId).not();
+    }
+
+    // 命名空间隔离：
+    // ledgerId != null → 检查该账本 + 全局（ledger_id=? OR ledger_id IS NULL）
+    // ledgerId == null → 仅检查全局（ledger_id IS NULL）
+    if (ledgerId != null) {
+      expression = expression &
+          (db.categories.ledgerId.equals(ledgerId) |
+              db.categories.ledgerId.isNull());
+    } else {
+      expression = expression & db.categories.ledgerId.isNull();
     }
 
     final query = db.select(db.categories)..where((c) => expression);

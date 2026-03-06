@@ -604,8 +604,10 @@ class LocalRepository extends BaseRepository {
       _categoryRepo.deleteCategoriesByIds(ids);
 
   @override
-  Future<int> upsertCategory({required String name, required String kind}) =>
-      _categoryRepo.upsertCategory(name: name, kind: kind);
+  Future<int> upsertCategory(
+          {required String name, required String kind, int? ledgerId}) =>
+      _categoryRepo.upsertCategory(
+          name: name, kind: kind, ledgerId: ledgerId);
 
   @override
   Future<Category?> getCategoryById(int categoryId) =>
@@ -625,8 +627,9 @@ class LocalRepository extends BaseRepository {
 
   @override
   Future<bool> isCategoryNameDuplicate(
-          {required String name, int? excludeId}) =>
-      _categoryRepo.isCategoryNameDuplicate(name: name, excludeId: excludeId);
+          {required String name, int? excludeId, int? ledgerId}) =>
+      _categoryRepo.isCategoryNameDuplicate(
+          name: name, excludeId: excludeId, ledgerId: ledgerId);
 
   @override
   Future<bool> hasSubCategories(int categoryId) =>
@@ -1459,8 +1462,10 @@ class LocalRepository extends BaseRepository {
       _tagRepo.watchTransactionsByTag(tagId);
 
   @override
-  Future<bool> isTagNameDuplicate({required String name, int? excludeId}) =>
-      _tagRepo.isTagNameDuplicate(name: name, excludeId: excludeId);
+  Future<bool> isTagNameDuplicate(
+          {required String name, int? excludeId, int? ledgerId}) =>
+      _tagRepo.isTagNameDuplicate(
+          name: name, excludeId: excludeId, ledgerId: ledgerId);
 
   @override
   Future<void> updateTagSortOrders(

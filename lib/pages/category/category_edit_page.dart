@@ -134,6 +134,15 @@ class _CategoryEditPageState extends ConsumerState<CategoryEditPage> {
 
   bool get isCreatingSubCategory => widget.parentCategory != null;
 
+  /// 获取当前账本的命名空间 ID（共享账本返回其 ID，个人账本返回 null）
+  int? _getScopedLedgerId() {
+    final ledger = ref.read(currentLedgerProvider).valueOrNull;
+    if (ledger != null && ledger.type == 'shared') {
+      return ledger.id;
+    }
+    return null;
+  }
+
   /// 检查分类名称是否重复
   Future<void> _checkNameDuplicate() async {
     final name = _nameController.text.trim();
@@ -151,6 +160,7 @@ class _CategoryEditPageState extends ConsumerState<CategoryEditPage> {
     final isDuplicate = await repo.isCategoryNameDuplicate(
       name: name,
       excludeId: excludeId,
+      ledgerId: _getScopedLedgerId(),
     );
 
     if (mounted) {
@@ -460,6 +470,7 @@ class _CategoryEditPageState extends ConsumerState<CategoryEditPage> {
     final isDuplicate = await repo.isCategoryNameDuplicate(
       name: name,
       excludeId: excludeId,
+      ledgerId: _getScopedLedgerId(),
     );
 
     if (isDuplicate) {
