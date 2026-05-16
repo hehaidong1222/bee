@@ -14,7 +14,9 @@ dependencies:
   flutter_riverpod: ^2.5.1
   collection: ^1.18.0
   drift: ^2.20.2
-  sqlite3_flutter_libs: ^0.5.24
+  # Pin upper bound:0.5.40+ 升到 sqlite3 ~> 3.52.0,跟 Podfile.lock 锁定的
+  # sqlite3 3.50.4 不兼容,pod install 会失败。下次故意升 sqlite3 时再放开。
+  sqlite3_flutter_libs: ">=0.5.24 <0.5.40"
   path_provider: ^2.1.4
   path: ^1.9.0
   intl: ^0.19.0

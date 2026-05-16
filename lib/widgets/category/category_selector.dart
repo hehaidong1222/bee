@@ -21,11 +21,16 @@ class CategorySelector extends ConsumerStatefulWidget {
   /// 初始选中的分类ID（可选）
   final int? initialCategoryId;
 
+  /// 给定记账上下文的账本 id。共享账本(Editor)下,内部按 ledger 切到 SharedCategories
+  /// 沙盒查 A 的分类。null = 走主表 Categories(管理页 / 历史路径兼容)。
+  final int? ledgerId;
+
   const CategorySelector({
     super.key,
     required this.kind,
     required this.onCategorySelected,
     this.initialCategoryId,
+    this.ledgerId,
   });
 
   @override
@@ -67,7 +72,7 @@ class _CategorySelectorState extends ConsumerState<CategorySelector> {
     final repo = ref.watch(repositoryProvider);
 
     return FutureBuilder<List<Category>>(
-      future: repo.getTopLevelCategories(widget.kind),
+      future: repo.getTopLevelCategoriesForLedger(widget.kind, ledgerId: widget.ledgerId),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
@@ -271,7 +276,7 @@ class _CategorySelectorState extends ConsumerState<CategorySelector> {
     final result = <int, List<Category>>{};
 
     for (final cat in topLevelCategories) {
-      final children = await repo.getSubCategories(cat.id);
+      final children = await repo.getSubCategoriesForLedger(cat.id, ledgerId: widget.ledgerId);
       if (children.isNotEmpty) {
         result[cat.id] = children;
       }

@@ -141,11 +141,13 @@ class _TransactionEditorPageState extends ConsumerState<TransactionEditorPage>
                   kind: 'expense',
                   onCategorySelected: (c) => _onCategorySelected(context, c, 'expense'),
                   initialCategoryId: widget.initialCategoryId,
+                  ledgerId: ref.read(currentLedgerIdProvider),
                 ),
                 CategorySelector(
                   kind: 'income',
                   onCategorySelected: (c) => _onCategorySelected(context, c, 'income'),
                   initialCategoryId: widget.initialCategoryId,
+                  ledgerId: ref.read(currentLedgerIdProvider),
                 ),
                 TransferForm(
                   onTransferComplete: () {
@@ -229,6 +231,44 @@ class _TransactionEditorPageState extends ConsumerState<TransactionEditorPage>
         onSubmit: (res) async {
           final repo = ref.read(repositoryProvider);
           final attachmentService = ref.read(attachmentServiceProvider);
+
+          // 共享账本 Phase 2:Editor 在共享账本下选 A 的资源时,categoryId/
+          // accountId 是 SharedCategories/SharedAccounts.id(跟主表 id 撞),
+          // 不能直接写 tx.categoryId,得转成 syncId override 形式存。
+          final ledgerRow = await (ref.read(databaseProvider).select(
+                  ref.read(databaseProvider).ledgers)
+                ..where((l) => l.id.equals(ledgerId)))
+              .getSingleOrNull();
+          final isEditorShared = ledgerRow != null &&
+              ledgerRow.isShared &&
+              ledgerRow.myRole != 'owner';
+
+          int? categoryIdToWrite = c.id;
+          int? accountIdToWrite = res.accountId;
+          String? catOverride;
+          String? accOverride;
+          String? tagOverrideJson;
+          if (isEditorShared) {
+            categoryIdToWrite = null;
+            accountIdToWrite = null;
+            catOverride = c.syncId; // c.syncId 即 SharedCategories.syncId
+            if (res.accountId != null) {
+              final sharedAcc = await (ref.read(databaseProvider).select(
+                      ref.read(databaseProvider).sharedAccounts)
+                    ..where((a) => a.id.equals(res.accountId!)))
+                  .getSingleOrNull();
+              accOverride = sharedAcc?.syncId;
+            }
+            if (res.tagIds.isNotEmpty) {
+              final db = ref.read(databaseProvider);
+              final sharedTags = await (db.select(db.sharedTags)
+                    ..where((t) => t.id.isIn(res.tagIds)))
+                  .get();
+              final ids = sharedTags.map((t) => '"${t.syncId}"').join(',');
+              tagOverrideJson = '[$ids]';
+            }
+          }
+
           int transactionId;
           if (widget.editingTransactionId != null) {
             // 编辑模式：使用repository更新交易
@@ -236,10 +276,13 @@ class _TransactionEditorPageState extends ConsumerState<TransactionEditorPage>
               id: widget.editingTransactionId!,
               type: kind,
               amount: res.amount,
-              categoryId: c.id,
+              categoryId: categoryIdToWrite,
               note: res.note,
               happenedAt: res.date,
-              accountId: res.accountId,
+              accountId: accountIdToWrite,
+              categorySyncIdOverride: catOverride,
+              accountSyncIdOverride: accOverride,
+              tagSyncIdsOverride: tagOverrideJson,
             );
             transactionId = widget.editingTransactionId!;
           } else {
@@ -247,10 +290,13 @@ class _TransactionEditorPageState extends ConsumerState<TransactionEditorPage>
               ledgerId: ledgerId,
               type: kind,
               amount: res.amount,
-              categoryId: c.id,
+              categoryId: categoryIdToWrite,
               happenedAt: res.date,
               note: res.note,
-              accountId: res.accountId,
+              accountId: accountIdToWrite,
+              categorySyncIdOverride: catOverride,
+              accountSyncIdOverride: accOverride,
+              tagSyncIdsOverride: tagOverrideJson,
             );
           }
           // 保存待上传的附件
@@ -263,18 +309,23 @@ class _TransactionEditorPageState extends ConsumerState<TransactionEditorPage>
             // 刷新附件列表缓存
             ref.read(attachmentListRefreshProvider.notifier).state++;
           }
-          // 更新标签关联
-          if (res.tagIds.isNotEmpty) {
-            await repo.updateTransactionTags(
-              transactionId: transactionId,
-              tagIds: res.tagIds,
-            );
-            // 刷新标签列表缓存
-            ref.read(tagListRefreshProvider.notifier).state++;
-          } else if (widget.editingTransactionId != null) {
-            // 编辑模式：如果没有选择标签，清除原有标签
-            await repo.removeAllTagsFromTransaction(transactionId);
-            // 刷新标签列表缓存
+          // 更新标签关联(Editor 共享场景跳过 — tag id 跨表撞,已经走 tagSyncIdsOverride)
+          if (!isEditorShared) {
+            if (res.tagIds.isNotEmpty) {
+              await repo.updateTransactionTags(
+                transactionId: transactionId,
+                tagIds: res.tagIds,
+              );
+              // 刷新标签列表缓存
+              ref.read(tagListRefreshProvider.notifier).state++;
+            } else if (widget.editingTransactionId != null) {
+              // 编辑模式：如果没有选择标签，清除原有标签
+              await repo.removeAllTagsFromTransaction(transactionId);
+              // 刷新标签列表缓存
+              ref.read(tagListRefreshProvider.notifier).state++;
+            }
+          } else {
+            // 共享场景:override 字段已在 add/update 路径写入,这里仅刷新 UI cache
             ref.read(tagListRefreshProvider.notifier).state++;
           }
           // 统一处理：自动/手动同步与状态刷新（后台静默）

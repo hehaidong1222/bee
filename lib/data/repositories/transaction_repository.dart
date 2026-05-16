@@ -58,6 +58,12 @@ abstract class TransactionRepository {
   });
 
   /// 添加交易
+  ///
+  /// **共享账本 Phase 2**:
+  /// - 单人账本/Owner 视角:用 categoryId/accountId(int),override 留 null
+  /// - Editor 在共享账本下选了 A 的资源:caller 传 categorySyncIdOverride 等
+  ///   字符串 syncId,categoryId 等留 null。渲染/push 时根据 override 路由
+  ///   到 SharedCategories/Accounts/Tags 沙盒表。
   Future<int> addTransaction({
     required int ledgerId,
     required String type,
@@ -68,6 +74,10 @@ abstract class TransactionRepository {
     required DateTime happenedAt,
     String? note,
     String? syncId,
+    String? categorySyncIdOverride,
+    String? accountSyncIdOverride,
+    String? toAccountSyncIdOverride,
+    String? tagSyncIdsOverride,
   });
 
   /// 批量新增交易，单事务内插入，返回插入条数
@@ -77,6 +87,8 @@ abstract class TransactionRepository {
   Future<int> insertTransactionCompanion(TransactionsCompanion item);
 
   /// 更新交易
+  ///
+  /// 同 addTransaction:override 字段给 Editor 共享场景用。
   Future<void> updateTransaction({
     required int id,
     required String type,
@@ -85,6 +97,10 @@ abstract class TransactionRepository {
     String? note,
     DateTime? happenedAt,
     dynamic accountId,
+    String? categorySyncIdOverride,
+    String? accountSyncIdOverride,
+    String? toAccountSyncIdOverride,
+    String? tagSyncIdsOverride,
   });
 
   /// 删除交易

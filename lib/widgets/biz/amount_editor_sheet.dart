@@ -664,7 +664,8 @@ class _AmountEditorSheetState extends ConsumerState<AmountEditorSheet> {
 
   /// 构建标签和附件选择行（一行显示）
   Widget _buildTagAndAttachmentRow() {
-    final allTagsAsync = ref.watch(allTagsProvider);
+    // 记账时按当前账本(共享 Editor 走 SharedTags 沙盒)
+    final allTagsAsync = ref.watch(recordingTagsProvider(widget.ledgerId));
     // 使用 valueOrNull 保留上一次数据，避免 loading 时显示空列表导致闪烁
     final allTags = allTagsAsync.valueOrNull ?? [];
 
@@ -703,6 +704,7 @@ class _AmountEditorSheetState extends ConsumerState<AmountEditorSheet> {
                 final result = await TagSelector.show(
                   context,
                   selectedTagIds: _selectedTagIds,
+                  ledgerId: widget.ledgerId,
                 );
                 if (result != null) {
                   setState(() {

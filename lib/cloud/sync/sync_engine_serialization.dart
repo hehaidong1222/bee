@@ -31,37 +31,92 @@ extension _SyncEngineSerialization on SyncEngine {
             .getSingleOrNull();
         if (tx == null) return <String, dynamic>{};
 
-        // 获取关联数据
-        final cat = tx.categoryId != null
-            ? await (db.select(db.categories)
-                  ..where((c) => c.id.equals(tx.categoryId!)))
-                .getSingleOrNull()
-            : null;
-        final acc = tx.accountId != null
-            ? await (db.select(db.accounts)
-                  ..where((a) => a.id.equals(tx.accountId!)))
-                .getSingleOrNull()
-            : null;
-        final toAcc = tx.toAccountId != null
-            ? await (db.select(db.accounts)
-                  ..where((a) => a.id.equals(tx.toAccountId!)))
-                .getSingleOrNull()
-            : null;
+        // 共享账本 Phase 2:override 字段非空时优先用作 syncId(跨设备稳定,不依赖
+        // 本地 int id)。否则走主表 id → syncId 路径(单人 / Owner 场景)。
+        // 这套 fallback 让 push 序列化对 override 字段引入零侵入。
 
-        // 获取标签（连同 tag.syncId，server 端按 id 反查最新名字）
-        final txTags = await (db.select(db.transactionTags)
-              ..where((tt) => tt.transactionId.equals(tx.id)))
-            .get();
+        // 获取关联分类
+        ({String? name, String? kind, String? syncId}) catInfo = (
+          name: null,
+          kind: null,
+          syncId: null,
+        );
+        if (tx.categorySyncIdOverride != null && tx.categorySyncIdOverride!.isNotEmpty) {
+          // Editor 共享:用 override 直接查 SharedCategories
+          final shared = await (db.select(db.sharedCategories)
+                ..where((c) => c.syncId.equals(tx.categorySyncIdOverride!)))
+              .getSingleOrNull();
+          if (shared != null) {
+            catInfo = (name: shared.name, kind: shared.kind, syncId: shared.syncId);
+          } else {
+            // 兜底:override 有值但本地 SharedCategories 没数据(被踢后还没拉新?)
+            // 至少把 syncId 透传给 server,server 端按 syncId 做 LWW 仍能 match。
+            catInfo = (name: null, kind: null, syncId: tx.categorySyncIdOverride);
+          }
+        } else if (tx.categoryId != null) {
+          final cat = await (db.select(db.categories)
+                ..where((c) => c.id.equals(tx.categoryId!)))
+              .getSingleOrNull();
+          if (cat != null) {
+            catInfo = (name: cat.name, kind: cat.kind, syncId: cat.syncId);
+          }
+        }
+
+        // 账户解析:override > 主表 id
+        Future<({String? name, String? syncId})> resolveAccount(
+          String? override,
+          int? id,
+        ) async {
+          if (override != null && override.isNotEmpty) {
+            final shared = await (db.select(db.sharedAccounts)
+                  ..where((a) => a.syncId.equals(override)))
+                .getSingleOrNull();
+            if (shared != null) return (name: shared.name, syncId: shared.syncId);
+            return (name: null, syncId: override);
+          }
+          if (id == null) return (name: null, syncId: null);
+          final acc = await (db.select(db.accounts)
+                ..where((a) => a.id.equals(id)))
+              .getSingleOrNull();
+          if (acc != null) return (name: acc.name, syncId: acc.syncId);
+          return (name: null, syncId: null);
+        }
+
+        final accInfo = await resolveAccount(tx.accountSyncIdOverride, tx.accountId);
+        final toAccInfo = await resolveAccount(tx.toAccountSyncIdOverride, tx.toAccountId);
+
+        // 标签:override(JSON array)> transaction_tags 主表关联
         final tagNames = <String>[];
         final tagSyncIds = <String>[];
-        for (final tt in txTags) {
-          final tag = await (db.select(db.tags)
-                ..where((t) => t.id.equals(tt.tagId)))
-              .getSingleOrNull();
-          if (tag != null) {
-            tagNames.add(tag.name);
-            if (tag.syncId != null && tag.syncId!.isNotEmpty) {
-              tagSyncIds.add(tag.syncId!);
+        if (tx.tagSyncIdsOverride != null && tx.tagSyncIdsOverride!.isNotEmpty) {
+          try {
+            final decoded = jsonDecode(tx.tagSyncIdsOverride!);
+            if (decoded is List) {
+              for (final entry in decoded) {
+                if (entry is! String || entry.isEmpty) continue;
+                tagSyncIds.add(entry);
+                final shared = await (db.select(db.sharedTags)
+                      ..where((t) => t.syncId.equals(entry)))
+                    .getSingleOrNull();
+                if (shared != null) tagNames.add(shared.name);
+              }
+            }
+          } catch (_) {
+            // ignore corrupted override
+          }
+        } else {
+          final txTags = await (db.select(db.transactionTags)
+                ..where((tt) => tt.transactionId.equals(tx.id)))
+              .get();
+          for (final tt in txTags) {
+            final tag = await (db.select(db.tags)
+                  ..where((t) => t.id.equals(tt.tagId)))
+                .getSingleOrNull();
+            if (tag != null) {
+              tagNames.add(tag.name);
+              if (tag.syncId != null && tag.syncId!.isNotEmpty) {
+                tagSyncIds.add(tag.syncId!);
+              }
             }
           }
         }
@@ -85,15 +140,15 @@ extension _SyncEngineSerialization on SyncEngine {
 
         return EntitySerializer.serializeTransaction(
           tx,
-          categoryName: cat?.name,
-          categoryKind: cat?.kind,
-          categorySyncId: cat?.syncId,
-          accountName: acc?.name,
-          accountSyncId: acc?.syncId,
-          fromAccountName: tx.type == 'transfer' ? acc?.name : null,
-          fromAccountSyncId: tx.type == 'transfer' ? acc?.syncId : null,
-          toAccountName: toAcc?.name,
-          toAccountSyncId: toAcc?.syncId,
+          categoryName: catInfo.name,
+          categoryKind: catInfo.kind,
+          categorySyncId: catInfo.syncId,
+          accountName: accInfo.name,
+          accountSyncId: accInfo.syncId,
+          fromAccountName: tx.type == 'transfer' ? accInfo.name : null,
+          fromAccountSyncId: tx.type == 'transfer' ? accInfo.syncId : null,
+          toAccountName: toAccInfo.name,
+          toAccountSyncId: toAccInfo.syncId,
           ledgerSyncId: parentLedgerSyncId,
           tagNames: tagNames.isNotEmpty ? tagNames : null,
           tagSyncIds: tagSyncIds.isNotEmpty ? tagSyncIds : null,

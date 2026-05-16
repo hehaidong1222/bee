@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import '../../db.dart';
 import '../transaction_repository.dart';
 import '../../../services/system/logger_service.dart';
+import '../../../utils/shared_to_main_adapter.dart';
 
 /// 本地交易Repository实现
 /// 基于 Drift 数据库实现
@@ -15,6 +16,49 @@ class LocalTransactionRepository implements TransactionRepository {
   final BeeDatabase db;
 
   LocalTransactionRepository(this.db);
+
+  /// 共享账本 — tx.categorySyncIdOverride 非空时,查 SharedCategories 拿;否则
+  /// 走 row 已经 join 出的主 Categories(行为完全兼容老代码)。
+  ///
+  /// 设计:
+  /// - 单人 / Owner 共享 → override 永远 null → 主表 left join 结果就是答案
+  /// - Editor 选 A 的分类 → override = A 的 syncId,categoryId=null → 查
+  ///   SharedCategories WHERE syncId=override
+  /// - 这样**所有现存按 categoryId join 主 Categories 的代码完全不需要改** —
+  ///   override 字段引入零侵入。
+  Future<List<({Transaction t, Category? category})>>
+      _resolveCategories(List<d.TypedResult> rows) async {
+    if (rows.isEmpty) return const [];
+
+    // 先收集所有需要查 SharedCategories 的 override syncId
+    final overrideIds = <String>{
+      for (final r in rows)
+        if (r.readTable(db.transactions).categorySyncIdOverride != null)
+          r.readTable(db.transactions).categorySyncIdOverride!,
+    };
+    // 一次批量查 Shared,按 syncId map
+    final Map<String, Category> sharedMap = {};
+    if (overrideIds.isNotEmpty) {
+      final sharedRows = await (db.select(db.sharedCategories)
+            ..where((c) => c.syncId.isIn(overrideIds)))
+          .get();
+      for (final s in sharedRows) {
+        sharedMap[s.syncId] = sharedCategoryAsCategory(s);
+      }
+    }
+
+    return [
+      for (final r in rows)
+        () {
+          final t = r.readTable(db.transactions);
+          final override = t.categorySyncIdOverride;
+          if (override != null && sharedMap[override] != null) {
+            return (t: t, category: sharedMap[override]);
+          }
+          return (t: t, category: r.readTableOrNull(db.categories));
+        }(),
+    ];
+  }
 
   @override
   Stream<List<Transaction>> watchRecentTransactions({
@@ -66,12 +110,7 @@ class LocalTransactionRepository implements TransactionRepository {
       d.leftOuterJoin(db.categories,
           db.categories.id.equalsExp(db.transactions.categoryId)),
     ]);
-    return q.watch().map((rows) => rows
-        .map((r) => (
-              t: r.readTable(db.transactions),
-              category: r.readTableOrNull(db.categories)
-            ))
-        .toList());
+    return q.watch().asyncMap(_resolveCategories);
   }
 
   @override
@@ -94,12 +133,7 @@ class LocalTransactionRepository implements TransactionRepository {
       d.leftOuterJoin(db.categories,
           db.categories.id.equalsExp(db.transactions.categoryId)),
     ]);
-    return q.watch().map((rows) => rows
-        .map((r) => (
-              t: r.readTable(db.transactions),
-              category: r.readTableOrNull(db.categories)
-            ))
-        .toList());
+    return q.watch().asyncMap(_resolveCategories);
   }
 
   @override
@@ -122,12 +156,7 @@ class LocalTransactionRepository implements TransactionRepository {
       d.leftOuterJoin(db.categories,
           db.categories.id.equalsExp(db.transactions.categoryId)),
     ]);
-    return q.watch().map((rows) => rows
-        .map((r) => (
-              t: r.readTable(db.transactions),
-              category: r.readTableOrNull(db.categories)
-            ))
-        .toList());
+    return q.watch().asyncMap(_resolveCategories);
   }
 
   @override
@@ -157,12 +186,7 @@ class LocalTransactionRepository implements TransactionRepository {
     } else {
       base.where(db.transactions.categoryId.equals(categoryId));
     }
-    return base.watch().map((rows) => rows
-        .map((r) => (
-              t: r.readTable(db.transactions),
-              category: r.readTableOrNull(db.categories)
-            ))
-        .toList());
+    return base.watch().asyncMap(_resolveCategories);
   }
 
   static const _uuid = Uuid();
@@ -178,6 +202,10 @@ class LocalTransactionRepository implements TransactionRepository {
     required DateTime happenedAt,
     String? note,
     String? syncId,
+    String? categorySyncIdOverride,
+    String? accountSyncIdOverride,
+    String? toAccountSyncIdOverride,
+    String? tagSyncIdsOverride,
   }) async {
     return db.into(db.transactions).insert(TransactionsCompanion.insert(
           ledgerId: ledgerId,
@@ -189,6 +217,10 @@ class LocalTransactionRepository implements TransactionRepository {
           happenedAt: d.Value(happenedAt),
           note: d.Value(note),
           syncId: d.Value(syncId ?? _uuid.v4()),
+          categorySyncIdOverride: d.Value(categorySyncIdOverride),
+          accountSyncIdOverride: d.Value(accountSyncIdOverride),
+          toAccountSyncIdOverride: d.Value(toAccountSyncIdOverride),
+          tagSyncIdsOverride: d.Value(tagSyncIdsOverride),
         ));
   }
 
@@ -217,6 +249,10 @@ class LocalTransactionRepository implements TransactionRepository {
     String? note,
     DateTime? happenedAt,
     dynamic accountId,
+    String? categorySyncIdOverride,
+    String? accountSyncIdOverride,
+    String? toAccountSyncIdOverride,
+    String? tagSyncIdsOverride,
   }) async {
     // 处理 accountId 参数
     final d.Value<int?> accountIdValue;
@@ -237,6 +273,10 @@ class LocalTransactionRepository implements TransactionRepository {
         happenedAt:
             happenedAt != null ? d.Value(happenedAt) : const d.Value.absent(),
         accountId: accountIdValue,
+        categorySyncIdOverride: d.Value(categorySyncIdOverride),
+        accountSyncIdOverride: d.Value(accountSyncIdOverride),
+        toAccountSyncIdOverride: d.Value(toAccountSyncIdOverride),
+        tagSyncIdsOverride: d.Value(tagSyncIdsOverride),
       ),
     );
   }
@@ -340,12 +380,7 @@ class LocalTransactionRepository implements TransactionRepository {
           db.categories.id.equalsExp(db.transactions.categoryId)),
     ]);
     final rows = await q.get();
-    return rows
-        .map((r) => (
-              t: r.readTable(db.transactions),
-              category: r.readTableOrNull(db.categories)
-            ))
-        .toList();
+    return _resolveCategories(rows);
   }
 
   @override

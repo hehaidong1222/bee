@@ -148,3 +148,36 @@ final accountByIdProvider = FutureProvider.family<Account?, int>((ref, accountId
   final repo = ref.watch(repositoryProvider);
   return await repo.getAccount(accountId);
 });
+
+/// 共享账本 Phase 2:tx.accountSyncIdOverride 非空时,按 syncId 直查 SharedAccounts,
+/// 返回 wrap 成 Account 的临时缓存(B 视角的 A 账户)。null 输入直接返 null。
+final accountBySharedSyncIdProvider =
+    FutureProvider.family.autoDispose<Account?, String>((ref, syncId) async {
+  ref.watch(syncGenerationProvider);
+  if (syncId.isEmpty) return null;
+  final db = ref.watch(databaseProvider);
+  final shared = await (db.select(db.sharedAccounts)
+        ..where((a) => a.syncId.equals(syncId)))
+      .getSingleOrNull();
+  if (shared == null) return null;
+  // 用现有 adapter wrap 成主表 Account 形状
+  // ignore: avoid_function_literals_in_foreach_calls
+  return Account(
+    id: shared.id,
+    ledgerId: -1,
+    name: shared.name,
+    type: shared.type,
+    currency: shared.currency,
+    initialBalance: shared.initialBalance,
+    createdAt: null,
+    updatedAt: null,
+    sortOrder: shared.sortOrder,
+    creditLimit: shared.creditLimit,
+    billingDay: shared.billingDay,
+    paymentDueDay: shared.paymentDueDay,
+    bankName: shared.bankName,
+    cardLastFour: shared.cardLastFour,
+    note: shared.note,
+    syncId: shared.syncId,
+  );
+});

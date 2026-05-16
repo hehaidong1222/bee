@@ -34,6 +34,11 @@ abstract class TagRepository {
   /// 获取所有标签
   Future<List<Tag>> getAllTags();
 
+  /// 给指定账本拿可用标签。
+  /// - 单人 / Owner 共享 / ledgerId=null → 主表 Tags(等同 getAllTags)
+  /// - Editor 视角共享账本 → SharedTags 沙盒,返回 wrap 成 Tag 的临时缓存数据
+  Future<List<Tag>> getAllTagsForLedger({int? ledgerId});
+
   /// 批量插入标签
   Future<void> batchInsertTags(List<TagsCompanion> tags);
 

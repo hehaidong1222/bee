@@ -33,6 +33,10 @@ extension _SyncEngineResolvers on SyncEngine {
     return acc?.id;
   }
 
+  // v26 共享账本 Phase 2:从主表 _resolveCategoryIdBySyncId 等 helper 也能
+  // 兼容 Shared* 表(后续按 syncId 直接放 override 字段,不再用本地 int id)。
+  // 历史的 _resolveSharedXxxIdBySyncId 已删除,统一走 override 路径。
+
   /// 根据分类名和类型查找 categoryId
   Future<int?> _resolveCategoryId({
     String? categoryName,

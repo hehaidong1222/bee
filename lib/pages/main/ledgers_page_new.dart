@@ -11,6 +11,7 @@ import '../../providers.dart';
 import '../../providers/cloud_mode_providers.dart';
 import '../../models/ledger_display_item.dart';
 import '../../cloud/transactions_sync_manager.dart';
+import '../cloud/member_list_page.dart';
 import '../../cloud/sync_service.dart';
 import '../../cloud/sync/sync_engine.dart';
 import '../../widgets/ui/ui.dart';
@@ -356,54 +357,74 @@ class _LedgersPageNewState extends ConsumerState<LedgersPageNew> {
 
   /// 显示本地账本操作菜单
   Future<void> _showLocalLedgerActions(BuildContext context, LedgerDisplayItem ledger) async {
+    final l10n = AppLocalizations.of(context);
+    final hasSyncId = ledger.localSyncId != null && ledger.localSyncId!.isNotEmpty;
+    // 共享账本 + B 是 Editor:server 端 owner-only 路径会拒所有改写,UI 直接隐藏
+    // "编辑 / 清空 / 删本地 / 删账本"四个写操作,只保留"成员管理"入口供 B 退出。
+    final isEditorShared = ledger.isShared && ledger.myRole != 'owner';
     final action = await showDialog<String>(
       context: context,
       builder: (dctx) {
         final primary = Theme.of(dctx).colorScheme.primary;
         return SimpleDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(AppLocalizations.of(context).ledgersActions),
+          title: Text(l10n.ledgersActions),
           children: [
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(dctx, 'edit'),
-              child: Row(
-                children: [
-                  Icon(Icons.edit, color: primary),
-                  const SizedBox(width: 8),
-                  Text(AppLocalizations.of(context).ledgersEdit),
-                ],
+            // 共享账本入口:仅当账本已 push 到 cloud(有 syncId) 才显示。
+            // 单人账本也可以"邀请加入"成为共享。
+            if (hasSyncId)
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(dctx, 'members'),
+                child: Row(
+                  children: [
+                    Icon(Icons.handshake_outlined, color: primary),
+                    const SizedBox(width: 8),
+                    Text(l10n.sharedMembersPageTitle),
+                  ],
+                ),
               ),
-            ),
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(dctx, 'clear'),
-              child: Row(
-                children: [
-                  const Icon(Icons.clear_all, color: Colors.orange),
-                  const SizedBox(width: 8),
-                  Text(AppLocalizations.of(context).ledgersClear),
-                ],
+            if (!isEditorShared) ...[
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(dctx, 'edit'),
+                child: Row(
+                  children: [
+                    Icon(Icons.edit, color: primary),
+                    const SizedBox(width: 8),
+                    Text(l10n.ledgersEdit),
+                  ],
+                ),
               ),
-            ),
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(dctx, 'deleteLocal'),
-              child: Row(
-                children: [
-                  const Icon(Icons.delete_outline, color: Colors.deepOrange),
-                  const SizedBox(width: 8),
-                  Text(AppLocalizations.of(context).ledgersDeleteLocal),
-                ],
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(dctx, 'clear'),
+                child: Row(
+                  children: [
+                    const Icon(Icons.clear_all, color: Colors.orange),
+                    const SizedBox(width: 8),
+                    Text(l10n.ledgersClear),
+                  ],
+                ),
               ),
-            ),
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(dctx, 'delete'),
-              child: Row(
-                children: [
-                  const Icon(Icons.delete_forever_outlined, color: Colors.redAccent),
-                  const SizedBox(width: 8),
-                  Text(AppLocalizations.of(context).ledgersDelete),
-                ],
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(dctx, 'deleteLocal'),
+                child: Row(
+                  children: [
+                    const Icon(Icons.delete_outline, color: Colors.deepOrange),
+                    const SizedBox(width: 8),
+                    Text(l10n.ledgersDeleteLocal),
+                  ],
+                ),
               ),
-            ),
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(dctx, 'delete'),
+                child: Row(
+                  children: [
+                    const Icon(Icons.delete_forever_outlined, color: Colors.redAccent),
+                    const SizedBox(width: 8),
+                    Text(l10n.ledgersDelete),
+                  ],
+                ),
+              ),
+            ],
           ],
         );
       },
@@ -411,7 +432,16 @@ class _LedgersPageNewState extends ConsumerState<LedgersPageNew> {
 
     if (!mounted) return;
 
-    if (action == 'edit') {
+    if (action == 'members') {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => MemberListPage(
+            ledgerExternalId: ledger.localSyncId!,
+            ledgerName: translateLedgerName(context, ledger.name),
+          ),
+        ),
+      );
+    } else if (action == 'edit') {
       await _handleEditLedger(context, ledger);
     } else if (action == 'clear') {
       await _handleClearLedger(context, ledger);

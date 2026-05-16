@@ -19,6 +19,16 @@ final allTagsProvider = FutureProvider<List<Tag>>((ref) async {
   return await repo.getAllTags();
 });
 
+/// 给指定账本拿可选标签。共享账本(Editor)走 SharedTags 沙盒,自动隔离 A 的标签
+/// 跟 B 自己 user-global 资源。记账页 / amount editor 用这个,标签管理页继续用
+/// allTagsProvider(管理页永远只看 B 自己的)。
+final recordingTagsProvider =
+    FutureProvider.autoDispose.family<List<Tag>, int?>((ref, ledgerId) async {
+  ref.watch(tagListRefreshProvider);
+  final repo = ref.watch(repositoryProvider);
+  return await repo.getAllTagsForLedger(ledgerId: ledgerId);
+});
+
 /// 标签列表带统计信息 Provider（响应式）
 /// 返回每个标签及其关联的交易数量
 final tagsWithStatsProvider = StreamProvider<List<({Tag tag, int transactionCount})>>((ref) {

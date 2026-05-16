@@ -15,6 +15,7 @@ import '../../styles/tokens.dart';
 import 'package:flutter_cloud_sync/flutter_cloud_sync.dart' hide SyncStatus;
 import '../../cloud/sync_service.dart';
 import '../cloud/cloud_service_page.dart';
+import '../cloud/join_shared_ledger_page.dart';
 import '../../services/system/logger_service.dart';
 import '../../services/ui/avatar_service.dart';
 import '../../providers/avatar_providers.dart';
@@ -279,6 +280,52 @@ class MinePage extends ConsumerWidget {
                                           );
                                         },
                                       ),
+                                      // BeeCount Cloud 模式 + 已登录 → 加入共享账本入口。
+                                      // 其他云模式 / 离线模式不显示(共享账本只在
+                                      // BeeCount Cloud 后端可用)。
+                                      if (canUseCloud) ...[
+                                        // ignore: prefer_const_constructors
+                                        Builder(builder: (ctx) {
+                                          final cfg = sectionRef
+                                              .watch(activeCloudConfigProvider)
+                                              .valueOrNull;
+                                          final isBc = cfg != null &&
+                                              cfg.type ==
+                                                  CloudBackendType
+                                                      .beecountCloud;
+                                          if (!isBc) {
+                                            return const SizedBox.shrink();
+                                          }
+                                          return Column(children: [
+                                            BeeTokens.cardDivider(
+                                                sectionContext),
+                                            AppListTile(
+                                              leading: Icons.handshake_outlined,
+                                              title: AppLocalizations.of(
+                                                      sectionContext)
+                                                  .sharedJoinPageTitle,
+                                              subtitle: AppLocalizations.of(
+                                                      sectionContext)
+                                                  .sharedJoinPageSubtitle,
+                                              trailing: Icon(
+                                                  Icons.chevron_right,
+                                                  color: BeeTokens
+                                                      .iconTertiary(context),
+                                                  size: 20),
+                                              onTap: () async {
+                                                await Navigator.of(
+                                                        sectionContext)
+                                                    .push(
+                                                  MaterialPageRoute(
+                                                    builder: (_) =>
+                                                        const JoinSharedLedgerPage(),
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          ]);
+                                        }),
+                                      ],
                                     ],
                                   );
                                 },

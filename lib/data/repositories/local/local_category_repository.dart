@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import '../../db.dart';
 import '../../category_node.dart';
 import '../../../services/system/logger_service.dart';
+import '../../../utils/shared_to_main_adapter.dart';
 import '../category_repository.dart';
 
 /// 本地分类Repository实现
@@ -197,6 +198,61 @@ class LocalCategoryRepository implements CategoryRepository {
           ..where((c) => c.parentId.equals(parentId) & c.level.equals(2))
           ..orderBy([(c) => d.OrderingTerm(expression: c.sortOrder)]))
         .get();
+  }
+
+  /// 判断本地 ledger 是否是 "B 是 Editor 角色的共享账本"。
+  Future<bool> _isEditorSharedLedger(int? ledgerId) async {
+    if (ledgerId == null) return false;
+    final ledger = await (db.select(db.ledgers)
+          ..where((l) => l.id.equals(ledgerId)))
+        .getSingleOrNull();
+    return ledger != null && ledger.isShared && ledger.myRole != 'owner';
+  }
+
+  @override
+  Future<List<Category>> getTopLevelCategoriesForLedger(
+    String kind, {
+    int? ledgerId,
+  }) async {
+    if (!await _isEditorSharedLedger(ledgerId)) {
+      // 主表(单人或 Owner 的共享)
+      return getTopLevelCategories(kind);
+    }
+    // SharedCategories 沙盒
+    final rows = await (db.select(db.sharedCategories)
+          ..where((c) =>
+              c.sharedLedgerId.equals(ledgerId!) &
+              c.kind.equals(kind) &
+              c.level.equals(1) &
+              c.parentSyncId.isNull())
+          ..orderBy([(c) => d.OrderingTerm(expression: c.sortOrder)]))
+        .get();
+    return rows.map(sharedCategoryAsCategory).toList();
+  }
+
+  @override
+  Future<List<Category>> getSubCategoriesForLedger(
+    int parentId, {
+    int? ledgerId,
+  }) async {
+    if (!await _isEditorSharedLedger(ledgerId)) {
+      return getSubCategories(parentId);
+    }
+    // parentId 在共享上下文下指向 SharedCategories.id。先查到 parent 拿其 syncId,
+    // 再用 syncId 找子分类。
+    final parent = await (db.select(db.sharedCategories)
+          ..where((c) =>
+              c.sharedLedgerId.equals(ledgerId!) & c.id.equals(parentId)))
+        .getSingleOrNull();
+    if (parent == null) return const [];
+    final rows = await (db.select(db.sharedCategories)
+          ..where((c) =>
+              c.sharedLedgerId.equals(ledgerId!) &
+              c.parentSyncId.equals(parent.syncId) &
+              c.level.equals(2))
+          ..orderBy([(c) => d.OrderingTerm(expression: c.sortOrder)]))
+        .get();
+    return rows.map(sharedCategoryAsCategory).toList();
   }
 
   @override

@@ -412,11 +412,17 @@ class SyncEngine implements app.SyncService {
               ..where((l) => l.syncId.equals(syncId)))
             .getSingleOrNull();
         if (existing != null) {
-          // update meta（name / currency 可能在 server 被改过）
+          // update meta（name / currency / 共享账本字段)
           await (db.update(db.ledgers)..where((l) => l.id.equals(existing.id)))
               .write(LedgersCompanion(
             name: d.Value(r.ledgerName),
             currency: d.Value(r.currency),
+            myRole: d.Value(r.role),
+            memberCount: d.Value(r.memberCount),
+            isShared: d.Value(r.isShared),
+            ownerUserId: r.ownerUserId != null
+                ? d.Value(r.ownerUserId)
+                : const d.Value.absent(),
           ));
           upserted++;
           continue;
@@ -431,6 +437,12 @@ class SyncEngine implements app.SyncService {
               .write(LedgersCompanion(
             syncId: d.Value(syncId),
             currency: d.Value(r.currency),
+            myRole: d.Value(r.role),
+            memberCount: d.Value(r.memberCount),
+            isShared: d.Value(r.isShared),
+            ownerUserId: r.ownerUserId != null
+                ? d.Value(r.ownerUserId)
+                : const d.Value.absent(),
           ));
           upserted++;
           continue;
@@ -440,6 +452,12 @@ class SyncEngine implements app.SyncService {
               name: r.ledgerName,
               currency: d.Value(r.currency),
               syncId: d.Value(syncId),
+              myRole: d.Value(r.role),
+              memberCount: d.Value(r.memberCount),
+              isShared: d.Value(r.isShared),
+              ownerUserId: r.ownerUserId != null
+                  ? d.Value(r.ownerUserId)
+                  : const d.Value.absent(),
             ));
         inserted++;
       }
@@ -506,10 +524,48 @@ class SyncEngine implements app.SyncService {
           '从 snapshot change 拿到 ledgerSyncId=$deletedLedgerSyncId,继续 push');
     }
 
+    // 共享账本 Phase 2:user-global 变更(category/account/tag,ledgerId=0)绑
+    // 当前 ledger.syncId 在 server 端会撞 Editor 限制(共享账本 server 拒非
+    // tx 的写),所以必须选一个 B 自己 owner 的账本挂上去。优先选非共享,兜底
+    // 选 B 自己的共享 owner 账本;都没有 → 跳过这条 user-global push(等下次
+    // B 切到自己账本时再 sync)。
+    String? userGlobalPushLedgerId;
+    final hasUserGlobal = changes.any((c) =>
+        ChangeTracker.userGlobalEntityTypes.contains(c.entityType));
+    if (hasUserGlobal) {
+      // 优先 myRole='owner' && isShared=false 的非共享自有账本
+      var ownLedger = await (db.select(db.ledgers)
+            ..where((l) =>
+                l.myRole.equals('owner') & l.isShared.equals(false) &
+                l.syncId.isNotNull())
+            ..orderBy([(l) => d.OrderingTerm.asc(l.id)])
+            ..limit(1))
+          .getSingleOrNull();
+      // 兜底:B 自己 own 的共享账本
+      ownLedger ??= await (db.select(db.ledgers)
+            ..where((l) => l.myRole.equals('owner') & l.syncId.isNotNull())
+            ..orderBy([(l) => d.OrderingTerm.asc(l.id)])
+            ..limit(1))
+          .getSingleOrNull();
+      userGlobalPushLedgerId = ownLedger?.syncId;
+      if (userGlobalPushLedgerId == null) {
+        logger.warning('SyncEngine',
+            'push: 有 user-global 变更但找不到 B own 的账本承载,本批跳过 user-global');
+      }
+    }
+
     // 构建服务端 push 格式：从 DB 读取最新数据序列化
     final syncChanges = <Map<String, dynamic>>[];
 
     for (final change in changes) {
+      final isUserGlobal =
+          ChangeTracker.userGlobalEntityTypes.contains(change.entityType);
+
+      // user-global 变更没有 owner 账本可挂时跳过(避免 push 给 Editor 共享被拒)
+      if (isUserGlobal && userGlobalPushLedgerId == null) {
+        continue;
+      }
+
       Map<String, dynamic> payload;
 
       if (change.action == 'delete') {
@@ -529,22 +585,15 @@ class SyncEngine implements app.SyncService {
       // 就同步过的账本，migration 把 syncId 回填成了原 int id（如 "1"、"5"），
       // 兼容 server 已有数据；对 v21 之后新建的账本，syncId 是 UUID。
       //
-      // 第二台设备看到同一账本后，syncLedgersFromServer 已把 A 的 syncId
-      // 写到 B 本地 ledger 行，B push 时 `ledger.syncId` 跟 A 相同 →
-      // server 不会 auto-create 新 ledger，同一账本始终单份存在。
-      //
       // 优先级:
-      //   1. ledger.syncId (常规路径,ledger 行还在)
-      //   2. deletedLedgerSyncId (deleteLedger 路径,从 ledger_snapshot:delete
-      //      change 现场捞回的被删账本 syncId,保证 server 端 ledger_id 字段
-      //      仍是它认得的 external_id 而不是本地 int id)
-      //   3. ledgerId 字符串 (兜底,理论上不会用到)
-      final pushLedgerId =
-          ledger?.syncId ?? deletedLedgerSyncId ?? ledgerId;
+      //   1. user-global 变更 → userGlobalPushLedgerId (B own 的账本)
+      //   2. ledger.syncId (常规账本路径)
+      //   3. deletedLedgerSyncId (deleteLedger 路径)
+      //   4. ledgerId 字符串 (兜底)
+      final pushLedgerId = isUserGlobal
+          ? userGlobalPushLedgerId!
+          : (ledger?.syncId ?? deletedLedgerSyncId ?? ledgerId);
       syncChanges.add({
-        // ledgerId=0 的 user-global 变更依附到当前账本 push 上。服务端按
-        // entity_type + entity_sync_id 做 LWW / 物化，不依赖这里的 ledger_id
-        // 字段，这样挂一下能让 mobile 的全局实体改动搭上任一账本的同步链。
         'ledger_id': pushLedgerId,
         'entity_type': change.entityType,
         'entity_sync_id': change.entitySyncId,

@@ -59,11 +59,12 @@ class _AccountSelectorState extends ConsumerState<AccountSelector> {
         return;
       }
 
-      // 获取所有账户，然后过滤与当前账本币种相同的可交易账户
-      final allAccounts = await repo.getAllAccounts();
-      final accounts = allAccounts
-          .where((a) => a.currency == ledger.currency && isTradableType(a.type))
-          .toList();
+      // getAvailableAccountsForLedger 内部按 ledger 类型决定查主表还是
+      // SharedAccounts(Editor 共享账本场景)。已过滤同币种,但 LRU 用还需要
+      // 二次过滤 isTradableType。
+      final allAccounts = await repo.getAvailableAccountsForLedger(widget.ledgerId);
+      final accounts =
+          allAccounts.where((a) => isTradableType(a.type)).toList();
 
       // 获取 LRU 排序
       final lruOrder = await _lruCache.getOrderedIds();

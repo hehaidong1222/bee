@@ -18,6 +18,19 @@ extension SyncEngineRealtime on SyncEngine {
         logger.info('SyncEngine',
             '收到实时事件: type=${event.type}, ledgerId=${event.ledgerId}');
         _schedulePull(event.ledgerId);
+      } else if (event.type == 'member_change') {
+        // 共享账本 Phase 2:成员加入 / 改角色 / 被踢。
+        // - joined / role_changed → schedule pull 让 UI 刷新
+        // - removed && isSelf == true → 立即清理本地该 ledger 的所有数据
+        //   (主 transactions + Shared{Categories/Accounts/Tags/TxTags/
+        //    TxAttachments} + Ledger 行 + 物理附件目录)
+        logger.info('SyncEngine',
+            '收到 member_change: ledgerId=${event.ledgerId} changeType=${event.changeType} isSelf=${event.isSelf}');
+        if (event.changeType == 'removed' && event.isSelf == true) {
+          unawaited(_handleSharedLedgerLeave(event.ledgerId));
+        } else {
+          _schedulePull(event.ledgerId);
+        }
       } else if (event.type == 'profile_change') {
         // A 设备改主题色 / 收支配色 / 外观 / 头像 → server 广播。这里拉一下
         // /profile/me,把 theme_primary_color / income_is_red / appearance
@@ -148,5 +161,91 @@ extension SyncEngineRealtime on SyncEngine {
         _autoPulling = false;
       }
     });
+  }
+
+  /// 被踢出共享账本时的本地清理。WS 推 member_change.removed && isSelf=true 触发,
+  /// 也支持主动退出后 client 端调用(member_list_page._confirmLeave)。
+  ///
+  /// 删除范围:
+  /// - transactions: 该 ledger 下所有 tx + 关联的 transaction_tags + 主表的
+  ///   transaction_attachments(共享账本 tx 同时挂的)
+  /// - SharedCategories / SharedAccounts / SharedTags / SharedTransactionTags /
+  ///   SharedTransactionAttachments: 按 sharedLedgerId = 该 ledger.id 批量清
+  /// - Ledgers 行本身
+  /// - 物理附件子目录(Step 4 加)
+  Future<void> _handleSharedLedgerLeave(String? ledgerSyncId) async {
+    if (ledgerSyncId == null || ledgerSyncId.isEmpty) return;
+    final ledger = await (db.select(db.ledgers)
+          ..where((l) => l.syncId.equals(ledgerSyncId)))
+        .getSingleOrNull();
+    if (ledger == null) {
+      logger.warning('SyncEngine',
+          'leave: 找不到本地 ledger syncId=$ledgerSyncId,跳过 purge');
+      return;
+    }
+    await purgeSharedLedger(ledger.id);
+    onAutoPullCompleted?.call(ledgerSyncId);
+  }
+
+  /// 公开版本,UI 主动退出场景(member_list_page._confirmLeave 成功后)直接调。
+  Future<void> purgeSharedLedger(int localLedgerId) async {
+    logger.info('SyncEngine', 'purgeSharedLedger: localLedgerId=$localLedgerId');
+
+    // 先收集要清的 tx + 物理附件路径(事务外做,免得 transaction 内 await
+    // 系统 I/O 拖事务时长)
+    final txs = await (db.select(db.transactions)
+          ..where((t) => t.ledgerId.equals(localLedgerId)))
+        .get();
+    final txIds = txs.map((t) => t.id).toList();
+
+    // Step 4:清磁盘附件 — 共享账本 tx 的 transaction_attachments 行被删前先清
+    // 物理文件,避免 attachments/*.jpg 永久残留。逻辑跟 _cleanupTxAttachmentFilesOnDisk
+    // 一致但批量做。
+    for (final txId in txIds) {
+      try {
+        await _cleanupTxAttachmentFilesOnDisk(txId);
+      } catch (e, st) {
+        logger.warning('SyncEngine',
+            'purgeSharedLedger: cleanup attachment files for tx=$txId failed: $e', st);
+      }
+    }
+
+    await db.transaction(() async {
+      if (txIds.isNotEmpty) {
+        await (db.delete(db.transactionTags)
+              ..where((tt) => tt.transactionId.isIn(txIds)))
+            .go();
+        await (db.delete(db.transactionAttachments)
+              ..where((a) => a.transactionId.isIn(txIds)))
+            .go();
+      }
+      await (db.delete(db.transactions)
+            ..where((t) => t.ledgerId.equals(localLedgerId)))
+          .go();
+
+      // Shared* 沙盒(Editor 视角的 A 资源临时缓存)
+      await (db.delete(db.sharedCategories)
+            ..where((c) => c.sharedLedgerId.equals(localLedgerId)))
+          .go();
+      await (db.delete(db.sharedAccounts)
+            ..where((a) => a.sharedLedgerId.equals(localLedgerId)))
+          .go();
+      await (db.delete(db.sharedTags)
+            ..where((t) => t.sharedLedgerId.equals(localLedgerId)))
+          .go();
+      await (db.delete(db.sharedTransactionTags)
+            ..where((stt) => stt.sharedLedgerId.equals(localLedgerId)))
+          .go();
+      await (db.delete(db.sharedTransactionAttachments)
+            ..where((sta) => sta.sharedLedgerId.equals(localLedgerId)))
+          .go();
+
+      // ledger 本身
+      await (db.delete(db.ledgers)
+            ..where((l) => l.id.equals(localLedgerId)))
+          .go();
+    });
+    logger.info('SyncEngine',
+        'purgeSharedLedger 完成: ledger=$localLedgerId tx=${txIds.length}');
   }
 }

@@ -297,6 +297,10 @@ class LocalRepository extends BaseRepository {
     required DateTime happenedAt,
     String? note,
     String? syncId,
+    String? categorySyncIdOverride,
+    String? accountSyncIdOverride,
+    String? toAccountSyncIdOverride,
+    String? tagSyncIdsOverride,
   }) async {
     final id = await _transactionRepo.addTransaction(
       ledgerId: ledgerId,
@@ -308,6 +312,10 @@ class LocalRepository extends BaseRepository {
       happenedAt: happenedAt,
       note: note,
       syncId: syncId,
+      categorySyncIdOverride: categorySyncIdOverride,
+      accountSyncIdOverride: accountSyncIdOverride,
+      toAccountSyncIdOverride: toAccountSyncIdOverride,
+      tagSyncIdsOverride: tagSyncIdsOverride,
     );
     if (changeTracker != null) {
       final tx = await _transactionRepo.getTransactionById(id);
@@ -369,6 +377,10 @@ class LocalRepository extends BaseRepository {
     String? note,
     DateTime? happenedAt,
     dynamic accountId,
+    String? categorySyncIdOverride,
+    String? accountSyncIdOverride,
+    String? toAccountSyncIdOverride,
+    String? tagSyncIdsOverride,
   }) async {
     if (changeTracker != null) {
       final tx = await _transactionRepo.getTransactionById(id);
@@ -377,6 +389,10 @@ class LocalRepository extends BaseRepository {
           id: id, type: type, amount: amount,
           categoryId: categoryId, note: note,
           happenedAt: happenedAt, accountId: accountId,
+          categorySyncIdOverride: categorySyncIdOverride,
+          accountSyncIdOverride: accountSyncIdOverride,
+          toAccountSyncIdOverride: toAccountSyncIdOverride,
+          tagSyncIdsOverride: tagSyncIdsOverride,
         );
         await changeTracker!.recordLedgerChange(
           entityType: 'transaction',
@@ -392,6 +408,10 @@ class LocalRepository extends BaseRepository {
       id: id, type: type, amount: amount,
       categoryId: categoryId, note: note,
       happenedAt: happenedAt, accountId: accountId,
+      categorySyncIdOverride: categorySyncIdOverride,
+      accountSyncIdOverride: accountSyncIdOverride,
+      toAccountSyncIdOverride: toAccountSyncIdOverride,
+      tagSyncIdsOverride: tagSyncIdsOverride,
     );
   }
 
@@ -714,6 +734,14 @@ class LocalRepository extends BaseRepository {
   @override
   Future<List<Category>> getSubCategories(int parentId) =>
       _categoryRepo.getSubCategories(parentId);
+
+  @override
+  Future<List<Category>> getTopLevelCategoriesForLedger(String kind, {int? ledgerId}) =>
+      _categoryRepo.getTopLevelCategoriesForLedger(kind, ledgerId: ledgerId);
+
+  @override
+  Future<List<Category>> getSubCategoriesForLedger(int parentId, {int? ledgerId}) =>
+      _categoryRepo.getSubCategoriesForLedger(parentId, ledgerId: ledgerId);
 
   @override
   Future<List<Category>> getUsableCategories(String kind) =>
@@ -1695,6 +1723,10 @@ class LocalRepository extends BaseRepository {
 
   @override
   Future<List<Tag>> getAllTags() => _tagRepo.getAllTags();
+
+  @override
+  Future<List<Tag>> getAllTagsForLedger({int? ledgerId}) =>
+      _tagRepo.getAllTagsForLedger(ledgerId: ledgerId);
 
   @override
   Future<void> batchInsertTags(List<TagsCompanion> tags) async {

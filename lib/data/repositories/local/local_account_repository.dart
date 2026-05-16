@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../db.dart';
 import '../../../services/system/logger_service.dart';
 import '../../../utils/account_type_utils.dart';
+import '../../../utils/shared_to_main_adapter.dart';
 import '../account_repository.dart';
 
 /// 本地账户Repository实现
@@ -55,7 +56,21 @@ class LocalAccountRepository implements AccountRepository {
           ..where((l) => l.id.equals(ledgerId)))
         .getSingle();
 
-    // 通过币种过滤账户
+    // 共享账本(Editor)走 SharedAccounts 沙盒
+    if (ledger.isShared && ledger.myRole != 'owner') {
+      final rows = await (db.select(db.sharedAccounts)
+            ..where((a) =>
+                a.sharedLedgerId.equals(ledgerId) &
+                a.currency.equals(ledger.currency))
+            ..orderBy([
+              (a) => d.OrderingTerm(expression: a.type),
+              (a) => d.OrderingTerm(expression: a.sortOrder),
+            ]))
+          .get();
+      return rows.map(sharedAccountAsAccount).toList();
+    }
+
+    // 单人 / Owner 共享:沿用主表 + 通过币种过滤
     return await (db.select(db.accounts)
           ..where((a) => a.currency.equals(ledger.currency)))
         .get();

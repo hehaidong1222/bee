@@ -55,6 +55,16 @@ abstract class CategoryRepository {
   /// 获取指定一级分类下的所有二级分类
   Future<List<Category>> getSubCategories(int parentId);
 
+  /// 给指定账本拿一级分类。
+  /// - 单人账本 / Owner 的共享账本(myRole='owner')→ 走主表 Categories(等同 getTopLevelCategories)
+  /// - Editor 视角共享账本(isShared && myRole != 'owner')→ 走 SharedCategories 沙盒,
+  ///   返回 wrap 成 Category 的临时缓存数据(A 的分类)
+  /// [ledgerId] 为 null 时跟 getTopLevelCategories 行为一致。
+  Future<List<Category>> getTopLevelCategoriesForLedger(String kind, {int? ledgerId});
+
+  /// 给指定账本拿二级分类。语义同上。
+  Future<List<Category>> getSubCategoriesForLedger(int parentId, {int? ledgerId});
+
   /// 获取可用于记账的分类（叶子分类）
   Future<List<Category>> getUsableCategories(String kind);
 

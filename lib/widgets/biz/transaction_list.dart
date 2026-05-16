@@ -422,21 +422,35 @@ class TransactionListState extends ConsumerState<TransactionList> {
             String? accountName;
             String? toAccountName; // 转账目标账户名称
 
-            if (accountFeatureEnabled && it.t.accountId != null) {
-              // 优先使用预加载的账户名称
-              accountName = _getAccountNameForTransaction(it.t.id);
-              if (isTransfer && it.t.toAccountId != null) {
-                toAccountName = _getToAccountNameForTransaction(it.t.id);
-              }
+            if (accountFeatureEnabled) {
+              // 共享账本 Phase 2:优先 override
+              final accOverride = it.t.accountSyncIdOverride;
+              final toAccOverride = it.t.toAccountSyncIdOverride;
 
-              // 预加载数据中找不到时，通过 Provider 获取（新记录的交易不在预加载缓存中）
-              if (accountName == null) {
-                final accountAsync = ref.watch(accountByIdProvider(it.t.accountId!));
-                accountName = accountAsync.valueOrNull?.name;
+              if (accOverride != null && accOverride.isNotEmpty) {
+                final shared = ref.watch(accountBySharedSyncIdProvider(accOverride));
+                accountName = shared.valueOrNull?.name;
+              } else if (it.t.accountId != null) {
+                // 优先使用预加载的账户名称
+                accountName = _getAccountNameForTransaction(it.t.id);
+                if (accountName == null) {
+                  final accountAsync = ref.watch(accountByIdProvider(it.t.accountId!));
+                  accountName = accountAsync.valueOrNull?.name;
+                }
               }
-              if (isTransfer && toAccountName == null && it.t.toAccountId != null) {
-                final toAccountAsync = ref.watch(accountByIdProvider(it.t.toAccountId!));
-                toAccountName = toAccountAsync.valueOrNull?.name;
+              if (isTransfer) {
+                if (toAccOverride != null && toAccOverride.isNotEmpty) {
+                  final shared =
+                      ref.watch(accountBySharedSyncIdProvider(toAccOverride));
+                  toAccountName = shared.valueOrNull?.name;
+                } else if (it.t.toAccountId != null) {
+                  toAccountName = _getToAccountNameForTransaction(it.t.id);
+                  if (toAccountName == null) {
+                    final toAccountAsync =
+                        ref.watch(accountByIdProvider(it.t.toAccountId!));
+                    toAccountName = toAccountAsync.valueOrNull?.name;
+                  }
+                }
               }
             }
 

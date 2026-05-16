@@ -17,16 +17,22 @@ class TagSelector extends ConsumerStatefulWidget {
   /// 选择完成回调
   final void Function(List<int> selectedIds)? onConfirm;
 
+  /// 给定记账上下文的 ledgerId,共享账本(Editor)下走 SharedTags 沙盒。
+  /// null = 用主表(标签管理页 / 没有账本上下文时)。
+  final int? ledgerId;
+
   const TagSelector({
     super.key,
     this.selectedTagIds = const [],
     this.onConfirm,
+    this.ledgerId,
   });
 
   /// 显示标签选择器
   static Future<List<int>?> show(
     BuildContext context, {
     List<int> selectedTagIds = const [],
+    int? ledgerId,
   }) async {
     return await showModalBottomSheet<List<int>>(
       context: context,
@@ -34,6 +40,7 @@ class TagSelector extends ConsumerStatefulWidget {
       backgroundColor: Colors.transparent,
       builder: (context) => TagSelector(
         selectedTagIds: selectedTagIds,
+        ledgerId: ledgerId,
       ),
     );
   }
@@ -55,7 +62,8 @@ class _TagSelectorState extends ConsumerState<TagSelector> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final allTagsAsync = ref.watch(allTagsProvider);
+    // 共享账本(Editor)下走 SharedTags 沙盒;管理页等无 ledgerId 上下文用主表
+    final allTagsAsync = ref.watch(recordingTagsProvider(widget.ledgerId));
     final recentTagsAsync = ref.watch(recentlyUsedTagsProvider);
 
     return Container(

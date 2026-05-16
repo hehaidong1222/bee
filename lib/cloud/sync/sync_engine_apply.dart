@@ -104,36 +104,77 @@ extension _SyncEngineApply on SyncEngine {
     final accountName = payload['accountName'] as String?;
     final toAccountName = payload['toAccountName'] as String?;
 
-    // 解析关联实体 ID —— 优先用 syncId 映射（跨设备稳定），fallback 到名字。
-    // payload 里的 categoryId / accountId / toAccountId 是 server snapshot.items[i]
-    // 存的远端实体 syncId，B 设备 pull 后 category/account 已经上 syncId 了
-    // （P1 的 fallback 给 seed 补的，或 pull 新插入带的），按 syncId 查一定命中。
-    // 名字 fallback 兜住旧 snapshot payload 没 syncId 的老数据。
+    // 共享账本 Phase 2:Editor 视角共享账本里,tx.categoryId/accountId 这些 int
+    // 字段留 null,改用 *SyncIdOverride 字段存 server syncId(跨设备稳定 + 不撞
+    // 主表 id)。单人 / Owner 共享走原 int 字段(老 join 主表代码继续工作)。
+    final ledger = ledgerIdInt > 0
+        ? await (db.select(db.ledgers)
+              ..where((l) => l.id.equals(ledgerIdInt)))
+            .getSingleOrNull()
+        : null;
+    final isEditorShared =
+        ledger != null && ledger.isShared && ledger.myRole != 'owner';
+
     final rawCategoryId = payload['categoryId'] as String?;
-    final categoryId =
-        await _resolveCategoryIdBySyncId(rawCategoryId) ??
-            await _resolveCategoryId(
-              categoryName: categoryName,
-              categoryKind: categoryKind,
-            );
     final rawAccountId = payload['accountId'] as String?;
-    final accountId =
-        await _resolveAccountIdBySyncId(rawAccountId) ??
-            await _resolveAccountId(
-              accountName: accountName,
-              ledgerId: ledgerIdInt,
-            );
     final rawToAccountId = payload['toAccountId'] as String?;
-    final toAccountId =
-        await _resolveAccountIdBySyncId(rawToAccountId) ??
-            await _resolveAccountId(
-              accountName: toAccountName,
-              ledgerId: ledgerIdInt,
-            );
+
+    int? categoryId;
+    int? accountId;
+    int? toAccountId;
+    String? categorySyncIdOverride;
+    String? accountSyncIdOverride;
+    String? toAccountSyncIdOverride;
+
+    if (isEditorShared) {
+      // 共享场景:int 字段全 null;override 字段写 server syncId。
+      // 渲染时按 override 查 SharedCategories;push 时直接当 categorySyncId 用。
+      categoryId = null;
+      accountId = null;
+      toAccountId = null;
+      categorySyncIdOverride = (rawCategoryId?.isEmpty ?? true) ? null : rawCategoryId;
+      accountSyncIdOverride = (rawAccountId?.isEmpty ?? true) ? null : rawAccountId;
+      toAccountSyncIdOverride =
+          (rawToAccountId?.isEmpty ?? true) ? null : rawToAccountId;
+    } else {
+      // 单人 / Owner 共享:走原主表 int 引用
+      categoryId = await _resolveCategoryIdBySyncId(rawCategoryId) ??
+          await _resolveCategoryId(
+            categoryName: categoryName,
+            categoryKind: categoryKind,
+          );
+      accountId = await _resolveAccountIdBySyncId(rawAccountId) ??
+          await _resolveAccountId(
+            accountName: accountName,
+            ledgerId: ledgerIdInt,
+          );
+      toAccountId = await _resolveAccountIdBySyncId(rawToAccountId) ??
+          await _resolveAccountId(
+            accountName: toAccountName,
+            ledgerId: ledgerIdInt,
+          );
+    }
 
     final existing = await (db.select(db.transactions)
           ..where((t) => t.syncId.equals(syncId)))
         .getSingleOrNull();
+
+    // 共享账本 Phase 1:server 在 payload 里捎来"谁创建 / 谁最后编辑"。
+    // 字段可能不存在(老 server)或为空字符串,统一 nullable。
+    final createdByUserId = (payload['createdByUserId'] as String?)?.trim();
+    final lastEditedByUserId =
+        (payload['updatedByUserId'] as String?)?.trim() ??
+            (payload['lastEditedByUserId'] as String?)?.trim();
+
+    // tagSyncIdsOverride: Editor 共享场景下从 payload.tagIds 取(主表 sync 路径用
+    // tag id 关联走 transaction_tags 主表;这里走 override 一并跳过)
+    String? tagSyncIdsOverride;
+    if (isEditorShared) {
+      final rawTagIds = payload['tagIds'];
+      if (rawTagIds is List && rawTagIds.isNotEmpty) {
+        tagSyncIdsOverride = '[${rawTagIds.whereType<String>().map((s) => '"$s"').join(',')}]';
+      }
+    }
 
     if (existing != null) {
       // 更新
@@ -147,9 +188,33 @@ extension _SyncEngineApply on SyncEngine {
         categoryId: d.Value(categoryId),
         accountId: d.Value(accountId),
         toAccountId: d.Value(toAccountId),
+        // 不覆盖已有 createdByUserId(后到的 update payload 通常不携带),
+        // 仅当 payload 给出且非空时同步;updatedByUserId 每次写都更新。
+        createdByUserId: (createdByUserId == null || createdByUserId.isEmpty)
+            ? const d.Value.absent()
+            : d.Value(createdByUserId),
+        lastEditedByUserId:
+            (lastEditedByUserId == null || lastEditedByUserId.isEmpty)
+                ? const d.Value.absent()
+                : d.Value(lastEditedByUserId),
+        // Editor 共享场景:override 字段刷新(包括清空场景:从有 override 改成无)
+        categorySyncIdOverride: isEditorShared
+            ? d.Value(categorySyncIdOverride)
+            : const d.Value.absent(),
+        accountSyncIdOverride: isEditorShared
+            ? d.Value(accountSyncIdOverride)
+            : const d.Value.absent(),
+        toAccountSyncIdOverride: isEditorShared
+            ? d.Value(toAccountSyncIdOverride)
+            : const d.Value.absent(),
+        tagSyncIdsOverride: isEditorShared
+            ? d.Value(tagSyncIdsOverride)
+            : const d.Value.absent(),
       ));
-      // 更新标签和附件
-      await _syncTransactionTags(existing.id, payload);
+      // 更新标签和附件(Editor 共享场景跳过 transaction_tags 主表写,改走 override)
+      if (!isEditorShared) {
+        await _syncTransactionTags(existing.id, payload);
+      }
       await _syncTransactionAttachments(existing.id, payload);
       logger.debug('SyncEngine', 'pull: 更新交易 $syncId');
     } else {
@@ -165,16 +230,45 @@ extension _SyncEngineApply on SyncEngine {
               accountId: d.Value(accountId),
               toAccountId: d.Value(toAccountId),
               syncId: d.Value(syncId),
+              createdByUserId: (createdByUserId == null || createdByUserId.isEmpty)
+                  ? const d.Value.absent()
+                  : d.Value(createdByUserId),
+              lastEditedByUserId:
+                  (lastEditedByUserId == null || lastEditedByUserId.isEmpty)
+                      ? const d.Value.absent()
+                      : d.Value(lastEditedByUserId),
+              categorySyncIdOverride: d.Value(categorySyncIdOverride),
+              accountSyncIdOverride: d.Value(accountSyncIdOverride),
+              toAccountSyncIdOverride: d.Value(toAccountSyncIdOverride),
+              tagSyncIdsOverride: d.Value(tagSyncIdsOverride),
             ),
           );
-      // 同步标签和附件
-      await _syncTransactionTags(id, payload);
+      // 同步标签和附件(Editor 共享场景跳过 transaction_tags 主表)
+      if (!isEditorShared) {
+        await _syncTransactionTags(id, payload);
+      }
       await _syncTransactionAttachments(id, payload);
       logger.debug('SyncEngine', 'pull: 新增交易 $syncId');
     }
   }
 
+  /// 判断 sync_change.ledger_id 对应本地是不是 "B 是 Editor 角色的共享账本"。
+  /// 是 → 返本地 ledger.id;否(单人 / Owner 的共享) → 返 null。
+  Future<int?> _resolveSharedLedgerScope(String ledgerSyncId) async {
+    final ledger = await (db.select(db.ledgers)
+          ..where((l) => l.syncId.equals(ledgerSyncId)))
+        .getSingleOrNull();
+    if (ledger == null) return null;
+    if (ledger.isShared && ledger.myRole != 'owner') return ledger.id;
+    return null;
+  }
+
   Future<void> _applyAccountChange(BeeCountCloudSyncChange change) async {
+    // 共享账本沙盒分派:B 是 Editor 时 A 的账户写到 SharedAccounts,与主表完全隔离
+    final scope = await _resolveSharedLedgerScope(change.ledgerId);
+    if (scope != null) {
+      return _applySharedAccountChange(change, sharedLedgerId: scope);
+    }
     final syncId = change.entitySyncId;
     // ledger_id 也按 syncId 映射到本地 int。account 表 ledgerId 是 legacy
     // 字段，但 insert 时仍需填个有效值；映射失败再 fallback 到旧格式。
@@ -273,6 +367,11 @@ extension _SyncEngineApply on SyncEngine {
 
   Future<void> _applyCategoryChange(
       BeeCountCloudSyncChange change) async {
+    // 共享账本沙盒分派
+    final scope = await _resolveSharedLedgerScope(change.ledgerId);
+    if (scope != null) {
+      return _applySharedCategoryChange(change, sharedLedgerId: scope);
+    }
     final syncId = change.entitySyncId;
 
     if (change.action == 'delete') {
@@ -427,6 +526,11 @@ extension _SyncEngineApply on SyncEngine {
   }
 
   Future<void> _applyTagChange(BeeCountCloudSyncChange change) async {
+    // 共享账本沙盒分派
+    final scope = await _resolveSharedLedgerScope(change.ledgerId);
+    if (scope != null) {
+      return _applySharedTagChange(change, sharedLedgerId: scope);
+    }
     final syncId = change.entitySyncId;
 
     if (change.action == 'delete') {
@@ -489,6 +593,225 @@ extension _SyncEngineApply on SyncEngine {
             ),
           );
       logger.debug('SyncEngine', 'pull: 新增标签 $syncId');
+    }
+  }
+
+  // =========================================================================
+  // 共享账本沙盒 apply 方法 — 把 A 的 categories/accounts/tags 写到独立的
+  // Shared* 表,跟主表完全物理隔离。
+  //
+  // 关键差异:
+  // - 没有 "seed 收编" 兜底(SharedX 表从来不会有 seed 数据)
+  // - PK / unique 在 (sharedLedgerId, syncId) 维度,可以多个共享账本各自有同名
+  //   分类共存
+  // - parentId 用 parentSyncId(因为本地 id 跨设备不通)
+  // - 删除时只清自己的 sharedLedgerId 命名空间,不动主表
+  // =========================================================================
+
+  Future<void> _applySharedCategoryChange(
+    BeeCountCloudSyncChange change, {
+    required int sharedLedgerId,
+  }) async {
+    final syncId = change.entitySyncId;
+
+    if (change.action == 'delete') {
+      // 同时删自己 + 自己的子分类
+      await (db.delete(db.sharedCategories)
+            ..where((c) =>
+                c.sharedLedgerId.equals(sharedLedgerId) &
+                c.parentSyncId.equals(syncId)))
+          .go();
+      await (db.delete(db.sharedCategories)
+            ..where((c) =>
+                c.sharedLedgerId.equals(sharedLedgerId) &
+                c.syncId.equals(syncId)))
+          .go();
+      logger.debug('SyncEngine', 'pull(shared): 删除分类 $syncId @ledger=$sharedLedgerId');
+      return;
+    }
+
+    final payload = change.payload!;
+    final name = payload['name'] as String? ?? '';
+    final kind = payload['kind'] as String? ?? 'expense';
+    final level = (payload['level'] as num?)?.toInt() ?? 1;
+    final sortOrder = (payload['sortOrder'] as num?)?.toInt() ?? 0;
+    final icon = payload['icon'] as String?;
+    final iconType = payload['iconType'] as String? ?? 'material';
+    final customIconPath = payload['customIconPath'] as String?;
+    // payload 里 parentName 是 A 视角的;Shared 表用 parentSyncId 嵌套
+    final parentName = payload['parentName'] as String?;
+    String? parentSyncId;
+    if (parentName != null && parentName.isNotEmpty) {
+      final parent = await (db.select(db.sharedCategories)
+            ..where((c) =>
+                c.sharedLedgerId.equals(sharedLedgerId) &
+                c.name.equals(parentName) &
+                c.kind.equals(kind) &
+                c.level.equals(1)))
+          .getSingleOrNull();
+      parentSyncId = parent?.syncId;
+    }
+
+    final existing = await (db.select(db.sharedCategories)
+          ..where((c) =>
+              c.sharedLedgerId.equals(sharedLedgerId) &
+              c.syncId.equals(syncId)))
+        .getSingleOrNull();
+
+    if (existing != null) {
+      await (db.update(db.sharedCategories)
+            ..where((c) => c.id.equals(existing.id)))
+          .write(SharedCategoriesCompanion(
+        name: d.Value(name),
+        kind: d.Value(kind),
+        level: d.Value(level),
+        sortOrder: d.Value(sortOrder),
+        icon: d.Value(icon),
+        iconType: d.Value(iconType),
+        customIconPath: d.Value(customIconPath),
+        parentSyncId: d.Value(parentSyncId),
+      ));
+      logger.debug('SyncEngine', 'pull(shared): 更新分类 $syncId @ledger=$sharedLedgerId');
+    } else {
+      await db.into(db.sharedCategories).insert(
+            SharedCategoriesCompanion.insert(
+              sharedLedgerId: sharedLedgerId,
+              syncId: syncId,
+              name: name,
+              kind: kind,
+              icon: d.Value(icon),
+              sortOrder: d.Value(sortOrder),
+              parentSyncId: d.Value(parentSyncId),
+              level: d.Value(level),
+              iconType: d.Value(iconType),
+              customIconPath: d.Value(customIconPath),
+            ),
+          );
+      logger.debug('SyncEngine', 'pull(shared): 新增分类 $syncId @ledger=$sharedLedgerId');
+    }
+  }
+
+  Future<void> _applySharedAccountChange(
+    BeeCountCloudSyncChange change, {
+    required int sharedLedgerId,
+  }) async {
+    final syncId = change.entitySyncId;
+
+    if (change.action == 'delete') {
+      await (db.delete(db.sharedAccounts)
+            ..where((a) =>
+                a.sharedLedgerId.equals(sharedLedgerId) &
+                a.syncId.equals(syncId)))
+          .go();
+      logger.debug('SyncEngine', 'pull(shared): 删除账户 $syncId @ledger=$sharedLedgerId');
+      return;
+    }
+
+    final payload = change.payload!;
+    final name = payload['name'] as String? ?? '';
+    final type = payload['type'] as String? ?? 'cash';
+    final currency = payload['currency'] as String? ?? 'CNY';
+    final initialBalance = (payload['initialBalance'] as num?)?.toDouble() ?? 0.0;
+    final sortOrder = (payload['sortOrder'] as num?)?.toInt() ?? 0;
+
+    final existing = await (db.select(db.sharedAccounts)
+          ..where((a) =>
+              a.sharedLedgerId.equals(sharedLedgerId) &
+              a.syncId.equals(syncId)))
+        .getSingleOrNull();
+
+    if (existing != null) {
+      await (db.update(db.sharedAccounts)
+            ..where((a) => a.id.equals(existing.id)))
+          .write(SharedAccountsCompanion(
+        name: d.Value(name),
+        type: d.Value(type),
+        currency: d.Value(currency),
+        initialBalance: d.Value(initialBalance),
+        sortOrder: d.Value(sortOrder),
+        creditLimit: d.Value((payload['creditLimit'] as num?)?.toDouble()),
+        billingDay: d.Value((payload['billingDay'] as num?)?.toInt()),
+        paymentDueDay: d.Value((payload['paymentDueDay'] as num?)?.toInt()),
+        bankName: d.Value(payload['bankName'] as String?),
+        cardLastFour: d.Value(payload['cardLastFour'] as String?),
+        note: d.Value(payload['note'] as String?),
+      ));
+      logger.debug('SyncEngine', 'pull(shared): 更新账户 $syncId @ledger=$sharedLedgerId');
+    } else {
+      await db.into(db.sharedAccounts).insert(
+            SharedAccountsCompanion.insert(
+              sharedLedgerId: sharedLedgerId,
+              syncId: syncId,
+              name: name,
+              type: d.Value(type),
+              currency: d.Value(currency),
+              initialBalance: d.Value(initialBalance),
+              sortOrder: d.Value(sortOrder),
+              creditLimit: d.Value((payload['creditLimit'] as num?)?.toDouble()),
+              billingDay: d.Value((payload['billingDay'] as num?)?.toInt()),
+              paymentDueDay: d.Value((payload['paymentDueDay'] as num?)?.toInt()),
+              bankName: d.Value(payload['bankName'] as String?),
+              cardLastFour: d.Value(payload['cardLastFour'] as String?),
+              note: d.Value(payload['note'] as String?),
+            ),
+          );
+      logger.debug('SyncEngine', 'pull(shared): 新增账户 $syncId @ledger=$sharedLedgerId');
+    }
+  }
+
+  Future<void> _applySharedTagChange(
+    BeeCountCloudSyncChange change, {
+    required int sharedLedgerId,
+  }) async {
+    final syncId = change.entitySyncId;
+
+    if (change.action == 'delete') {
+      // 同时删 SharedTransactionTags 关联
+      await (db.delete(db.sharedTransactionTags)
+            ..where((stt) =>
+                stt.sharedLedgerId.equals(sharedLedgerId) &
+                stt.tagSyncId.equals(syncId)))
+          .go();
+      await (db.delete(db.sharedTags)
+            ..where((t) =>
+                t.sharedLedgerId.equals(sharedLedgerId) &
+                t.syncId.equals(syncId)))
+          .go();
+      logger.debug('SyncEngine', 'pull(shared): 删除标签 $syncId @ledger=$sharedLedgerId');
+      return;
+    }
+
+    final payload = change.payload!;
+    final name = payload['name'] as String? ?? '';
+    final color = payload['color'] as String?;
+    final sortOrder = (payload['sortOrder'] as num?)?.toInt() ?? 0;
+
+    final existing = await (db.select(db.sharedTags)
+          ..where((t) =>
+              t.sharedLedgerId.equals(sharedLedgerId) &
+              t.syncId.equals(syncId)))
+        .getSingleOrNull();
+
+    if (existing != null) {
+      await (db.update(db.sharedTags)
+            ..where((t) => t.id.equals(existing.id)))
+          .write(SharedTagsCompanion(
+        name: d.Value(name),
+        color: d.Value(color),
+        sortOrder: d.Value(sortOrder),
+      ));
+      logger.debug('SyncEngine', 'pull(shared): 更新标签 $syncId @ledger=$sharedLedgerId');
+    } else {
+      await db.into(db.sharedTags).insert(
+            SharedTagsCompanion.insert(
+              sharedLedgerId: sharedLedgerId,
+              syncId: syncId,
+              name: name,
+              color: d.Value(color),
+              sortOrder: d.Value(sortOrder),
+            ),
+          );
+      logger.debug('SyncEngine', 'pull(shared): 新增标签 $syncId @ledger=$sharedLedgerId');
     }
   }
 

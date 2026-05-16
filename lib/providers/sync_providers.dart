@@ -729,6 +729,10 @@ final localLedgersProvider =
         createdAt: ledger.createdAt,
         transactionCount: stats.transactionCount,
         balance: stats.balance,
+        isShared: ledger.isShared,
+        memberCount: ledger.memberCount,
+        myRole: ledger.myRole,
+        localSyncId: ledger.syncId,
       ));
     }
 
@@ -795,6 +799,9 @@ final remoteLedgersProvider =
         updatedAt: r.updatedAt ?? DateTime.now(),
         transactionCount: r.transactionCount,
         balance: r.incomeTotal - r.expenseTotal,
+        isShared: r.isShared,
+        memberCount: r.memberCount,
+        myRole: r.role,
       ));
     }
     return out;

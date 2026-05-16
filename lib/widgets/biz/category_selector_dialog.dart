@@ -115,13 +115,20 @@ class _CategorySelectorDialogState extends ConsumerState<CategorySelectorDialog>
     super.dispose();
   }
 
-  /// 加载所有分类
+  /// 加载所有分类。共享账本(Editor)场景下,自动从 SharedCategories 沙盒取
+  /// (传 widget.ledgerId 让 repo 内部按 ledger 决定查主表还是 Shared)
   Future<List<Category>> _loadAllCategories() async {
     final repo = ref.read(repositoryProvider);
 
     // 获取收入和支出分类
-    final incomeCategories = await repo.getTopLevelCategories('income');
-    final expenseCategories = await repo.getTopLevelCategories('expense');
+    final incomeCategories = await repo.getTopLevelCategoriesForLedger(
+      'income',
+      ledgerId: widget.ledgerId,
+    );
+    final expenseCategories = await repo.getTopLevelCategoriesForLedger(
+      'expense',
+      ledgerId: widget.ledgerId,
+    );
 
     // 获取所有二级分类
     final allCategories = <Category>[];
@@ -132,7 +139,10 @@ class _CategorySelectorDialogState extends ConsumerState<CategorySelectorDialog>
     if (!widget.onlyTopLevel) {
       // 为每个一级分类获取子分类
       for (final category in [...incomeCategories, ...expenseCategories]) {
-        final subs = await repo.getSubCategories(category.id);
+        final subs = await repo.getSubCategoriesForLedger(
+          category.id,
+          ledgerId: widget.ledgerId,
+        );
         allCategories.addAll(subs);
       }
     }

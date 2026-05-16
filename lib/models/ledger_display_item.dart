@@ -31,6 +31,16 @@ class LedgerDisplayItem {
   /// remote-only 项的 `id` 是仅用于 UI 唯一化的占位 hashCode。
   final String? remoteSyncId;
 
+  /// 共享账本字段(v24)。从 Drift Ledgers 或 server readLedgers 直接复制。
+  /// 单人账本时 isShared=false,memberCount=1,myRole='owner'。
+  final bool isShared;
+  final int memberCount;
+  final String myRole;
+
+  /// 本地 Drift 行的 syncId(= server external_id)。共享账本需要它去调
+  /// invites/members API。单人本地账本可能为 null(还没 push 过)。
+  final String? localSyncId;
+
   const LedgerDisplayItem({
     required this.id,
     required this.name,
@@ -40,6 +50,10 @@ class LedgerDisplayItem {
     required this.lastUpdated,
     this.isRemoteOnly = false,
     this.remoteSyncId,
+    this.isShared = false,
+    this.memberCount = 1,
+    this.myRole = 'owner',
+    this.localSyncId,
   });
 
   /// 从本地账本创建
@@ -50,6 +64,10 @@ class LedgerDisplayItem {
     required DateTime createdAt,
     required int transactionCount,
     required double balance,
+    bool isShared = false,
+    int memberCount = 1,
+    String myRole = 'owner',
+    String? localSyncId,
   }) {
     return LedgerDisplayItem(
       id: id,
@@ -59,6 +77,10 @@ class LedgerDisplayItem {
       balance: balance,
       lastUpdated: createdAt,
       isRemoteOnly: false,
+      isShared: isShared,
+      memberCount: memberCount,
+      myRole: myRole,
+      localSyncId: localSyncId,
     );
   }
 
@@ -70,6 +92,9 @@ class LedgerDisplayItem {
     required DateTime updatedAt,
     required int transactionCount,
     required double balance,
+    bool isShared = false,
+    int memberCount = 1,
+    String myRole = 'owner',
   }) {
     return LedgerDisplayItem(
       // id 是 remoteSyncId 的 hashCode，只为 UI 列表唯一性；真正用于
@@ -82,6 +107,9 @@ class LedgerDisplayItem {
       lastUpdated: updatedAt,
       isRemoteOnly: true,
       remoteSyncId: remoteSyncId,
+      isShared: isShared,
+      memberCount: memberCount,
+      myRole: myRole,
     );
   }
 

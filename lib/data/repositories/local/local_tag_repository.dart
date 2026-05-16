@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart' as d;
 import 'package:uuid/uuid.dart';
 
 import '../../db.dart';
+import '../../../utils/shared_to_main_adapter.dart';
 import '../tag_repository.dart';
 
 /// 本地标签Repository实现
@@ -75,6 +78,23 @@ class LocalTagRepository implements TagRepository {
   Future<List<Tag>> getAllTags() async {
     return await (db.select(db.tags)
       ..orderBy([(t) => d.OrderingTerm(expression: t.sortOrder)])).get();
+  }
+
+  @override
+  Future<List<Tag>> getAllTagsForLedger({int? ledgerId}) async {
+    if (ledgerId == null) return getAllTags();
+    final ledger = await (db.select(db.ledgers)
+          ..where((l) => l.id.equals(ledgerId)))
+        .getSingleOrNull();
+    if (ledger == null || !ledger.isShared || ledger.myRole == 'owner') {
+      return getAllTags();
+    }
+    // Editor 共享账本 → SharedTags 沙盒
+    final rows = await (db.select(db.sharedTags)
+          ..where((t) => t.sharedLedgerId.equals(ledgerId))
+          ..orderBy([(t) => d.OrderingTerm(expression: t.sortOrder)]))
+        .get();
+    return rows.map(sharedTagAsTag).toList();
   }
 
   @override
@@ -168,6 +188,7 @@ class LocalTagRepository implements TagRepository {
   Future<Map<int, List<Tag>>> getTagsForTransactions(List<int> transactionIds) async {
     if (transactionIds.isEmpty) return {};
 
+    // 1) 走主表 transaction_tags(单人 / Owner 共享路径)
     final query = db.select(db.transactionTags).join([
       d.innerJoin(
         db.tags,
@@ -182,6 +203,45 @@ class LocalTagRepository implements TagRepository {
       final transactionTag = row.readTable(db.transactionTags);
       final tag = row.readTable(db.tags);
       result.putIfAbsent(transactionTag.transactionId, () => []).add(tag);
+    }
+
+    // 2) 共享账本 Phase 2:tx.tagSyncIdsOverride 非空时,从 SharedTags 查
+    final txs = await (db.select(db.transactions)
+          ..where((t) =>
+              t.id.isIn(transactionIds) &
+              t.tagSyncIdsOverride.isNotNull()))
+        .get();
+    if (txs.isNotEmpty) {
+      // 收集所有 syncId 一次性查 SharedTags
+      final allSyncIds = <String>{};
+      final txToSyncIds = <int, List<String>>{};
+      for (final tx in txs) {
+        try {
+          final decoded = jsonDecode(tx.tagSyncIdsOverride!);
+          if (decoded is List) {
+            final ids = decoded.whereType<String>().toList();
+            txToSyncIds[tx.id] = ids;
+            allSyncIds.addAll(ids);
+          }
+        } catch (_) {}
+      }
+      if (allSyncIds.isNotEmpty) {
+        final sharedRows = await (db.select(db.sharedTags)
+              ..where((t) => t.syncId.isIn(allSyncIds)))
+            .get();
+        final sharedMap = {
+          for (final s in sharedRows) s.syncId: sharedTagAsTag(s),
+        };
+        for (final entry in txToSyncIds.entries) {
+          final tags = <Tag>[
+            for (final id in entry.value)
+              if (sharedMap[id] != null) sharedMap[id]!,
+          ];
+          if (tags.isNotEmpty) {
+            result[entry.key] = tags;
+          }
+        }
+      }
     }
 
     return result;
