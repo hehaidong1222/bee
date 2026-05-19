@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'dart:ui';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,8 +19,8 @@ import '../../data/category_node.dart';
 import '../../l10n/app_localizations.dart';
 import '../system/logger_service.dart';
 
-/// 鑷姩璁拌处鏈嶅姟 - 閫氱敤鏍稿績閫昏緫
-/// Android鍜宨OS鍏辩敤鐨凮CR璇嗗埆鍜岃嚜鍔ㄨ璐﹂€昏緫
+/// 自动记账服务 - 通用核心逻辑
+/// Android和iOS共用的OCR识别和自动记账逻辑
 class AutoBillingService {
   static const _ledgerIdKey = 'current_ledger_id';
   static const _processedScreenshotsKey = 'processed_screenshots';
@@ -30,7 +30,7 @@ class AutoBillingService {
   final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
-  // 闃查噸澶嶅鐞?
+  // 防重复处理
   final Set<String> _processedPaths = {};
   String? _lastProcessedPath;
   int _lastProcessedTime = 0;
@@ -40,7 +40,7 @@ class AutoBillingService {
     _loadProcessedScreenshots();
   }
 
-  /// 鍒濆鍖栭€氱煡
+  /// 初始化通知
   Future<void> _initNotifications() async {
     const androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -54,67 +54,67 @@ class AutoBillingService {
     await _notificationsPlugin.initialize(initSettings);
   }
 
-  /// 鍔犺浇宸插鐞嗙殑鎴浘鍒楄〃
+  /// 加载已处理的截图列表
   Future<void> _loadProcessedScreenshots() async {
     final prefs = await SharedPreferences.getInstance();
     final list = prefs.getStringList(_processedScreenshotsKey) ?? [];
     _processedPaths.addAll(list);
 
-    // 鍙繚鐣欐渶杩慛涓紝閬垮厤鍐呭瓨鍗犵敤杩囧ぇ
+    // 只保留最近N个，避免内存占用过大
     if (_processedPaths.length > AutoBillingConfig.maxProcessedCache) {
       final toRemove =
           _processedPaths.length - AutoBillingConfig.maxProcessedCache;
       _processedPaths.removeAll(_processedPaths.take(toRemove));
       await _saveProcessedScreenshots();
-      logger.debug('AutoBilling', '娓呯悊宸插鐞嗙紦瀛?,
-          '绉婚櫎=$toRemove, 淇濈暀=${AutoBillingConfig.maxProcessedCache}');
+      logger.debug('AutoBilling', '清理已处理缓存',
+          '移除=$toRemove, 保留=${AutoBillingConfig.maxProcessedCache}');
     }
   }
 
-  /// 淇濆瓨宸插鐞嗙殑鎴浘鍒楄〃
+  /// 保存已处理的截图列表
   Future<void> _saveProcessedScreenshots() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(
         _processedScreenshotsKey, _processedPaths.toList());
   }
 
-  /// 鏍囪鎴浘宸插鐞?
+  /// 标记截图已处理
   Future<void> _markAsProcessed(String path) async {
     _processedPaths.add(path);
     await _saveProcessedScreenshots();
   }
 
-  /// 妫€鏌ユ埅鍥炬槸鍚﹀凡澶勭悊
+  /// 检查截图是否已处理
   bool _isProcessed(String path) {
     return _processedPaths.contains(path);
   }
 
-  /// 鏍稿績锛氬鐞嗘埅鍥惧苟鑷姩璁拌处
-  /// [imagePath] 鎴浘鏂囦欢璺緞
-  /// [showNotification] 鏄惁鏄剧ず閫氱煡锛堥粯璁rue锛?
-  /// 杩斿洖锛氫氦鏄撹褰旾D锛屽け璐ヨ繑鍥瀗ull
+  /// 核心：处理截图并自动记账
+  /// [imagePath] 截图文件路径
+  /// [showNotification] 是否显示通知（默认true）
+  /// 返回：交易记录ID，失败返回null
   Future<int?> processScreenshot(
     String imagePath, {
     bool showNotification = true,
   }) async {
     final totalStartTime = DateTime.now().millisecondsSinceEpoch;
-    print('馃摳 [AutoBilling] 寮€濮嬪鐞嗘埅鍥? $imagePath');
-    logger.info('AutoBilling', '寮€濮嬪鐞嗘埅鍥?, imagePath);
+    print('📸 [AutoBilling] 开始处理截图: $imagePath');
+    logger.info('AutoBilling', '开始处理截图', imagePath);
 
-    // 闃查噸澶嶅鐞? 宸插鐞嗚繃鐨勮烦杩?
+    // 防重复处理: 已处理过的跳过
     if (_isProcessed(imagePath)) {
-      print('鈿狅笍 [AutoBilling] 鎴浘宸插鐞嗚繃锛岃烦杩?);
-      logger.warning('AutoBilling', '鎴浘宸插鐞嗚繃锛岃烦杩?, imagePath);
+      print('⚠️ [AutoBilling] 截图已处理过，跳过');
+      logger.warning('AutoBilling', '截图已处理过，跳过', imagePath);
       return null;
     }
 
-    // 闃查噸澶嶅鐞? 閰嶇疆鏃堕棿绐楀彛鍐呯浉鍚岃矾寰勫彧澶勭悊涓€娆?
+    // 防重复处理: 配置时间窗口内相同路径只处理一次
     final now = DateTime.now().millisecondsSinceEpoch;
     if (_lastProcessedPath == imagePath &&
         (now - _lastProcessedTime) < AutoBillingConfig.duplicateCheckWindow) {
       final timeDiff = now - _lastProcessedTime;
-      print('鈿狅笍 [AutoBilling] 閲嶅鎴浘锛岃烦杩囧鐞?(${timeDiff}ms鍓嶅凡澶勭悊)');
-      logger.warning('AutoBilling', '閲嶅鎴浘锛岃烦杩囧鐞?, '${timeDiff}ms鍓嶅凡澶勭悊');
+      print('⚠️ [AutoBilling] 重复截图，跳过处理 (${timeDiff}ms前已处理)');
+      logger.warning('AutoBilling', '重复截图，跳过处理', '${timeDiff}ms前已处理');
       return null;
     }
 
@@ -124,21 +124,21 @@ class AutoBillingService {
     try {
       const notificationId = 1001;
 
-      // 妫€鏌ユ枃浠舵槸鍚﹀瓨鍦?
+      // 检查文件是否存在
       final file = File(imagePath);
 
-      // 濡傛灉鏂囦欢涓嶅瓨鍦?鍙兘闇€瑕佺煭鏆傜瓑寰?
-      // (鏃犻殰纰嶆湇鍔＄洿鎺ユ埅鍥炬椂鏂囦欢宸插氨缁?ContentObserver 鍙兘闇€瑕佺瓑寰?
+      // 如果文件不存在,可能需要短暂等待
+      // (无障碍服务直接截图时文件已就绪,ContentObserver 可能需要等待)
       if (!await file.exists()) {
-        print('鈴?鏂囦欢灏氭湭灏辩华,绛夊緟鏈€澶?{AutoBillingConfig.fileWaitTimeout}ms...');
-        logger.info('AutoBilling', '鏂囦欢灏氭湭灏辩华锛屽紑濮嬬瓑寰?,
-            '璺緞=$imagePath, 瓒呮椂=${AutoBillingConfig.fileWaitTimeout}ms');
+        print('⏳ 文件尚未就绪,等待最多${AutoBillingConfig.fileWaitTimeout}ms...');
+        logger.info('AutoBilling', '文件尚未就绪，开始等待',
+            '路径=$imagePath, 超时=${AutoBillingConfig.fileWaitTimeout}ms');
 
         if (showNotification) {
           await _showNotification(
             id: notificationId,
-            title: '鉁?妫€娴嬪埌鎴浘',
-            body: '姝ｅ湪绛夊緟鏂囦欢鍐欏叆...',
+            title: '✅ 检测到截图',
+            body: '正在等待文件写入...',
           );
         }
 
@@ -148,8 +148,8 @@ class AutoBillingService {
 
         while (waitTime < maxWait) {
           if (await file.exists() && await file.length() > 0) {
-            print('鉁?鏂囦欢宸插氨缁紝绛夊緟鏃堕棿=${waitTime}ms');
-            logger.info('AutoBilling', '鏂囦欢灏辩华', '绛夊緟鏃堕棿=${waitTime}ms');
+            print('✅ 文件已就绪，等待时间=${waitTime}ms');
+            logger.info('AutoBilling', '文件就绪', '等待时间=${waitTime}ms');
             break;
           }
           await Future.delayed(Duration(milliseconds: AutoBillingConfig.fileCheckInterval));
@@ -157,29 +157,29 @@ class AutoBillingService {
         }
 
         if (!await file.exists() || await file.length() == 0) {
-          print('鉂?鎴浘鏂囦欢绛夊緟瓒呮椂 (${waitTime}ms)');
-          logger.error('AutoBilling', '鎴浘鏂囦欢绛夊緟瓒呮椂',
-              '璺緞=$imagePath, 绛夊緟鏃堕棿=${waitTime}ms, 鏂囦欢瀛樺湪=${await file.exists()}');
+          print('❌ 截图文件等待超时 (${waitTime}ms)');
+          logger.error('AutoBilling', '截图文件等待超时',
+              '路径=$imagePath, 等待时间=${waitTime}ms, 文件存在=${await file.exists()}');
           if (showNotification) {
             await _showNotification(
               id: notificationId,
-              title: '璇嗗埆澶辫触',
-              body: '鎴浘鏂囦欢涓嶅彲鐢?,
+              title: '识别失败',
+              body: '截图文件不可用',
             );
           }
           return null;
         }
       } else {
-        print('鉁?鏂囦欢宸插氨缁?鏃犻渶绛夊緟');
-        logger.debug('AutoBilling', '鏂囦欢宸插氨缁紝鏃犻渶绛夊緟');
+        print('✅ 文件已就绪,无需等待');
+        logger.debug('AutoBilling', '文件已就绪，无需等待');
       }
 
-      // 鏇存柊閫氱煡锛氬紑濮嬭瘑鍒?
+      // 更新通知：开始识别
       if (showNotification) {
         await _showNotification(
           id: notificationId,
-          title: '姝ｅ湪璇嗗埆鎴浘...',
-          body: '姝ｅ湪鍒嗘瀽鏀粯淇℃伅,璇风◢鍊?,
+          title: '正在识别截图...',
+          body: '正在分析支付信息,请稍候',
         );
       }
 
@@ -191,12 +191,12 @@ class AutoBillingService {
 
       OcrResult result;
       if (aiEnabled) {
-        print('馃 [AutoBilling] AI宸插惎鐢紝灏濊瘯AI瑙嗚璇嗗埆');
+        print('🤖 [AutoBilling] AI已启用，尝试AI视觉识别');
         if (showNotification) {
           await _showNotification(
             id: notificationId,
-            title: '馃 AI璇嗗埆涓?..',
-            body: '姝ｅ湪浣跨敤AI鍒嗘瀽鏀粯鎴浘',
+            title: '🤖 AI识别中...',
+            body: '正在使用AI分析支付截图',
           );
         }
         final aiResult = await _tryAiVision(file, repo);
@@ -204,30 +204,30 @@ class AutoBillingService {
           if (showNotification) {
             await _showNotification(
               id: notificationId,
-              title: '鉂?AI璇嗗埆澶辫触',
-              body: 'AI鏈兘璇嗗埆鍑烘湁鏁堥噾棰濓紝璇烽噸璇曟垨妫€鏌I閰嶇疆',
+              title: '❌ AI识别失败',
+              body: 'AI未能识别出有效金额，请重试或检查AI配置',
             );
           }
-          print('鉂?[AutoBilling] AI瑙嗚璇嗗埆澶辫触锛屽凡鍙栨秷');
+          print('❌ [AutoBilling] AI视觉识别失败，已取消');
           return null;
         }
         result = aiResult;
-        print('鉁?[AutoBilling] AI瑙嗚璇嗗埆鎴愬姛: 閲戦=${result.amount}');
+        print('✅ [AutoBilling] AI视觉识别成功: 金额=${result.amount}');
       } else {
         result = await _ocrService.recognizePaymentImage(file, repo: repo);
       }
 
-      // 鎵撳嵃璇嗗埆缁撴灉鐢ㄤ簬璋冭瘯
-      print('馃挵 璇嗗埆鍒扮殑閲戦: ${result.amount}');
-      print('馃摑 璇嗗埆鍒扮殑澶囨敞: ${result.note}');
-      print('鈴?璇嗗埆鍒扮殑鏃堕棿: ${result.time}');
-      print('馃 鏄惁AI璇嗗埆: ${result.aiEnhanced}');
+      // 打印识别结果用于调试
+      print('💰 识别到的金额: ${result.amount}');
+      print('📝 识别到的备注: ${result.note}');
+      print('⏰ 识别到的时间: ${result.time}');
+      print('🤖 是否AI识别: ${result.aiEnhanced}');
       if (result.aiEnhanced) {
-        print('馃搨 AI鍒嗙被: ${result.aiCategoryName}');
-        print('馃彟 AI璐︽埛: ${result.aiAccountName}');
-        print('馃搵 AI绫诲瀷: ${result.aiType}');
+        print('📂 AI分类: ${result.aiCategoryName}');
+        print('🏦 AI账户: ${result.aiAccountName}');
+        print('📋 AI类型: ${result.aiType}');
       }
-      logger.info('AutoBilling', '璇嗗埆缁撴灉', {
+      logger.info('AutoBilling', '识别结果', {
         'amount': result.amount,
         'note': result.note,
         'time': result.time,
@@ -237,16 +237,16 @@ class AutoBillingService {
         'aiType': result.aiType,
       }.toString());
 
-      // 鏍囪涓哄凡澶勭悊
+      // 标记为已处理
       await _markAsProcessed(imagePath);
 
-      // 鏍规嵁璇嗗埆缁撴灉澶勭悊
+      // 根据识别结果处理
       if (result.amount != null && result.amount!.abs() > 0) {
-        print('鉁?璇嗗埆鎴愬姛: 閲戦=${result.amount}, 澶囨敞=${result.note}');
+        print('✅ 识别成功: 金额=${result.amount}, 备注=${result.note}');
 
         try {
           final dbStartTime = DateTime.now().millisecondsSinceEpoch;
-          print('鈴憋笍 [鎬ц兘] 寮€濮嬪垱寤轰氦鏄撹褰?);
+          print('⏱️ [性能] 开始创建交易记录');
           final autoAddTags = _container.read(smartBillingAutoTagsProvider);
           final autoAddAttachment = _container.read(smartBillingAutoAttachmentProvider);
 
@@ -260,7 +260,7 @@ class AutoBillingService {
             autoAddTags: autoAddTags,
           );
           final dbElapsed = DateTime.now().millisecondsSinceEpoch - dbStartTime;
-          print('鈴憋笍 [鎬ц兘] 浜ゆ槗璁板綍鍒涘缓瀹屾垚, 鑰楁椂=${dbElapsed}ms');
+          print('⏱️ [性能] 交易记录创建完成, 耗时=${dbElapsed}ms');
 
           if (transactionId != null) {
             if (autoAddAttachment) {
@@ -271,42 +271,42 @@ class AutoBillingService {
                   sourceFile: file,
                   index: 0,
                 );
-                logger.info('AutoBilling', '鎴浘闄勪欢淇濆瓨鎴愬姛', 'transactionId=$transactionId');
+                logger.info('AutoBilling', '截图附件保存成功', 'transactionId=$transactionId');
                 _container.read(attachmentListRefreshProvider.notifier).state++;
               } catch (e, st) {
-                logger.error('AutoBilling', '淇濆瓨鎴浘闄勪欢澶辫触', e, st);
+                logger.error('AutoBilling', '保存截图附件失败', e, st);
               }
             }
 
             _container.read(statsRefreshProvider.notifier).state++;
             if (showNotification) {
-              final prefix = result.aiEnhanced ? '馃 ' : '';
+              final prefix = result.aiEnhanced ? '🤖 ' : '';
               await _showNotification(
                 id: notificationId,
-                title: '${prefix}鉁?鑷姩璁拌处鎴愬姛 楼${result.amount!.toStringAsFixed(2)}',
+                title: '${prefix}✅ 自动记账成功 ¥${result.amount!.toStringAsFixed(2)}',
                 body: result.note != null
-                    ? '澶囨敞: ${result.note}'
-                    : '宸茶嚜鍔ㄥ垱寤烘敮鍑鸿褰?,
+                    ? '备注: ${result.note}'
+                    : '已自动创建支出记录',
               );
             }
-            print('鉁?鑷姩璁拌处鎴愬姛: ID=$transactionId');
-            logger.info('AutoBilling', '鑷姩璁拌处鎴愬姛', 'ID=$transactionId, 閲戦=${result.amount}');
+            print('✅ 自动记账成功: ID=$transactionId');
+            logger.info('AutoBilling', '自动记账成功', 'ID=$transactionId, 金额=${result.amount}');
             return transactionId;
           } else {
             if (showNotification) {
               await _showNotification(
                 id: notificationId,
-                title: '鉂?鑷姩璁拌处澶辫触',
-                body: '璇嗗埆鎴愬姛浣嗗垱寤鸿褰曞け璐ワ紝璇锋墜鍔ㄨ璐?,
+                title: '❌ 自动记账失败',
+                body: '识别成功但创建记录失败，请手动记账',
               );
             }
-            print('鉂?鑷姩璁拌处澶辫触: 鍒涘缓浜ゆ槗璁板綍杩斿洖null');
-            logger.error('AutoBilling', '鑷姩璁拌处澶辫触锛氬垱寤轰氦鏄撹褰曡繑鍥瀗ull');
+            print('❌ 自动记账失败: 创建交易记录返回null');
+            logger.error('AutoBilling', '自动记账失败：创建交易记录返回null');
             return null;
           }
         } catch (e, stackTrace) {
-          print('鉂?鑷姩璁拌处澶辫触: $e');
-          logger.error('AutoBilling', '鑷姩璁拌处澶辫触', {
+          print('❌ 自动记账失败: $e');
+          logger.error('AutoBilling', '自动记账失败', {
             'path': imagePath,
             'amount': result.amount,
             'note': result.note,
@@ -315,8 +315,8 @@ class AutoBillingService {
           if (showNotification) {
             await _showNotification(
               id: notificationId,
-              title: '鉂?鑷姩璁拌处澶辫触',
-              body: '璇嗗埆鎴愬姛浣嗗垱寤鸿褰曞け璐? $e',
+              title: '❌ 自动记账失败',
+              body: '识别成功但创建记录失败: $e',
             );
           }
           return null;
@@ -325,101 +325,101 @@ class AutoBillingService {
         if (showNotification) {
           await _showNotification(
             id: notificationId,
-            title: '鈿狅笍 璇嗗埆鍒伴噾棰濆€欓€?,
-            body: '鍙兘鐨勯噾棰? ${result.allNumbers.join(", ")} | 璇锋墜鍔ㄧ‘璁?,
+            title: '⚠️ 识别到金额候选',
+            body: '可能的金额: ${result.allNumbers.join(", ")} | 请手动确认',
           );
         }
-        print('鈿狅笍 璇嗗埆鍒版暟瀛椾絾鏈‘瀹氶噾棰? ${result.allNumbers}');
-        logger.warning('AutoBilling', '璇嗗埆鍒版暟瀛椾絾鏈‘瀹氶噾棰?, result.allNumbers.toString());
+        print('⚠️ 识别到数字但未确定金额: ${result.allNumbers}');
+        logger.warning('AutoBilling', '识别到数字但未确定金额', result.allNumbers.toString());
         return null;
       } else {
         if (showNotification) {
           await _showNotification(
             id: notificationId,
-            title: '鉂?鏈瘑鍒埌鏀粯淇℃伅',
-            body: '鍙兘涓嶆槸鏀粯鎴浘,鎴栧浘鐗囪川閲忚緝宸?,
+            title: '❌ 未识别到支付信息',
+            body: '可能不是支付截图,或图片质量较差',
           );
         }
-        print('鈿狅笍 鏈瘑鍒埌浠讳綍鏈夋晥閲戦');
-        logger.warning('AutoBilling', '鏈瘑鍒埌浠讳綍鏈夋晥閲戦');
+        print('⚠️ 未识别到任何有效金额');
+        logger.warning('AutoBilling', '未识别到任何有效金额');
         return null;
       }
     } catch (e, stackTrace) {
-      print('鉂?澶勭悊鎴浘澶辫触: $e');
-      logger.error('AutoBilling', '澶勭悊鎴浘澶辫触', {
+      print('❌ 处理截图失败: $e');
+      logger.error('AutoBilling', '处理截图失败', {
         'path': imagePath,
         'error': e.toString(),
-        'stage': '鏈煡闃舵',
+        'stage': '未知阶段',
       }, stackTrace);
       return null;
     } finally {
       final totalElapsed =
           DateTime.now().millisecondsSinceEpoch - totalStartTime;
-      print('鈴憋笍 [鎬ц兘] 鏁翠釜娴佺▼瀹屾垚, 鎬昏€楁椂=${totalElapsed}ms');
+      print('⏱️ [性能] 整个流程完成, 总耗时=${totalElapsed}ms');
     }
   }
 
-  /// 鏍稿績锛氱洿鎺ュ鐞嗘枃鏈苟鑷姩璁拌处(蹇嵎鎸囦护鎺ㄨ崘鏂瑰紡)
-  /// [text] 蹇嵎鎸囦护浼犻€掔殑璇嗗埆鏂囨湰
-  /// [showNotification] 鏄惁鏄剧ず閫氱煡锛堥粯璁rue锛?
-  /// 杩斿洖锛氫氦鏄撹褰旾D锛屽け璐ヨ繑鍥瀗ull
+  /// 核心：直接处理文本并自动记账(快捷指令推荐方式)
+  /// [text] 快捷指令传递的识别文本
+  /// [showNotification] 是否显示通知（默认true）
+  /// 返回：交易记录ID，失败返回null
   Future<int?> processText(
     String text, {
     bool showNotification = true,
   }) async {
     final totalStartTime = DateTime.now().millisecondsSinceEpoch;
-    print('馃摑 [AutoBilling] 寮€濮嬪鐞嗘枃鏈? $text');
+    print('📝 [AutoBilling] 开始处理文本: $text');
 
     try {
       const notificationId = 1002;
 
-      // 鏄剧ず"姝ｅ湪璇嗗埆"閫氱煡
+      // 显示"正在识别"通知
       if (showNotification) {
         await _showNotification(
           id: notificationId,
-          title: '鈴?姝ｅ湪璇嗗埆',
-          body: '姝ｅ湪瑙ｆ瀽鏀粯淇℃伅...',
+          title: '⏳ 正在识别',
+          body: '正在解析支付信息...',
         );
       }
 
-      // 鐩存帴瑙ｆ瀽鏂囨湰(鏃犻渶OCR)
+      // 直接解析文本(无需OCR)
       final ocrResult = _ocrService.parsePaymentText(text);
 
       if (ocrResult.amount == null) {
-        print('鉂?鏈兘璇嗗埆鍑洪噾棰?);
+        print('❌ 未能识别出金额');
         if (showNotification) {
           await _showNotification(
             id: notificationId,
-            title: '鉂?璇嗗埆澶辫触',
-            body: '鏈兘璇嗗埆鍑洪噾棰濅俊鎭?,
+            title: '❌ 识别失败',
+            body: '未能识别出金额信息',
           );
         }
         return null;
       }
 
-      print('鉁?璇嗗埆鎴愬姛: 閲戦=${ocrResult.amount}, 澶囨敞=${ocrResult.note}');
+      print('✅ 识别成功: 金额=${ocrResult.amount}, 备注=${ocrResult.note}');
 
-      // 鏇存柊閫氱煡鐘舵€?
+      // 更新通知状态
       if (showNotification) {
         await _showNotification(
           id: notificationId,
-          title: '鉁?璇嗗埆鎴愬姛',
-          body: '姝ｅ湪鍒涘缓浜ゆ槗璁板綍...',
+          title: '✅ 识别成功',
+          body: '正在创建交易记录...',
         );
       }
 
-      // 鑾峰彇鍒嗙被骞跺垱寤轰氦鏄?
+      // 获取分类并创建交易
       final repo = _container.read(repositoryProvider);
       final topLevelCategories = await repo.getTopLevelCategories('expense');
       final allCategories = <Category>[];
       allCategories.addAll(topLevelCategories);
-      // 鑾峰彇鎵€鏈夊瓙鍒嗙被
+      // 获取所有子分类
       for (final category in topLevelCategories) {
         final subCategories = await repo.getSubCategories(category.id);
         allCategories.addAll(subCategories);
       }
 
-      // 杩囨护鍑哄彲鐢ㄥ垎绫伙紙鎺掗櫎鏈夊瓙鍒嗙被鐨勭埗鍒嗙被锛?
+      // 过滤出可用分类（排除有子分类的父分类）
       final categories = CategoryHierarchy.getUsableCategories(allCategories);
 
       final suggestedCategoryId = CategoryMatcher.smartMatch(
@@ -437,110 +437,110 @@ class AutoBillingService {
         suggestedCategoryId: suggestedCategoryId,
       );
 
-      // 鍒涘缓浜ゆ槗璁板綍
+      // 创建交易记录
       final txId = await _createTransaction(resultWithCategory);
 
       if (txId != null) {
-        // 鍒锋柊缁熻淇℃伅
+        // 刷新统计信息
         _container.read(statsRefreshProvider.notifier).state++;
-        print('鉁?浜ゆ槗鍒涘缓鎴愬姛: id=$txId');
+        print('✅ 交易创建成功: id=$txId');
         if (showNotification) {
           await _showNotification(
             id: notificationId,
-            title: '鉁?璁拌处鎴愬姛',
-            body: '宸茶嚜鍔ㄥ垱寤烘敮鍑鸿褰? 楼${ocrResult.amount}',
+            title: '✅ 记账成功',
+            body: '已自动创建支出记录: ¥${ocrResult.amount}',
           );
         }
         return txId;
       } else {
-        print('鉂?浜ゆ槗鍒涘缓澶辫触');
+        print('❌ 交易创建失败');
         if (showNotification) {
           await _showNotification(
             id: notificationId,
-            title: '鉂?鍒涘缓澶辫触',
-            body: '鏃犳硶鍒涘缓浜ゆ槗璁板綍',
+            title: '❌ 创建失败',
+            body: '无法创建交易记录',
           );
         }
         return null;
       }
     } catch (e) {
-      print('鉂?[AutoBilling] 鏂囨湰澶勭悊澶辫触: $e');
+      print('❌ [AutoBilling] 文本处理失败: $e');
       if (showNotification) {
         await _showNotification(
           id: 1002,
-          title: '鉂?澶勭悊澶辫触',
-          body: '閿欒: $e',
+          title: '❌ 处理失败',
+          body: '错误: $e',
         );
       }
       return null;
     } finally {
       final totalElapsed =
           DateTime.now().millisecondsSinceEpoch - totalStartTime;
-      print('鈴憋笍 [鎬ц兘] 鏂囨湰澶勭悊瀹屾垚, 鎬昏€楁椂=${totalElapsed}ms');
+      print('⏱️ [性能] 文本处理完成, 总耗时=${totalElapsed}ms');
     }
   }
 
-  /// 鍒涘缓浜ゆ槗璁板綍
-  /// [billingTypes] 璁拌处鏂瑰紡鍒楄〃锛岀敤浜庢坊鍔犳爣绛?
-  /// [autoAddTags] 鏄惁鑷姩娣诲姞鏍囩
+  /// 创建交易记录
+  /// [billingTypes] 记账方式列表，用于添加标签
+  /// [autoAddTags] 是否自动添加标签
   Future<int?> _createTransaction(
     OcrResult result, {
     List<String>? billingTypes,
     bool autoAddTags = true,
   }) async {
     try {
-      // 鑾峰彇褰撳墠璐︽湰ID锛堜紭鍏堜粠Provider璇诲彇锛屽け璐ュ垯浠嶴haredPreferences璇诲彇锛屾渶鍚庝粠鏁版嵁搴撹幏鍙栭粯璁よ处鏈級
+      // 获取当前账本ID（优先从Provider读取，失败则从SharedPreferences读取，最后从数据库获取默认账本）
       int? ledgerId;
 
-      // 鏂规1: 灏濊瘯浠嶱rovider璇诲彇
+      // 方案1: 尝试从Provider读取
       try {
         ledgerId = _container.read(currentLedgerIdProvider);
-        print('鉁?浠嶱rovider鑾峰彇璐︽湰ID: $ledgerId');
+        print('✅ 从Provider获取账本ID: $ledgerId');
       } catch (e) {
-        print('鈿狅笍 浠嶱rovider鑾峰彇璐︽湰ID澶辫触: $e');
+        print('⚠️ 从Provider获取账本ID失败: $e');
       }
 
-      // 鏂规2: 濡傛灉Provider澶辫触锛屼粠SharedPreferences璇诲彇
+      // 方案2: 如果Provider失败，从SharedPreferences读取
       if (ledgerId == null) {
         final prefs = await SharedPreferences.getInstance();
         ledgerId = prefs.getInt(_ledgerIdKey);
         if (ledgerId != null) {
-          print('鉁?浠嶴haredPreferences鑾峰彇璐︽湰ID: $ledgerId');
+          print('✅ 从SharedPreferences获取账本ID: $ledgerId');
         }
       }
 
-      // 鏂规3: 濡傛灉閮藉け璐ワ紝浠庢暟鎹簱鑾峰彇绗竴涓处鏈?
+      // 方案3: 如果都失败，从数据库获取第一个账本
       if (ledgerId == null) {
-        print('鈿狅笍 鏃犳硶浠庣紦瀛樿幏鍙栬处鏈琁D锛屽皾璇曚粠鏁版嵁搴撹幏鍙栭粯璁よ处鏈?);
+        print('⚠️ 无法从缓存获取账本ID，尝试从数据库获取默认账本');
         final repo = _container.read(repositoryProvider);
         final ledgers = await repo.getAllLedgers();
         if (ledgers.isNotEmpty) {
           ledgerId = ledgers.first.id;
-          print('鉁?浠庢暟鎹簱鑾峰彇榛樿璐︽湰ID: $ledgerId');
-          // 淇濆瓨鍒癝haredPreferences渚涗笅娆′娇鐢?
+          print('✅ 从数据库获取默认账本ID: $ledgerId');
+          // 保存到SharedPreferences供下次使用
           final prefs = await SharedPreferences.getInstance();
           await prefs.setInt(_ledgerIdKey, ledgerId!);
         }
       }
 
       if (ledgerId == null) {
-        print('鉂?鏃犳硶鑾峰彇浠讳綍璐︽湰ID锛岃鍏堝垱寤鸿处鏈?);
+        print('❌ 无法获取任何账本ID，请先创建账本');
         return null;
       }
 
-      print('馃摑 鍑嗗鍒涘缓浜ゆ槗: ledgerId=$ledgerId');
+      print('📝 准备创建交易: ledgerId=$ledgerId');
 
-      // 浣跨敤鍏变韩鐨凚illCreationService鍒涘缓浜ゆ槗
+      // 使用共享的BillCreationService创建交易
       final repo = _container.read(repositoryProvider);
       final billCreationService = BillCreationService(repo);
 
-      // 鍑嗗澶囨敞
+      // 准备备注
       String? note;
       if (result.note != null) {
         note = result.note!;
       }
 
-      // 鑾峰彇 l10n锛堜娇鐢ㄧ郴缁熻瑷€璁剧疆锛?
+      // 获取 l10n（使用系统语言设置）
       final systemLocale = PlatformDispatcher.instance.locale;
       final l10n = lookupAppLocalizations(systemLocale);
 
@@ -554,22 +554,22 @@ class AutoBillingService {
       );
 
       if (transactionId != null) {
-        logger.info('AutoBilling', '浜ゆ槗璁板綍宸插垱寤?, 'ID=$transactionId');
-        // 缁熶竴鍚庡鐞嗭細鍒锋柊UI + 瑙﹀彂浜戝悓姝?
+        logger.info('AutoBilling', '交易记录已创建', 'ID=$transactionId');
+        // 统一后处理：刷新UI + 触发云同步
         await PostProcessor.runC(_container, ledgerId: ledgerId, tags: true);
       } else {
-        logger.warning('AutoBilling', '鍒涘缓浜ゆ槗璁板綍澶辫触');
+        logger.warning('AutoBilling', '创建交易记录失败');
       }
 
       return transactionId;
     } catch (e) {
-      print('鉂?鍒涘缓浜ゆ槗璁板綍澶辫触: $e');
-      print('鉂?閿欒鍫嗘爤: ${StackTrace.current}');
+      print('❌ 创建交易记录失败: $e');
+      print('❌ 错误堆栈: ${StackTrace.current}');
       rethrow;
     }
   }
 
-  /// 灏濊瘯绾疉I瑙嗚璇嗗埆锛堢洿鎺ヤ娇鐢℅LM瑙嗚妯″瀷锛岃烦杩嘙LKit OCR锛?
+  /// 尝试纯AI视觉识别（直接使用GLM视觉模型，跳过MLKit OCR）
   Future<OcrResult?> _tryAiVision(File file, BaseRepository repo) async {
     try {
       List<String> expenseCategories = [];
@@ -584,7 +584,7 @@ class AutoBillingService {
         final allAccounts = await repo.getAllAccounts();
         accounts = allAccounts.map((a) => a.name).toList();
       } catch (e) {
-        logger.warning('AutoBilling', '鑾峰彇鍒嗙被/璐︽埛鍒楄〃澶辫触', e);
+        logger.warning('AutoBilling', '获取分类/账户列表失败', e);
       }
 
       final service = BillExtractionService(
@@ -612,12 +612,12 @@ class AutoBillingService {
         aiEnhanced: true,
       );
     } catch (e) {
-      logger.warning('AutoBilling', 'AI瑙嗚璇嗗埆澶辫触锛屽噯澶囧洖閫€MLKit', e);
+      logger.warning('AutoBilling', 'AI视觉识别失败，准备回退MLKit', e);
       return null;
     }
   }
 
-  /// 鏄剧ず閫氱煡
+  /// 显示通知
   Future<void> _showNotification({
     required int id,
     required String title,
@@ -625,8 +625,8 @@ class AutoBillingService {
   }) async {
     const androidDetails = AndroidNotificationDetails(
       'screenshot_ocr',
-      '鎴浘璇嗗埆',
-      channelDescription: '鎴浘鑷姩璇嗗埆閫氱煡',
+      '截图识别',
+      channelDescription: '截图自动识别通知',
       importance: Importance.high,
       priority: Priority.high,
     );
@@ -641,7 +641,7 @@ class AutoBillingService {
     await _notificationsPlugin.show(id, title, body, details);
   }
 
-  /// 閲婃斁璧勬簮
+  /// 释放资源
   void dispose() {
     _ocrService.dispose();
   }
