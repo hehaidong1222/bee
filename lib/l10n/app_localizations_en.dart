@@ -6327,6 +6327,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get sharedRequiresCloudSync => 'Please enable cloud sync first';
+
+  @override
   String get sharedMembersStatsTitle => 'Member balances';
 
   @override

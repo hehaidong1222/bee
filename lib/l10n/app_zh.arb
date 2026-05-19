@@ -2812,6 +2812,7 @@
   "@sharedTxEditedBy": { "placeholders": { "name": { "type": "String" } } },
   "sharedTxCreatedAndEditedBy": "{name} 创建并编辑",
   "@sharedTxCreatedAndEditedBy": { "placeholders": { "name": { "type": "String" } } },
+  "sharedRequiresCloudSync": "请先启用云同步",
   "sharedMembersStatsTitle": "成员收支",
   "sharedMembersStatsEmpty": "本期暂无记账",
   "sharedMembersStatsLoading": "加载中…",

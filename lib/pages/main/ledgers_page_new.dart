@@ -510,7 +510,7 @@ class _LedgersPageNewState extends ConsumerState<LedgersPageNew> {
         syncId = entry.syncId;
       }
       if (syncId == null || syncId.isEmpty) {
-        if (mounted) showToast(context, '请先启用云同步');
+        if (mounted) showToast(context, AppLocalizations.of(context).sharedRequiresCloudSync);
         return;
       }
       final extId = syncId;
@@ -537,7 +537,7 @@ class _LedgersPageNewState extends ConsumerState<LedgersPageNew> {
         syncId = entry.syncId;
       }
       if (syncId == null || syncId.isEmpty) {
-        if (mounted) showToast(context, '请先启用云同步');
+        if (mounted) showToast(context, AppLocalizations.of(context).sharedRequiresCloudSync);
         return;
       }
       final extId = syncId;

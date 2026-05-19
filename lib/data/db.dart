@@ -992,7 +992,8 @@ class BeeDatabase extends _$BeeDatabase {
             // 分类用稳定 FK(syncId)而非 parent_name 建父子关系。
             // 数据回填:对每个 level=2 行,在同 ledger_sync_id + kind 内按
             // parent_name 反查 level=1 行的 syncId,填进 parent_sync_id。
-            print('[DB Migration] 开始迁移到 v25: SharedLedgerCategories.parent_sync_id');
+            logger.info('DBMigration',
+                '开始迁移到 v25: SharedLedgerCategories.parent_sync_id');
             await customStatement(
                 'ALTER TABLE shared_ledger_categories ADD COLUMN parent_sync_id TEXT;');
             await customStatement('''
@@ -1013,7 +1014,7 @@ class BeeDatabase extends _$BeeDatabase {
             // server 端 0013 alembic 已经在 projection 回填 parent_sync_id,
             // mobile 后续 fetchAndStoreSharedResources 会重新覆盖一遍。
             await customStatement('UPDATE sync_state SET server_cursor = 0');
-            print('[DB Migration] v25 迁移完成');
+            logger.info('DBMigration', 'v25 迁移完成');
           }
         },
       );

@@ -2514,6 +2514,7 @@
   "@sharedTxEditedBy": { "placeholders": { "name": { "type": "String" } } },
   "sharedTxCreatedAndEditedBy": "{name} 建立並編輯",
   "@sharedTxCreatedAndEditedBy": { "placeholders": { "name": { "type": "String" } } },
+  "sharedRequiresCloudSync": "請先啟用雲端同步",
   "sharedMembersStatsTitle": "成員收支",
   "sharedMembersStatsEmpty": "本期暫無記帳",
   "sharedMembersStatsLoading": "載入中…",

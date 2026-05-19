@@ -6327,6 +6327,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get sharedRequiresCloudSync => '请先启用云同步';
+
+  @override
   String get sharedMembersStatsTitle => '成员收支';
 
   @override
@@ -12640,6 +12643,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String sharedTxCreatedAndEditedBy(String name) {
     return '$name 建立並編輯';
   }
+
+  @override
+  String get sharedRequiresCloudSync => '請先啟用雲端同步';
 
   @override
   String get sharedMembersStatsTitle => '成員收支';

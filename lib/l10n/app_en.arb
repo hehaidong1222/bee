@@ -2852,6 +2852,7 @@
   "@sharedTxEditedBy": { "placeholders": { "name": { "type": "String" } } },
   "sharedTxCreatedAndEditedBy": "Created and edited by {name}",
   "@sharedTxCreatedAndEditedBy": { "placeholders": { "name": { "type": "String" } } },
+  "sharedRequiresCloudSync": "Please enable cloud sync first",
   "sharedMembersStatsTitle": "Member balances",
   "sharedMembersStatsEmpty": "No transactions yet",
   "sharedMembersStatsLoading": "Loading…",

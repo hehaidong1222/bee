@@ -50,9 +50,8 @@ class TxAuthorService {
         isCreate: isCreate,
       );
     } catch (e, st) {
-      logger.warning('TxAuthorService',
-          'markImpl 失败 txId=$txId isCreate=$isCreate', st);
-      logger.warning('TxAuthorService', 'error: $e');
+      logger.error('TxAuthorService',
+          'markImpl 失败 txId=$txId isCreate=$isCreate', e, st);
     }
   }
 
@@ -75,9 +74,8 @@ class TxAuthorService {
         isCreate: isCreate,
       );
     } catch (e, st) {
-      logger.warning('TxAuthorService',
-          'markImplC 失败 txId=$txId isCreate=$isCreate', st);
-      logger.warning('TxAuthorService', 'error: $e');
+      logger.error('TxAuthorService',
+          'markImplC 失败 txId=$txId isCreate=$isCreate', e, st);
     }
   }
 }

@@ -58,21 +58,20 @@ class MemberStatsKey {
 
 /// 共享账本成员收支统计 provider。watch sharedResourceRefreshProvider 实现
 /// 实时跟随:当 WS sync_change / member_change 来时,bump tick → refetch。
+///
+/// 错误处理:cloud 不可用时返 null(单人 / 非 Cloud 后端场景),让 UI
+/// 自动隐藏。**其它异常一律向上抛**,让 AsyncValue.when error 分支展示
+/// 真实错误,而不是把 401/403/500/网络 等全部 swallow 成"无数据"。
 final memberStatsProvider = FutureProvider.autoDispose
     .family<BeeCountCloudMemberStats?, MemberStatsKey>((ref, key) async {
   ref.watch(sharedResourceRefreshProvider);
   final cloud = await ref.watch(beecountCloudProviderInstance.future);
   if (cloud == null) return null;
-  try {
-    return await cloud.fetchMemberStats(
-      ledgerId: key.ledgerId,
-      scope: key.scope,
-      tzOffsetMinutes: DateTime.now().timeZoneOffset.inMinutes,
-    );
-  } catch (_) {
-    // 非 member / server 404 等异常一律返 null,UI 自动降级隐藏。
-    return null;
-  }
+  return cloud.fetchMemberStats(
+    ledgerId: key.ledgerId,
+    scope: key.scope,
+    tzOffsetMinutes: DateTime.now().timeZoneOffset.inMinutes,
+  );
 });
 
 /// 列出某账本"当前 active"邀请(仅 owner)。

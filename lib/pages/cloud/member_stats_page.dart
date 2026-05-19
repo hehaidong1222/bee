@@ -120,7 +120,7 @@ class _MemberStatsPageState extends ConsumerState<MemberStatsPage> {
                 _SummaryCell(
                   label: l10n.sharedMembersStatsIncome,
                   amount: '+$symbol${formatMoneyCompact(totalIncome)}',
-                  color: Colors.green,
+                  color: BeeTokens.incomeColor(context, ref),
                 ),
                 Container(
                   width: 1,
@@ -130,7 +130,7 @@ class _MemberStatsPageState extends ConsumerState<MemberStatsPage> {
                 _SummaryCell(
                   label: l10n.sharedMembersStatsExpense,
                   amount: '-$symbol${formatMoneyCompact(totalExpense)}',
-                  color: Colors.redAccent,
+                  color: BeeTokens.expenseColor(context, ref),
                 ),
               ],
             ),
@@ -232,11 +232,11 @@ class _MemberStatTile extends ConsumerWidget {
         children: [
           Text(
             '+$symbol${formatMoneyCompact(stat.incomeTotal)}',
-            style: const TextStyle(
-              color: Colors.green,
+            style: TextStyle(
+              color: BeeTokens.incomeColor(context, ref),
               fontSize: 13,
               fontWeight: FontWeight.w500,
-              fontFeatures: [FontFeature.tabularFigures()],
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
           const SizedBox(height: 2),
@@ -255,11 +255,11 @@ class _MemberStatTile extends ConsumerWidget {
               ],
               Text(
                 '-$symbol${formatMoneyCompact(stat.expenseTotal)}',
-                style: const TextStyle(
-                  color: Colors.redAccent,
+                style: TextStyle(
+                  color: BeeTokens.expenseColor(context, ref),
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
-                  fontFeatures: [FontFeature.tabularFigures()],
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
             ],

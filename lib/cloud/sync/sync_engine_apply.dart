@@ -167,10 +167,11 @@ extension _SyncEngineApply on SyncEngine {
 
     if (existing != null) {
       // 更新 — createdByUserId 走"本地为 null 就回填,否则保持"的策略:
-      //   - 本地已有值:trust local(server first-write-wins 已保证 payload
-      //     的 createdByUserId 跟本地一致,跳过避免冗余写)
+      //   - 本地已有值:不接受 server 覆盖(避免 server 数据修复路径反过来
+      //     污染本地;创建人是稳定属性,本地一旦有值就以本地为准)
       //   - 本地为 null + payload 非 null:从 server 兜底补一次。覆盖
-      //     mobile EntitySerializer 历史缺字段 + server 未补全期产生的脏数据
+      //     mobile 早期版本本地未填 created_by_user_id 列 + 服务端 SyncChange
+      //     enrichment 修复前留下的脏数据
       final shouldBackfillCreator =
           existing.createdByUserId == null && createdByUserId != null;
       await (db.update(db.transactions)

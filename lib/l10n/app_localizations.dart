@@ -12000,6 +12000,12 @@ abstract class AppLocalizations {
   /// **'Created and edited by {name}'**
   String sharedTxCreatedAndEditedBy(String name);
 
+  /// No description provided for @sharedRequiresCloudSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enable cloud sync first'**
+  String get sharedRequiresCloudSync;
+
   /// No description provided for @sharedMembersStatsTitle.
   ///
   /// In en, this message translates to:

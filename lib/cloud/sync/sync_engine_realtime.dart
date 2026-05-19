@@ -107,9 +107,8 @@ extension SyncEngineRealtime on SyncEngine {
           try {
             await _refreshAllSharedResourcesAfterReconnect();
           } catch (e, st) {
-            logger.warning('SyncEngine',
-                '重连共享资源对账失败,继续 sync', st);
-            logger.warning('SyncEngine', 'error: $e');
+            logger.error('SyncEngine',
+                '重连共享资源对账失败,继续 sync', e, st);
           }
         }
         final result = await sync(ledgerId: ledgerId);
@@ -170,8 +169,8 @@ extension SyncEngineRealtime on SyncEngine {
         return;
       }
 
-      // 其他场景(别人 joined / 角色变):重拉 ledgers list(memberCount / isShared
-      // 可能变),不阻塞
+      // 其他场景(别人 joined / 角色变 / 被踢 / 别人退出):重拉 ledgers
+      // list(memberCount / isShared 可能变),不阻塞
       await syncLedgersFromServer();
       onAutoPullCompleted?.call(ledgerExternalId);
     } catch (e, st) {
@@ -325,20 +324,27 @@ extension SyncEngineRealtime on SyncEngine {
     if (rows.isEmpty) return;
     logger.info('SyncEngine',
         '重连共享资源对账:Editor 角色账本 ${rows.length} 个');
-    int ok = 0;
-    int fail = 0;
+    // 并发拉(每账本独立 HTTP),原串行 await 在多账本场景下会 N×RTT 阻塞
+    // 整条 auto sync 链。Future.wait + 在 inner future 内吞错保证一个失败
+    // 不影响其它账本。
+    final futures = <Future<bool>>[];
     for (final l in rows) {
       final sid = l.syncId;
       if (sid == null || sid.isEmpty) continue;
-      try {
-        await fetchAndStoreSharedResources(sid);
-        ok++;
-      } catch (e, st) {
-        fail++;
-        logger.warning('SyncEngine',
-            '重连共享资源对账失败 ledger=$sid: $e', st);
-      }
+      futures.add(() async {
+        try {
+          await fetchAndStoreSharedResources(sid);
+          return true;
+        } catch (e, st) {
+          logger.error('SyncEngine',
+              '重连共享资源对账失败 ledger=$sid', e, st);
+          return false;
+        }
+      }());
     }
+    final results = await Future.wait(futures);
+    final ok = results.where((v) => v).length;
+    final fail = results.length - ok;
     logger.info('SyncEngine',
         '重连共享资源对账完成 ok=$ok fail=$fail');
     if (ok > 0) {
