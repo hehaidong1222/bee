@@ -297,6 +297,9 @@ extension SyncEngineRealtime on SyncEngine {
           }
           break;
       }
+      // 共享资源变化的精确信号(sharedResourceRefreshProvider 在此 bump),
+      // 跟通用 onAutoPullCompleted 分开避免 home 全局刷新。
+      onSharedResourceChanged?.call(ledgerExternalId);
       onAutoPullCompleted?.call(ledgerExternalId);
     } catch (e, st) {
       logger.warning('SyncEngine',
@@ -436,6 +439,11 @@ extension SyncEngineRealtime on SyncEngine {
     // §7 决策(v25):自定义图标走 sha256 cache 异步下载,SharedLedger* 行
     // 已落地,UI 渲染按 'custom_icons/shared_<sha256>.png' 路径查找。
     await _downloadCustomIconsForSharedSnapshot(snapshot);
+
+    // 共享资源整批刷过,通知 UI 重渲(HomePage StreamBuilder 重订阅 +
+    // picker / 反查 widget rebuild)。不在 _refreshAllSharedResourcesAfterReconnect
+    // 里调,因为那个方法会逐账本调本函数,每个账本独立 fire。
+    onSharedResourceChanged?.call(ledgerExternalId);
   }
 
   Future<void> onInviteAccepted(String ledgerExternalId) async {

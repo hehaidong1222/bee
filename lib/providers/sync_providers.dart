@@ -173,6 +173,15 @@ final syncServiceProvider = Provider<SyncService>((ref) {
       repo: repo,
     );
 
+    // 共享账本资源(分类/账户/标签)的精确刷新信号 — 跟通用 onAutoPullCompleted
+    // 分开。后者每次 auto-pull 都触发(包括自己 push 完成后的空 pull),
+    // HomePage listen sharedResourceRefreshProvider 会重建 StreamBuilder 子树
+    // → 编辑 tx 时表现为"全局刷新"。这个回调只在 WS shared_resource_change
+    // 或 fetchAndStoreSharedResources 时 fire,避免误触。
+    engine.onSharedResourceChanged = (ledgerId) {
+      ref.read(sharedResourceRefreshProvider.notifier).state++;
+    };
+
     // 开始监听 WebSocket 实时事件，自动触发 pull
     engine.onAutoPullCompleted = (ledgerId) {
       // pull 完成把远端变更落到 Drift 之后，把所有"UI 刷新 tick" 全部 +1，
@@ -190,9 +199,15 @@ final syncServiceProvider = Provider<SyncService>((ref) {
       ref.read(budgetRefreshProvider.notifier).state++;
       ref.read(tagListRefreshProvider.notifier).state++;
       ref.read(calendarRefreshProvider.notifier).state++;
-      // 共享账本资源 tick:Owner 改 / WS shared_resource_change / accept 等
-      // 触发后 picker / 反查 widget watch 它 reactive 刷新
-      ref.read(sharedResourceRefreshProvider.notifier).state++;
+      // 注意:`sharedResourceRefreshProvider` **不在这里**无条件 bump。
+      // 它的语义是"Owner 共享资源(分类/账户/标签)变了,Editor 端 SharedLedger*
+      // 镜像表已更新,UI 应重建以显示最新分类名/图标"。HomePage 上 listen 它
+      // 触发 _streamBuilderKey++ 重建整个 StreamBuilder 子树,代价大。
+      // 如果在每次 auto-pull 后都 bump,自己 mobile push 完触发的 pull 也会
+      // bump → home 全局刷新一次,体验差。
+      // 改成只在真有共享资源变化的两个路径 bump:
+      //   - WS `shared_resource_change` → _handleSharedResourceChange
+      //   - reconnect / accept invite 重拉 → fetchAndStoreSharedResources
       // 附件计数 / 列表的 tick：TransactionList 用它重新 _loadAttachmentCounts，
       // 另一端删除 / 新增的附件就能在对端实时反映，不需要重启 app。
       ref.read(attachmentListRefreshProvider.notifier).state++;

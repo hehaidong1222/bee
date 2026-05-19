@@ -87,6 +87,15 @@ class SyncEngine implements app.SyncService {
   /// 外部回调：自动 pull 完成后通知（用于刷新 UI）
   void Function(String ledgerId)? onAutoPullCompleted;
 
+  /// 外部回调:专门信号"共享账本资源(分类/账户/标签)发生了变化"。跟
+  /// onAutoPullCompleted 分开是因为后者每次 auto-pull 都触发(包括自己
+  /// push 完成后的空 pull),HomePage 等 listener 会重建整个 StreamBuilder
+  /// 子树 → 全局刷新。这个回调只在两个真有共享资源变化的路径触发:
+  ///   - WS `shared_resource_change` → _handleSharedResourceChange
+  ///   - reconnect / accept invite 重拉 → fetchAndStoreSharedResources
+  /// sync_providers 把这个回调绑到 sharedResourceRefreshProvider bump。
+  void Function(String ledgerId)? onSharedResourceChanged;
+
   /// 外部注入：当前活跃 ledgerId 的解析器。WS 重连 / 网络恢复 时需要知道
   /// 往哪个 ledger 触发 sync，但 SyncEngine 内部不挂 Riverpod ref，所以让
   /// sync_providers 构造完之后塞一个函数进来。返回 0 / null 会跳过本次 sync。
