@@ -36,9 +36,7 @@
   "voiceRecordingDuration": "Duration: {duration}s",
   "@voiceRecordingDuration": {
     "placeholders": {
-      "duration": {
-        "type": "int"
-      }
+      "duration": {}
     }
   },
   "voiceRecordingSuccess": "Voice billing successful",
@@ -50,33 +48,25 @@
   "voiceRecordingStartFailed": "Failed to start recording: {error}",
   "@voiceRecordingStartFailed": {
     "placeholders": {
-      "error": {
-        "type": "String"
-      }
+      "error": {}
     }
   },
   "voiceRecordingFailed": "Recording failed: {error}",
   "@voiceRecordingFailed": {
     "placeholders": {
-      "error": {
-        "type": "String"
-      }
+      "error": {}
     }
   },
   "voiceRecordingRecognizeFailed": "Recognition failed: {error}",
   "@voiceRecordingRecognizeFailed": {
     "placeholders": {
-      "error": {
-        "type": "String"
-      }
+      "error": {}
     }
   },
   "voiceRecordingNoInfoDetected": "Unable to extract bill info: {text}",
   "@voiceRecordingNoInfoDetected": {
     "placeholders": {
-      "text": {
-        "type": "String"
-      }
+      "text": {}
     }
   },
   "voiceRecordingNoSpeech": "No speech detected",
@@ -111,17 +101,13 @@
   "homeYear": "{year}",
   "@homeYear": {
     "placeholders": {
-      "year": {
-        "type": "int"
-      }
+      "year": {}
     }
   },
   "homeMonth": "{month}M",
   "@homeMonth": {
     "placeholders": {
-      "month": {
-        "type": "String"
-      }
+      "month": {}
     }
   },
   "homeNoRecordsSubtext": "Tap the plus button at the bottom to add a record",
@@ -130,9 +116,7 @@
   "homeAnnualReportReminder": "Your {year} Annual Report is ready",
   "@homeAnnualReportReminder": {
     "placeholders": {
-      "year": {
-        "type": "int"
-      }
+      "year": {}
     }
   },
   "homeAnnualReportView": "View",
@@ -150,6 +134,12 @@
   "searchNoResults": "No matching results found",
   "searchBatchMode": "Batch Operations",
   "searchBatchModeWithCount": "Batch Operations ({selected}/{total})",
+  "@searchBatchModeWithCount": {
+    "placeholders": {
+      "selected": {},
+      "total": {}
+    }
+  },
   "searchExitBatchMode": "Exit Batch Mode",
   "searchSelectAll": "Select All",
   "searchDeselectAll": "Deselect All",
@@ -189,9 +179,7 @@
   "analyticsSwitchTo": "Switch to {type}",
   "@analyticsSwitchTo": {
     "placeholders": {
-      "type": {
-        "type": "String"
-      }
+      "type": {}
     }
   },
   "analyticsTipHeader": "Tip: Top capsule can switch Month/Year/All",
@@ -201,9 +189,9 @@
   "splashAppName": "Bee Accounting",
   "splashSlogan": "Record Every Drop",
   "splashSecurityTitle": "Open Source Data Security",
-  "splashSecurityFeature1": "• Local data storage, complete privacy control",
-  "splashSecurityFeature2": "• Open source code transparency, trustworthy security",
-  "splashSecurityFeature3": "• Optional cloud sync, consistent data across devices",
+  "splashSecurityFeature1": "鈥?Local data storage, complete privacy control",
+  "splashSecurityFeature2": "鈥?Open source code transparency, trustworthy security",
+  "splashSecurityFeature3": "鈥?Optional cloud sync, consistent data across devices",
   "splashInitializing": "Initializing data...",
   "ledgersTitle": "Ledger Management",
   "ledgersNew": "New Ledger",
@@ -232,17 +220,13 @@
   "ledgersRecords": "Records: {count}",
   "@ledgersRecords": {
     "placeholders": {
-      "count": {
-        "type": "String"
-      }
+      "count": {}
     }
   },
   "ledgersBalance": "Balance: {balance}",
   "@ledgersBalance": {
     "placeholders": {
-      "balance": {
-        "type": "String"
-      }
+      "balance": {}
     }
   },
   "ledgerCardDownloadCloud": "Download from Cloud",
@@ -253,27 +237,21 @@
   "ledgersSwitched": "Switched to ledger \"{name}\"",
   "@ledgersSwitched": {
     "placeholders": {
-      "name": {
-        "type": "String"
-      }
+      "name": {}
     }
   },
   "ledgersDownloadTitle": "Download Ledger",
   "ledgersDownloadMessage": "Confirm download ledger \"{name}\" to local?",
   "@ledgersDownloadMessage": {
     "placeholders": {
-      "name": {
-        "type": "String"
-      }
+      "name": {}
     }
   },
   "ledgersDownloading": "Downloading...",
   "ledgersDownloadSuccess": "Ledger \"{name}\" downloaded successfully",
   "@ledgersDownloadSuccess": {
     "placeholders": {
-      "name": {
-        "type": "String"
-      }
+      "name": {}
     }
   },
   "ledgersDownload": "Download",
@@ -282,9 +260,7 @@
   "ledgersDeleteRemoteMessage": "Confirm delete cloud ledger \"{name}\"? This action cannot be undone.",
   "@ledgersDeleteRemoteMessage": {
     "placeholders": {
-      "name": {
-        "type": "String"
-      }
+      "name": {}
     }
   },
   "ledgersDeleting": "Deleting...",
@@ -294,9 +270,7 @@
   "ledgersRestoreAllMessage": "Confirm restore all cloud ledgers? Total {count}.",
   "@ledgersRestoreAllMessage": {
     "placeholders": {
-      "count": {
-        "type": "int"
-      }
+      "count": {}
     }
   },
   "ledgersRestoring": "Restoring...",
@@ -304,12 +278,8 @@
   "ledgersRestoreResult": "Success: {success}, Failed: {failed}",
   "@ledgersRestoreResult": {
     "placeholders": {
-      "success": {
-        "type": "int"
-      },
-      "failed": {
-        "type": "int"
-      }
+      "success": {},
+      "failed": {}
     }
   },
   "categoryTitle": "Category Management",
@@ -322,9 +292,7 @@
   "categoryLoadFailed": "Load failed: {error}",
   "@categoryLoadFailed": {
     "placeholders": {
-      "error": {
-        "type": "String"
-      }
+      "error": {}
     }
   },
   "iconPickerTitle": "Select Icon",
@@ -347,8 +315,8 @@
   "importChooseFile": "Choose File",
   "importNoFileSelected": "No file selected",
   "importHint": "Tip: Please select a file to start importing (CSV/TSV/XLSX)",
-  "importReading": "Reading file…",
-  "importPreparing": "Preparing…",
+  "importReading": "Reading file鈥?,
+  "importPreparing": "Preparing鈥?,
   "importColumnNumber": "Column {number}",
   "importConfirmMapping": "Confirm Mapping",
   "importCategoryMapping": "Category Mapping",
@@ -382,9 +350,7 @@
   "importFileOpenError": "Unable to open file picker: {error}",
   "@importFileOpenError": {
     "placeholders": {
-      "error": {
-        "type": "String"
-      }
+      "error": {}
     }
   },
   "mineTitle": "Mine",
@@ -395,7 +361,7 @@
   "mineUpdate": "Check for Updates",
   "mineLanguageSettings": "Language Settings",
   "languageTitle": "Language Settings",
-  "languageChinese": "中文",
+  "languageChinese": "涓枃",
   "languageEnglish": "English",
   "languageSystemDefault": "Follow System",
   "deleteConfirmTitle": "Delete Confirmation",
@@ -409,27 +375,21 @@
   "annualReportSubtitle": "Review your {year} financial journey",
   "@annualReportSubtitle": {
     "placeholders": {
-      "year": {
-        "type": "int"
-      }
+      "year": {}
     }
   },
   "annualReportEntrySubtitle": "Create your personalized annual report to share",
   "annualReportNoData": "No data for {year}",
   "@annualReportNoData": {
     "placeholders": {
-      "year": {
-        "type": "int"
-      }
+      "year": {}
     }
   },
   "annualReportPage1Title": "Annual Overview",
   "annualReportPage1Subtitle": "Your {year} bookkeeping journey",
   "@annualReportPage1Subtitle": {
     "placeholders": {
-      "year": {
-        "type": "int"
-      }
+      "year": {}
     }
   },
   "annualReportTotalDays": "Days Tracked",
@@ -454,9 +414,7 @@
   "annualReportAchievementConsistentDesc": "Tracked for over {days} days straight",
   "@annualReportAchievementConsistentDesc": {
     "placeholders": {
-      "days": {
-        "type": "int"
-      }
+      "days": {}
     }
   },
   "annualReportAchievementSaver": "Saver",
@@ -465,9 +423,7 @@
   "annualReportAchievementDetailDesc": "Over {count} records tracked",
   "@annualReportAchievementDetailDesc": {
     "placeholders": {
-      "count": {
-        "type": "int"
-      }
+      "count": {}
     }
   },
   "annualReportShareButton": "Generate Share Poster",
@@ -480,12 +436,12 @@
   "mineShareGenerating": "Generating share poster...",
   "sharePosterAppName": "BeeCount",
   "sharePosterSlogan": "Smart Accounting, Beautiful Life",
-  "sharePosterFeature1": "Data Security·You Control",
-  "sharePosterFeature2": "Open Source·Auditable",
-  "sharePosterFeature3": "AI Smart·Photo & Voice",
-  "sharePosterFeature4": "Photo Accounting·Auto Recognition",
-  "sharePosterFeature5": "Multi Ledger·Dark Mode",
-  "sharePosterFeature6": "Self-Hosted Cloud·Free Forever",
+  "sharePosterFeature1": "Data Security路You Control",
+  "sharePosterFeature2": "Open Source路Auditable",
+  "sharePosterFeature3": "AI Smart路Photo & Voice",
+  "sharePosterFeature4": "Photo Accounting路Auto Recognition",
+  "sharePosterFeature5": "Multi Ledger路Dark Mode",
+  "sharePosterFeature6": "Self-Hosted Cloud路Free Forever",
   "sharePosterScanText": "Scan to visit open source project",
   "appPromoTagOpenSource": "Open Source",
   "appPromoTagFree": "Free",
@@ -493,9 +449,7 @@
   "userProfileJourneyYears": "Bookkeeping Pro {years} Years",
   "@userProfileJourneyYears": {
     "placeholders": {
-      "years": {
-        "type": "int"
-      }
+      "years": {}
     }
   },
   "userProfileJourneyOneYear": "One Year of Bookkeeping",
@@ -510,7 +464,7 @@
   "sharePosterHideIncome": "Hide Income",
   "sharePosterShowIncome": "Show Income",
   "sharePosterSaveSuccess": "Saved to gallery",
-  "shareGuidanceCopyText": "Track my expenses with BeeCount - open source, free & ad-free! 🐝 Download: https://github.com/TNT-Likely/BeeCount",
+  "shareGuidanceCopyText": "Track my expenses with BeeCount - open source, free & ad-free! 馃悵 Download: https://github.com/TNT-Likely/BeeCount",
   "shareGuidanceCopied": "Text copied",
   "sharePosterSaveFailed": "Failed to save",
   "sharePosterPermissionDenied": "Gallery permission denied, please enable in settings",
@@ -546,9 +500,7 @@
   "userProfilePosterStartDate": "Bookkeeping since {date}",
   "@userProfilePosterStartDate": {
     "placeholders": {
-      "date": {
-        "type": "String"
-      }
+      "date": {}
     }
   },
   "userProfilePosterRecordDays": "Days",
@@ -630,13 +582,11 @@
   "mineFeedbackSubtitle": "Report issues or suggestions",
   "mineHelp": "Help",
   "mineHelpSubtitle": "View documentation and FAQ",
-  "mineSupportAuthor": "Star the Project ⭐️",
+  "mineSupportAuthor": "Star the Project 猸愶笍",
   "mineSupportAuthorSubtitle": "Open source, {count} stars",
   "@mineSupportAuthorSubtitle": {
     "placeholders": {
-      "count": {
-        "type": "String"
-      }
+      "count": {}
     }
   },
   "githubStarGuideTitle": "How to Star the Project",
@@ -648,7 +598,7 @@
   "categoryMigrationTooltip": "Category Migration",
   "categoryMigrationTitle": "Category Migration",
   "categoryMigrationDescription": "Category Migration Instructions",
-  "categoryMigrationDescriptionContent": "• Migrate all transaction records from one category to another\n• After migration, all transaction data from the source category will be transferred to the target category\n• This operation cannot be undone, please choose carefully",
+  "categoryMigrationDescriptionContent": "鈥?Migrate all transaction records from one category to another\n鈥?After migration, all transaction data from the source category will be transferred to the target category\n鈥?This operation cannot be undone, please choose carefully",
   "categoryMigrationTypeLabel": "Select Type",
   "categoryMigrationFromLabel": "From Category",
   "categoryMigrationFromHint": "Select category to migrate from",
@@ -707,15 +657,9 @@
   "categoryImportSuccessDetail": "Imported {imported} categories, skipped {skipped}, imported {icons} icons",
   "@categoryImportSuccessDetail": {
     "placeholders": {
-      "imported": {
-        "type": "int"
-      },
-      "skipped": {
-        "type": "int"
-      },
-      "icons": {
-        "type": "int"
-      }
+      "imported": {},
+      "skipped": {},
+      "icons": {}
     }
   },
   "categoryImportFailed": "Import failed",
@@ -773,7 +717,7 @@
   "personalizeTitle": "Personalize",
   "personalizeCustomColor": "Choose custom color",
   "personalizeCustomTitle": "Custom",
-  "personalizeHue": "Hue ({value}°)",
+  "personalizeHue": "Hue ({value}掳)",
   "personalizeSaturation": "Saturation ({value}%)",
   "personalizeBrightness": "Brightness ({value}%)",
   "personalizeSelectColor": "Select this color",
@@ -794,8 +738,8 @@
   "appearanceShowTransactionTime": "Show Transaction Time",
   "appearanceShowTransactionTimeDesc": "Display time in transaction list, allow time selection when editing",
   "appearanceColorScheme": "Income/Expense Color Scheme",
-  "appearanceColorSchemeOn": "Red for income · Green for expense",
-  "appearanceColorSchemeOff": "Red for expense · Green for income",
+  "appearanceColorSchemeOn": "Red for income 路 Green for expense",
+  "appearanceColorSchemeOff": "Red for expense 路 Green for income",
   "appearanceColorSchemeOnDesc": "Red represents income, green represents expense",
   "appearanceColorSchemeOffDesc": "Red represents expense, green represents income",
   "fontSettingsCurrentScale": "Current scale: x{scale}",
@@ -850,41 +794,41 @@
   "reminderManufacturer": "Manufacturer: {value}",
   "reminderModel": "Model: {value}",
   "reminderAndroidVersion": "Android Version: {value}",
-  "reminderBatteryIgnored": "Battery optimization: Ignored ✅",
-  "reminderBatteryNotIgnored": "Battery optimization: Not ignored ⚠️",
+  "reminderBatteryIgnored": "Battery optimization: Ignored 鉁?,
+  "reminderBatteryNotIgnored": "Battery optimization: Not ignored 鈿狅笍",
   "reminderBatteryAdvice": "Recommend disabling battery optimization for proper notifications",
   "reminderCheckChannel": "Check Notification Channel Settings",
   "reminderChannelStatus": "Notification Channel Status",
-  "reminderChannelEnabled": "Channel enabled: Yes ✅",
-  "reminderChannelDisabled": "Channel enabled: No ❌",
+  "reminderChannelEnabled": "Channel enabled: Yes 鉁?,
+  "reminderChannelDisabled": "Channel enabled: No 鉂?,
   "reminderChannelImportance": "Importance: {value}",
-  "reminderChannelSoundOn": "Sound: On 🔊",
-  "reminderChannelSoundOff": "Sound: Off 🔇",
-  "reminderChannelVibrationOn": "Vibration: On 📳",
+  "reminderChannelSoundOn": "Sound: On 馃攰",
+  "reminderChannelSoundOff": "Sound: Off 馃攪",
+  "reminderChannelVibrationOn": "Vibration: On 馃摮",
   "reminderChannelVibrationOff": "Vibration: Off",
   "reminderChannelDndBypass": "Do Not Disturb: Can bypass",
   "reminderChannelDndNoBypass": "Do Not Disturb: Cannot bypass",
-  "reminderChannelAdvice": "⚠️ Recommended settings:",
-  "reminderChannelAdviceImportance": "• Importance: Urgent or High",
-  "reminderChannelAdviceSound": "• Enable sound and vibration",
-  "reminderChannelAdviceBanner": "• Allow banner notifications",
-  "reminderChannelAdviceXiaomi": "• Xiaomi phones need individual channel setup",
-  "reminderChannelGood": "✅ Notification channel well configured",
+  "reminderChannelAdvice": "鈿狅笍 Recommended settings:",
+  "reminderChannelAdviceImportance": "鈥?Importance: Urgent or High",
+  "reminderChannelAdviceSound": "鈥?Enable sound and vibration",
+  "reminderChannelAdviceBanner": "鈥?Allow banner notifications",
+  "reminderChannelAdviceXiaomi": "鈥?Xiaomi phones need individual channel setup",
+  "reminderChannelGood": "鉁?Notification channel well configured",
   "reminderOpenAppSettings": "Open App Settings",
   "reminderAppSettingsMessage": "Please allow notifications and disable battery optimization in settings",
   "reminderDescription": "Tip: When recording reminder is enabled, the system will send notifications at the specified time daily to remind you to record income and expenses.",
-  "reminderIOSInstructions": "🍎 iOS notification settings:\n• Settings > Notifications > Bee Accounting\n• Enable \"Allow Notifications\"\n• Set notification style: Banner or Alert\n• Enable sound and vibration\n\n⚠️ Important Note:\n• iOS local notifications depend on app process\n• Do not force quit app from task manager\n• Notifications work when app is in background or foreground\n• Force quitting will disable notifications\n\n💡 Usage Tips:\n• Simply press Home button to exit app\n• iOS will manage background apps automatically\n• Keep app in background to receive reminders",
-  "reminderAndroidInstructions": "If notifications don't work properly, check:\n• App is allowed to send notifications\n• Disable battery optimization/power saving for app\n• Allow app to run in background and auto-start\n• Android 12+ needs exact alarm permission\n\n📱 Xiaomi phone special settings:\n• Settings > App Management > Bee Accounting > Notification Management\n• Tap \"Recording Reminder\" channel\n• Set importance to \"Urgent\" or \"High\"\n• Enable \"Banner notifications\", \"Sound\", \"Vibration\"\n• Security Center > App Management > Permissions > Auto-start\n\n🔒 Lock background methods:\n• Find Bee Accounting in recent tasks\n• Pull down app card to show lock icon\n• Tap lock icon to prevent cleanup",
+  "reminderIOSInstructions": "馃崕 iOS notification settings:\n鈥?Settings > Notifications > Bee Accounting\n鈥?Enable \"Allow Notifications\"\n鈥?Set notification style: Banner or Alert\n鈥?Enable sound and vibration\n\n鈿狅笍 Important Note:\n鈥?iOS local notifications depend on app process\n鈥?Do not force quit app from task manager\n鈥?Notifications work when app is in background or foreground\n鈥?Force quitting will disable notifications\n\n馃挕 Usage Tips:\n鈥?Simply press Home button to exit app\n鈥?iOS will manage background apps automatically\n鈥?Keep app in background to receive reminders",
+  "reminderAndroidInstructions": "If notifications don't work properly, check:\n鈥?App is allowed to send notifications\n鈥?Disable battery optimization/power saving for app\n鈥?Allow app to run in background and auto-start\n鈥?Android 12+ needs exact alarm permission\n\n馃摫 Xiaomi phone special settings:\n鈥?Settings > App Management > Bee Accounting > Notification Management\n鈥?Tap \"Recording Reminder\" channel\n鈥?Set importance to \"Urgent\" or \"High\"\n鈥?Enable \"Banner notifications\", \"Sound\", \"Vibration\"\n鈥?Security Center > App Management > Permissions > Auto-start\n\n馃敀 Lock background methods:\n鈥?Find Bee Accounting in recent tasks\n鈥?Pull down app card to show lock icon\n鈥?Tap lock icon to prevent cleanup",
   "categoryDetailLoadFailed": "Load failed",
   "categoryDetailSummaryTitle": "Category Summary",
   "categoryDetailTotalCount": "Total Count",
   "categoryDetailTotalAmount": "Total Amount",
   "categoryDetailAverageAmount": "Average Amount",
   "categoryDetailSortTitle": "Sort",
-  "categoryDetailSortTimeDesc": "Time ↓",
-  "categoryDetailSortTimeAsc": "Time ↑",
-  "categoryDetailSortAmountDesc": "Amount ↓",
-  "categoryDetailSortAmountAsc": "Amount ↑",
+  "categoryDetailSortTimeDesc": "Time 鈫?,
+  "categoryDetailSortTimeAsc": "Time 鈫?,
+  "categoryDetailSortAmountDesc": "Amount 鈫?,
+  "categoryDetailSortAmountAsc": "Amount 鈫?,
   "categoryDetailNoTransactions": "No transactions",
   "categoryDetailNoTransactionsSubtext": "No transactions in this category yet",
   "categoryDetailDeleteFailed": "Delete failed",
@@ -898,9 +842,7 @@
   "categoryMigrationTransactionLabel": "{count} records",
   "@categoryMigrationTransactionLabel": {
     "placeholders": {
-      "count": {
-        "type": "int"
-      }
+      "count": {}
     }
   },
   "mineImportCompleteAllSuccess": "All Success",
@@ -915,7 +857,7 @@
   "cloudAnonKeyLabel": "Anon Key",
   "cloudSelectServiceType": "Select Cloud Service Type",
   "cloudMultiDeviceWarningTitle": "Multi-Device Tips",
-  "cloudMultiDeviceWarningMessage": "Upload before switching devices, download on the new device before editing. Don't edit the same ledger on two devices at once. Tap for details →",
+  "cloudMultiDeviceWarningMessage": "Upload before switching devices, download on the new device before editing. Don't edit the same ledger on two devices at once. Tap for details 鈫?,
   "cloudWebdavUrlLabel": "WebDAV Server URL",
   "cloudWebdavUrlHint": "https://dav.jianguoyun.com/dav/",
   "cloudWebdavUsernameLabel": "Username",
@@ -956,7 +898,7 @@
   "authErrorWeakPassword": "Password is too simple, please include letters and numbers, at least 6 characters.",
   "importSelectCsvFile": "Please select a file to import (CSV/TSV/XLSX supported)",
   "exportTitle": "Export",
-  "exportDescription": "Supported export types:\n• Transactions (Income/Expense/Transfer)\n• Categories\n• Accounts\n\nClick the button below to select save location and export current ledger to CSV file.",
+  "exportDescription": "Supported export types:\n鈥?Transactions (Income/Expense/Transfer)\n鈥?Categories\n鈥?Accounts\n\nClick the button below to select save location and export current ledger to CSV file.",
   "exportButtonIOS": "Export and Share",
   "exportButtonAndroid": "Export Data",
   "exportSavedTo": "Saved to: {path}",
@@ -981,23 +923,17 @@
   "exportTypeTransfer": "Transfer",
   "@exportSavedTo": {
     "placeholders": {
-      "path": {
-        "type": "String"
-      }
+      "path": {}
     }
   },
   "@exportSuccessMessageIOS": {
     "placeholders": {
-      "path": {
-        "type": "String"
-      }
+      "path": {}
     }
   },
   "@exportSuccessMessageAndroid": {
     "placeholders": {
-      "path": {
-        "type": "String"
-      }
+      "path": {}
     }
   },
   "personalizeThemeHoney": "Bee Yellow",
@@ -1036,17 +972,13 @@
   "analyticsAvgIncome": "{avgLabel} Income: ",
   "@analyticsAvgIncome": {
     "placeholders": {
-      "avgLabel": {
-        "type": "String"
-      }
+      "avgLabel": {}
     }
   },
   "analyticsAvgExpense": "{avgLabel} Expense: ",
   "@analyticsAvgExpense": {
     "placeholders": {
-      "avgLabel": {
-        "type": "String"
-      }
+      "avgLabel": {}
     }
   },
   "analyticsExpense": "Expense",
@@ -1054,26 +986,20 @@
   "analyticsTotal": "Total {type}: ",
   "@analyticsTotal": {
     "placeholders": {
-      "type": {
-        "type": "String"
-      }
+      "type": {}
     }
   },
   "analyticsAverage": "{avgLabel}: ",
   "@analyticsAverage": {
     "placeholders": {
-      "avgLabel": {
-        "type": "String"
-      }
+      "avgLabel": {}
     }
   },
   "updateCheckTitle": "Check Update",
   "updateNewVersionTitle": "New Version {version} Found",
   "@updateNewVersionTitle": {
     "placeholders": {
-      "version": {
-        "type": "String"
-      }
+      "version": {}
     }
   },
   "updateNoApkFound": "APK download link not found",
@@ -1085,9 +1011,7 @@
   "updateDownloading": "Downloading: {percent}%",
   "@updateDownloading": {
     "placeholders": {
-      "percent": {
-        "type": "String"
-      }
+      "percent": {}
     }
   },
   "updateDownloadBackgroundHint": "You can switch the app to background, download will continue",
@@ -1134,70 +1058,48 @@
   "updateDownloadProgress": "Downloading: {percent}%",
   "@updateDownloadProgress": {
     "placeholders": {
-      "percent": {
-        "type": "String"
-      }
+      "percent": {}
     }
   },
   "updateCheckingUpdateError": "Update check failed: {error}",
   "@updateCheckingUpdateError": {
     "placeholders": {
-      "error": {
-        "type": "String"
-      }
+      "error": {}
     }
   },
   "updateNoLocalApkFoundMessage": "No downloaded update package file found.\\n\\nPlease first download new version through \"Check Update\".",
   "updateInstallPackageFoundMessage": "Found update package:\\n\\nFile name: {fileName}\\nSize: {fileSize}MB\\nDownload time: {time}\\n\\nInstall immediately?",
   "@updateInstallPackageFoundMessage": {
     "placeholders": {
-      "fileName": {
-        "type": "String"
-      },
-      "fileSize": {
-        "type": "String"
-      },
-      "time": {
-        "type": "String"
-      }
+      "fileName": {},
+      "fileSize": {},
+      "time": {}
     }
   },
   "updateMultiplePackagesFoundMessage": "Found {count} update package files.\\n\\nRecommend using the latest downloaded version, or manually install in file manager.\\n\\nFile location: {path}",
   "@updateMultiplePackagesFoundMessage": {
     "placeholders": {
-      "count": {
-        "type": "int"
-      },
-      "path": {
-        "type": "String"
-      }
+      "count": {},
+      "path": {}
     }
   },
   "updateSearchLocalApkError": "Error occurred while searching for local update packages: {error}",
   "@updateSearchLocalApkError": {
     "placeholders": {
-      "error": {
-        "type": "String"
-      }
+      "error": {}
     }
   },
   "updateCachedPackageFoundMessage": "Detected previously downloaded update package:\\n\\nFile name: {fileName}\\nSize: {fileSize}MB\\n\\nInstall immediately?",
   "@updateCachedPackageFoundMessage": {
     "placeholders": {
-      "fileName": {
-        "type": "String"
-      },
-      "fileSize": {
-        "type": "String"
-      }
+      "fileName": {},
+      "fileSize": {}
     }
   },
   "updateReadCachedPackageError": "Failed to read cached update package: {error}",
   "@updateReadCachedPackageError": {
     "placeholders": {
-      "error": {
-        "type": "String"
-      }
+      "error": {}
     }
   },
   "updateOk": "OK",
@@ -1213,21 +1115,15 @@
   "updateMirrorTesting": "Testing {completed}/{total}...",
   "@updateMirrorTesting": {
     "placeholders": {
-      "completed": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
+      "completed": {},
+      "total": {}
     }
   },
   "updateMirrorDirectHint": "For users with good network",
   "updateDownloadMirror": "Source: {mirror}",
   "@updateDownloadMirror": {
     "placeholders": {
-      "mirror": {
-        "type": "String"
-      }
+      "mirror": {}
     }
   },
   "updateMirrorSettingTitle": "Download Accelerator",
@@ -1303,33 +1199,25 @@
   "recurringTransactionEveryNDays": "Every {n} day(s)",
   "@recurringTransactionEveryNDays": {
     "placeholders": {
-      "n": {
-        "type": "int"
-      }
+      "n": {}
     }
   },
   "recurringTransactionEveryNWeeks": "Every {n} week(s)",
   "@recurringTransactionEveryNWeeks": {
     "placeholders": {
-      "n": {
-        "type": "int"
-      }
+      "n": {}
     }
   },
   "recurringTransactionEveryNMonths": "Every {n} month(s)",
   "@recurringTransactionEveryNMonths": {
     "placeholders": {
-      "n": {
-        "type": "int"
-      }
+      "n": {}
     }
   },
   "recurringTransactionEveryNYears": "Every {n} year(s)",
   "@recurringTransactionEveryNYears": {
     "placeholders": {
-      "n": {
-        "type": "int"
-      }
+      "n": {}
     }
   },
   "recurringTransactionUsageTitle": "Usage Guide",
@@ -1351,7 +1239,7 @@
   "cloudCustomS3Title": "S3 Protocol Storage",
   "cloudCustomS3Subtitle": "AWS S3 / Cloudflare R2 / MinIO",
   "cloudBeeCountCloudTitle": "BeeCount Cloud",
-  "cloudBeeCountCloudSubtitle": "Self-hosted · Incremental sync · Multi-device",
+  "cloudBeeCountCloudSubtitle": "Self-hosted 路 Incremental sync 路 Multi-device",
   "cloudConfigureBeeCountCloudTitle": "Configure BeeCount Cloud",
   "cloudBeeCountCloudUrlLabel": "Server URL",
   "cloudBeeCountCloudUrlHint": "https://your-server.com",
@@ -1363,7 +1251,7 @@
   "cloudBeeCountCloudPasswordHint": "Enter password",
   "cloudBeeCountCloudLoginSuccess": "Login successful",
   "cloudBeeCountCloudLoginFailed": "Login failed",
-  "cloudBeeCountCloudSyncSubtitle": "Incremental sync · Multi-device",
+  "cloudBeeCountCloudSyncSubtitle": "Incremental sync 路 Multi-device",
   "cloudBeeCountCloudConnected": "Connected",
   "cloudBeeCountCloudNotConnected": "Not connected",
   "cloudBeeCountCloudNotConnectedHint": "Configure and login in cloud service settings",
@@ -1457,9 +1345,7 @@
   "cloudErrorServerStatus": "Server returned status code {code}",
   "@cloudErrorServerStatus": {
     "placeholders": {
-      "code": {
-        "type": "String"
-      }
+      "code": {}
     }
   },
   "cloudErrorWebdavNotSupported": "Server does not support WebDAV protocol",
@@ -1468,17 +1354,13 @@
   "cloudErrorPathNotFound": "Server path not found: {path}",
   "@cloudErrorPathNotFound": {
     "placeholders": {
-      "path": {
-        "type": "String"
-      }
+      "path": {}
     }
   },
   "cloudErrorNetwork": "Network error: {message}",
   "@cloudErrorNetwork": {
     "placeholders": {
-      "message": {
-        "type": "String"
-      }
+      "message": {}
     }
   },
   "cloudTestSuccessTitle": "Test Successful",
@@ -1496,9 +1378,7 @@
   "cloudSwitchedTo": "Switched to {type}",
   "@cloudSwitchedTo": {
     "placeholders": {
-      "type": {
-        "type": "String"
-      }
+      "type": {}
     }
   },
   "cloudConfigureSupabaseTitle": "Configure Supabase",
@@ -1532,9 +1412,7 @@
   "accountDeleteWarningMessage": "This account has {count} related transactions. After deletion, account information in transaction records will be cleared. Confirm deletion?",
   "@accountDeleteWarningMessage": {
     "placeholders": {
-      "count": {
-        "type": "int"
-      }
+      "count": {}
     }
   },
   "accountDeleteConfirm": "Confirm to delete this account?",
@@ -1547,7 +1425,7 @@
   "welcomeTitle": "Welcome to BeeCount",
   "welcomeDescription": "An accounting app that truly respects your privacy",
   "welcomeCurrencyDescription": "Choose your preferred currency, you can change it anytime in settings",
-  "welcomePrivacyTitle": "Open Source · Community Driven",
+  "welcomePrivacyTitle": "Open Source 路 Community Driven",
   "welcomePrivacyFeature1": "100% open source code, supervised by community",
   "welcomePrivacyFeature2": "No privacy concerns, data stored locally",
   "welcomeOpenSourceFeature1": "Active developer community, continuous improvement",
@@ -1584,7 +1462,7 @@
   "autoScreenshotBillingDesc": "Auto-recognize payment info from screenshots",
   "autoScreenshotBillingTitle": "Auto Screenshot Billing",
   "featureDescription": "Feature Description",
-  "featureDescriptionContent": "After taking a screenshot of payment page, the system will automatically recognize amount and merchant info, and create expense record.\n\n⚡ Recognition speed: 2-3 seconds (may be longer on some devices)\n🤖 Smart category matching\n📝 Auto-fill notes\n\n⚠️ Note:\n• Different devices have different screenshot save speeds, delay may be 5-10 seconds\n• May not work on some devices, depending on system implementation\n• Recognized screenshots will be skipped automatically\n• Due to Android Scoped Storage restrictions (Android 10+), apps cannot delete system screenshots. Manual cleanup required",
+  "featureDescriptionContent": "After taking a screenshot of payment page, the system will automatically recognize amount and merchant info, and create expense record.\n\n鈿?Recognition speed: 2-3 seconds (may be longer on some devices)\n馃 Smart category matching\n馃摑 Auto-fill notes\n\n鈿狅笍 Note:\n鈥?Different devices have different screenshot save speeds, delay may be 5-10 seconds\n鈥?May not work on some devices, depending on system implementation\n鈥?Recognized screenshots will be skipped automatically\n鈥?Due to Android Scoped Storage restrictions (Android 10+), apps cannot delete system screenshots. Manual cleanup required",
   "autoBilling": "Auto Billing",
   "enabled": "Enabled",
   "disabled": "Disabled",
@@ -1595,7 +1473,7 @@
   "autoBillingBatteryGuideTitle": "Battery Optimization Settings",
   "autoBillingBatteryDesc": "Auto billing requires the app to keep running in the background. Some phones automatically clean background apps when locked, which may cause auto billing to fail. It is recommended to disable battery optimization to ensure proper functionality.",
   "autoBillingCheckBattery": "Check Battery Optimization",
-  "autoBillingBatteryWarning": "⚠️ Battery optimization is not disabled. The app may be automatically cleaned by the system, causing auto billing to fail. Please tap the \"Settings\" button above to disable battery optimization.",
+  "autoBillingBatteryWarning": "鈿狅笍 Battery optimization is not disabled. The app may be automatically cleaned by the system, causing auto billing to fail. Please tap the \"Settings\" button above to disable battery optimization.",
   "enableFailed": "Enable failed",
   "disableFailed": "Disable failed",
   "iosAutoFeatureDesc": "Use iOS \"Shortcuts\" app to automatically identify payment information from screenshots and create transactions. Once set up, it will automatically trigger on every screenshot.",
@@ -1606,9 +1484,9 @@
   "iosAutoShortcutStep4": "Set the screenshot parameter of \"BeeCount\" to the previous \"Screenshot\"",
   "iosAutoShortcutStep5": "(Optional) Go to Settings > Accessibility > Touch > Back Tap, bind this shortcut",
   "iosAutoShortcutStep6": "Done! Double tap phone back during payment for quick billing",
-  "iosAutoShortcutRecommendedTip": "✅ Recommended: After binding the shortcut to \"Back Tap\", double tap phone back during payment to auto-screenshot and recognize billing, no manual screenshot needed.",
-  "iosAutoBackTapTitle": "💡 Double Tap Back to Trigger (Recommended)",
-  "iosAutoBackTapDesc": "Settings > Accessibility > Touch > Back Tap\n• Select \"Double Tap\" or \"Triple Tap\"\n• Choose the shortcut you just created\n• After setup, double tap phone back during payment to auto-record, no screenshot needed",
+  "iosAutoShortcutRecommendedTip": "鉁?Recommended: After binding the shortcut to \"Back Tap\", double tap phone back during payment to auto-screenshot and recognize billing, no manual screenshot needed.",
+  "iosAutoBackTapTitle": "馃挕 Double Tap Back to Trigger (Recommended)",
+  "iosAutoBackTapDesc": "Settings > Accessibility > Touch > Back Tap\n鈥?Select \"Double Tap\" or \"Triple Tap\"\n鈥?Choose the shortcut you just created\n鈥?After setup, double tap phone back during payment to auto-record, no screenshot needed",
   "iosAutoTutorialTitle": "Video Tutorial",
   "iosAutoTutorialDesc": "Watch detailed setup video tutorial",
   "aiSettingsTitle": "AI Assistant",
@@ -1628,9 +1506,7 @@
   "aiStrategySwitched": "Switched to: {strategy}",
   "@aiStrategySwitched": {
     "placeholders": {
-      "strategy": {
-        "type": "String"
-      }
+      "strategy": {}
     }
   },
   "aiCloudApiKeyHint": "Enter your Zhipu AI API Key",
@@ -1647,23 +1523,17 @@
   "aiOcrRecognizing": "Recognizing bill...",
   "aiOcrNoAmount": "No valid amount recognized, please add manually",
   "aiOcrNoLedger": "Ledger not found",
-  "aiOcrSuccess": "✅ {type} bill created ¥{amount}",
+  "aiOcrSuccess": "鉁?{type} bill created 楼{amount}",
   "@aiOcrSuccess": {
     "placeholders": {
-      "type": {
-        "type": "String"
-      },
-      "amount": {
-        "type": "String"
-      }
+      "type": {},
+      "amount": {}
     }
   },
   "aiOcrFailed": "Recognition failed: {error}",
   "@aiOcrFailed": {
     "placeholders": {
-      "error": {
-        "type": "String"
-      }
+      "error": {}
     }
   },
   "aiOcrCreateFailed": "Failed to create bill",
@@ -1676,28 +1546,28 @@
   "cloudTutorialStep1Title": "Step 1: Deploy or join a server",
   "cloudTutorialStep1Desc": "Self-host with one Docker command (see the Docker guide in GitHub README). Or join an existing BeeCount Cloud server run by a friend / team.",
   "cloudTutorialStep2Title": "Step 2: Get an account",
-  "cloudTutorialStep2Desc": "BeeCount Cloud does NOT offer self-registration (to prevent abuse on public servers). If you self-host: the first Docker boot prints a random admin email + password to the logs — use that. Joining someone else's server: ask the admin to create an account for you in Web → Users.",
+  "cloudTutorialStep2Desc": "BeeCount Cloud does NOT offer self-registration (to prevent abuse on public servers). If you self-host: the first Docker boot prints a random admin email + password to the logs 鈥?use that. Joining someone else's server: ask the admin to create an account for you in Web 鈫?Users.",
   "cloudTutorialStep3Title": "Step 3: Login + enable sync",
   "cloudTutorialStep3Desc": "In the app, pick BeeCount Cloud, enter the server URL and the account you got in step 2. First login uploads your entire local ledger; every subsequent edit is pushed in real time.",
   "cloudTutorialStep4Title": "Step 4: Login from other devices",
-  "cloudTutorialStep4Desc": "Phone / tablet / Web — same account, instant shared state. Edits propagate within seconds.",
+  "cloudTutorialStep4Desc": "Phone / tablet / Web 鈥?same account, instant shared state. Edits propagate within seconds.",
   "cloudTutorialTipTitle": "Tip",
   "cloudTutorialTipDesc": "The Web UI lives at the server URL. Open it in a browser to manage ledgers, members, and view logs.",
   "cloudTutorialFeaturesTitle": "Features",
-  "cloudTutorialFeature1": "📱 Real-time multi-device: phone A + phone B + Web on one account, sub-second sync",
-  "cloudTutorialFeature2": "🌐 Web UI included: one Docker image ships server + Web, browser ready",
-  "cloudTutorialFeature3": "👥 Multi-user isolation: multiple users on one server, data fully separated",
-  "cloudTutorialFeature4": "🔜 Planned: shared ledgers (invite family / team to a common ledger)",
+  "cloudTutorialFeature1": "馃摫 Real-time multi-device: phone A + phone B + Web on one account, sub-second sync",
+  "cloudTutorialFeature2": "馃寪 Web UI included: one Docker image ships server + Web, browser ready",
+  "cloudTutorialFeature3": "馃懃 Multi-user isolation: multiple users on one server, data fully separated",
+  "cloudTutorialFeature4": "馃敎 Planned: shared ledgers (invite family / team to a common ledger)",
   "cloudTutorialGotIt": "Got it",
-  "cloudSyncHint": "Downloads automatically compare differences for selective preview. Not real-time — avoid editing the same ledger on multiple devices simultaneously. Sync scope covers ledger data (including associated accounts, categories, and tags), excluding attachments.",
+  "cloudSyncHint": "Downloads automatically compare differences for selective preview. Not real-time 鈥?avoid editing the same ledger on multiple devices simultaneously. Sync scope covers ledger data (including associated accounts, categories, and tags), excluding attachments.",
   "cloudSyncNow": "Sync Now",
   "cloudSyncNowHint": "Push local changes and pull remote updates",
   "cloudSyncInProgress": "Syncing...",
   "cloudSyncComplete": "Sync complete: pushed {pushed}, pulled {pulled}",
   "@cloudSyncComplete": {
     "placeholders": {
-      "pushed": {"type": "int"},
-      "pulled": {"type": "int"}
+      "pushed": {},
+      "pulled": {}
     }
   },
   "cloudAutoSyncHint": "Auto-sync to cloud after data changes",
@@ -1749,34 +1619,34 @@
   "aboutSupportDevelopment": "Support Development",
   "aboutSupportDevelopmentSubtitle": "Buy me a coffee",
   "aboutDeveloperStoryTitle": "From the Developer",
-  "aboutDeveloperStory": "I started tracking my expenses in 2015 as an intern, and I've kept the habit for over a decade. Concerned about ads, paywalls, privacy risks, and apps shutting down, I decided to build my own — first as a small tool for myself and my family.\n\nIn September 2025, BeeCount launched its first version. Honestly, I had no idea if anyone would use it. But gradually, feedback started coming in — someone said they finally found a clean budgeting app, others offered great suggestions, and some quietly left five-star reviews. Every single message reminded me this was worth continuing.\n\nBeeCount is ad-free, subscription-free, and fully open source. All your data stays on your device and is never uploaded to any third-party server. But publishing and maintaining an app isn't free — developer accounts, servers, and other costs are currently covered by community donations, and every system update, bug fix, and new feature is built outside of my day job.\n\nIf BeeCount has been helpful to you, a rating, a share, or a donation would help this little project go further. Thank you for your trust.",
+  "aboutDeveloperStory": "I started tracking my expenses in 2015 as an intern, and I've kept the habit for over a decade. Concerned about ads, paywalls, privacy risks, and apps shutting down, I decided to build my own 鈥?first as a small tool for myself and my family.\n\nIn September 2025, BeeCount launched its first version. Honestly, I had no idea if anyone would use it. But gradually, feedback started coming in 鈥?someone said they finally found a clean budgeting app, others offered great suggestions, and some quietly left five-star reviews. Every single message reminded me this was worth continuing.\n\nBeeCount is ad-free, subscription-free, and fully open source. All your data stays on your device and is never uploaded to any third-party server. But publishing and maintaining an app isn't free 鈥?developer accounts, servers, and other costs are currently covered by community donations, and every system update, bug fix, and new feature is built outside of my day job.\n\nIf BeeCount has been helpful to you, a rating, a share, or a donation would help this little project go further. Thank you for your trust.",
   "aboutRelatedProducts": "More Products",
   "aboutBeeAssets": "BeeAssets",
   "aboutBeeAssetsSubtitle": "Visualize your full asset portfolio",
   "aboutBeeAssetsIntro": "BeeCount focuses on daily cash flow; BeeAssets is its sibling product, focused on asset portfolio visualization: net worth trends across accounts, property / investment / crypto classification, returns, holding period, and allocation breakdown.",
   "aboutBeeDNS": "BeeDNS",
   "aboutBeeDNSSubtitle": "Simple and efficient DNS management tool",
-  "aboutBeeDNSIntro": "Got domains across Cloudflare and Aliyun? BeeDNS unifies them in one place: batch edit records, A/AAAA toggles, resolution migration, subdomain bulk management — no more switching between provider consoles.",
+  "aboutBeeDNSIntro": "Got domains across Cloudflare and Aliyun? BeeDNS unifies them in one place: batch edit records, A/AAAA toggles, resolution migration, subdomain bulk management 鈥?no more switching between provider consoles.",
   "productPromoAndroidTitle": "Request Beta Access",
-  "productPromoAndroidMessage": "This app is still in closed testing on Google Play — invitation only.\n\nHow to apply: email us with your Google account address (required) and a brief use case (optional). We'll reply within 1-3 days and add you to the beta whitelist.",
+  "productPromoAndroidMessage": "This app is still in closed testing on Google Play 鈥?invitation only.\n\nHow to apply: email us with your Google account address (required) and a brief use case (optional). We'll reply within 1-3 days and add you to the beta whitelist.",
   "productPromoOpenStore": "Open in App Store",
   "productPromoTestFlight": "TestFlight beta",
   "productPromoLearnMore": "Pro",
   "productPromoEmailLabel": "Application Email (tap to copy)",
   "productPromoCopiedToast": "Email copied to clipboard",
-  "productPromoMailUnavailable": "No email app detected. The address has been copied — paste it into any mail app to send.",
+  "productPromoMailUnavailable": "No email app detected. The address has been copied 鈥?paste it into any mail app to send.",
   "productPromoEmailButton": "Send Email",
   "productPromoWebsiteButton": "Visit Website",
   "productPromoEmailSubject": "Beta access request - {productName}",
   "@productPromoEmailSubject": {
     "placeholders": {
-      "productName": { "type": "String" }
+      "productName": {}
     }
   },
   "productPromoEmailBody": "Hi,\n\nI'd like to join the closed beta for {productName} on Google Play. My Google account email is:\n\n(please fill in your Gmail / Google account email)\n\nThanks!",
   "@productPromoEmailBody": {
     "placeholders": {
-      "productName": { "type": "String" }
+      "productName": {}
     }
   },
   "logCenterTitle": "Log Center",
@@ -1797,7 +1667,7 @@
   "configImportExportTitle": "Config Import/Export",
   "configImportExportSubtitle": "Backup and restore app configurations",
   "configImportExportInfoTitle": "Feature Description",
-  "configImportExportInfoMessage": "This feature is used to export and import app configurations, including cloud service settings, AI settings, etc. The config file uses YAML format for easy viewing and editing.\n\n⚠️ Config files contain sensitive information (such as API keys, passwords, etc.), please keep them safe.",
+  "configImportExportInfoMessage": "This feature is used to export and import app configurations, including cloud service settings, AI settings, etc. The config file uses YAML format for easy viewing and editing.\n\n鈿狅笍 Config files contain sensitive information (such as API keys, passwords, etc.), please keep them safe.",
   "configExportTitle": "Export Config",
   "configExportSubtitle": "Export current config to YAML file",
   "configExportShareSubject": "BeeCount Config File",
@@ -1819,9 +1689,7 @@
   "configExportReadFileFailed": "Failed to read file",
   "@configExportSavedTo": {
     "placeholders": {
-      "path": {
-        "type": "String"
-      }
+      "path": {}
     }
   },
   "configIncludeLedgers": "Ledgers",
@@ -1848,41 +1716,31 @@
   "ledgersConflictLocalInfo": "Local: {count} transactions",
   "@ledgersConflictLocalInfo": {
     "placeholders": {
-      "count": {
-        "type": "int"
-      }
+      "count": {}
     }
   },
   "ledgersConflictRemoteInfo": "Cloud: {count} transactions",
   "@ledgersConflictRemoteInfo": {
     "placeholders": {
-      "count": {
-        "type": "int"
-      }
+      "count": {}
     }
   },
   "ledgersConflictRemoteUpdated": "Cloud updated: {time}",
   "@ledgersConflictRemoteUpdated": {
     "placeholders": {
-      "time": {
-        "type": "String"
-      }
+      "time": {}
     }
   },
   "ledgersConflictLocalFingerprint": "Local fingerprint: {fp}",
   "@ledgersConflictLocalFingerprint": {
     "placeholders": {
-      "fp": {
-        "type": "String"
-      }
+      "fp": {}
     }
   },
   "ledgersConflictRemoteFingerprint": "Cloud fingerprint: {fp}",
   "@ledgersConflictRemoteFingerprint": {
     "placeholders": {
-      "fp": {
-        "type": "String"
-      }
+      "fp": {}
     }
   },
   "ledgersConflictUpload": "Upload to Cloud",
@@ -1893,9 +1751,7 @@
   "ledgersConflictDownloadSuccess": "Download successful, merged {inserted} transactions",
   "@ledgersConflictDownloadSuccess": {
     "placeholders": {
-      "inserted": {
-        "type": "int"
-      }
+      "inserted": {}
     }
   },
   "storageManagementTitle": "Storage Management",
@@ -1909,17 +1765,13 @@
   "storageClearAIModelsMessage": "Are you sure you want to clear all AI models? Size: {size}",
   "@storageClearAIModelsMessage": {
     "placeholders": {
-      "size": {
-        "type": "String"
-      }
+      "size": {}
     }
   },
   "storageClearAPKMessage": "Are you sure you want to clear all installation packages? Size: {size}",
   "@storageClearAPKMessage": {
     "placeholders": {
-      "size": {
-        "type": "String"
-      }
+      "size": {}
     }
   },
   "storageClearSuccess": "Cleared successfully",
@@ -1966,9 +1818,7 @@
   "welcomeImportFailed": "Import failed: {error}",
   "@welcomeImportFailed": {
     "placeholders": {
-      "error": {
-        "type": "String"
-      }
+      "error": {}
     }
   },
   "welcomeImportNoFile": "No file selected",
@@ -1979,17 +1829,13 @@
   "welcomeImportAttachmentSuccess": "Attachments imported: {imported}",
   "@welcomeImportAttachmentSuccess": {
     "placeholders": {
-      "imported": {
-        "type": "int"
-      }
+      "imported": {}
     }
   },
   "welcomeImportAttachmentFailed": "Attachment import failed: {error}",
   "@welcomeImportAttachmentFailed": {
     "placeholders": {
-      "error": {
-        "type": "String"
-      }
+      "error": {}
     }
   },
   "welcomeImportingAttachment": "Importing attachments...",
@@ -2013,11 +1859,11 @@
   "aiChatSendFailed": "Failed to send",
   "billCardSuccess": "Booking Successful",
   "billCardUndone": "Undone",
-  "billCardAmount": "💰 Amount",
-  "billCardCategory": "🏷️ Category",
-  "billCardTime": "📅 Time",
-  "billCardNote": "📝 Note",
-  "billCardAccount": "💳 Account",
+  "billCardAmount": "馃挵 Amount",
+  "billCardCategory": "馃彿锔?Category",
+  "billCardTime": "馃搮 Time",
+  "billCardNote": "馃摑 Note",
+  "billCardAccount": "馃挸 Account",
   "billCardUndo": "Undo",
   "billCardEdit": "Edit",
   "donationTitle": "Donate",
@@ -2031,9 +1877,7 @@
   "donationThankYouMessage": "Thank you for purchasing {productName}! Your support means a lot to me. I will continue to improve BeeCount to make it even better!",
   "@donationThankYouMessage": {
     "placeholders": {
-      "productName": {
-        "type": "String"
-      }
+      "productName": {}
     }
   },
   "aiQuickCommandFinancialHealthTitle": "Financial Health Analysis",
@@ -2088,9 +1932,7 @@
   "aiModelSwitched": "Switched to {modelName}",
   "@aiModelSwitched": {
     "placeholders": {
-      "modelName": {
-        "type": "String"
-      }
+      "modelName": {}
     }
   },
   "aiUsingVisionDesc": "Image recognition is enabled for higher recognition accuracy",
@@ -2121,9 +1963,7 @@
   "tagDeleteConfirmMessage": "Delete tag \"{name}\"? This will not affect associated transactions.",
   "@tagDeleteConfirmMessage": {
     "placeholders": {
-      "name": {
-        "type": "String"
-      }
+      "name": {}
     }
   },
   "tagDeleteSuccess": "Tag deleted",
@@ -2135,9 +1975,7 @@
   "tagTransactionCount": "{count} transactions",
   "@tagTransactionCount": {
     "placeholders": {
-      "count": {
-        "type": "int"
-      }
+      "count": {}
     }
   },
   "tagDetailTitle": "Tag Details",
@@ -2178,9 +2016,7 @@
   "tagShareSuccess": "Saved to {path}",
   "@tagShareSuccess": {
     "placeholders": {
-      "path": {
-        "type": "String"
-      }
+      "path": {}
     }
   },
   "tagShareSubject": "BeeCount Tags Configuration",
@@ -2199,17 +2035,13 @@
   "tagClearUnusedMessage": "Delete {count} unused tags?",
   "@tagClearUnusedMessage": {
     "placeholders": {
-      "count": {
-        "type": "int"
-      }
+      "count": {}
     }
   },
   "tagClearUnusedSuccess": "Deleted {count} tags",
   "@tagClearUnusedSuccess": {
     "placeholders": {
-      "count": {
-        "type": "int"
-      }
+      "count": {}
     }
   },
   "tagClearUnusedFailed": "Clear failed",
@@ -2225,17 +2057,13 @@
   "budgetDaysRemaining": "{days} days remaining",
   "@budgetDaysRemaining": {
     "placeholders": {
-      "days": {
-        "type": "int"
-      }
+      "days": {}
     }
   },
   "budgetDailyAvailable": "Daily available {amount}",
   "@budgetDailyAvailable": {
     "placeholders": {
-      "amount": {
-        "type": "String"
-      }
+      "amount": {}
     }
   },
   "budgetCategoryBudgets": "Category Budgets",
@@ -2260,9 +2088,7 @@
   "attachmentCount": "{count} images",
   "@attachmentCount": {
     "placeholders": {
-      "count": {
-        "type": "int"
-      }
+      "count": {}
     }
   },
   "commonDeleted": "Deleted",
@@ -2274,38 +2100,24 @@
   "attachmentExportProgress": "Exporting attachments ({current}/{total})",
   "@attachmentExportProgress": {
     "placeholders": {
-      "current": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
+      "current": {},
+      "total": {}
     }
   },
   "attachmentExportProgressDetail": "Exporting {attachmentCount} attachment(s) + {iconCount} icon(s) ({current}/{total})",
   "@attachmentExportProgressDetail": {
     "placeholders": {
-      "attachmentCount": {
-        "type": "int"
-      },
-      "iconCount": {
-        "type": "int"
-      },
-      "current": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
+      "attachmentCount": {},
+      "iconCount": {},
+      "current": {},
+      "total": {}
     }
   },
   "attachmentExportSuccess": "Attachments exported successfully",
   "attachmentExportSavedTo": "Saved to: {path}",
   "@attachmentExportSavedTo": {
     "placeholders": {
-      "path": {
-        "type": "String"
-      }
+      "path": {}
     }
   },
   "attachmentImportConflictStrategy": "Conflict Strategy",
@@ -2314,41 +2126,25 @@
   "attachmentImportProgress": "Importing attachments ({current}/{total})",
   "@attachmentImportProgress": {
     "placeholders": {
-      "current": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
+      "current": {},
+      "total": {}
     }
   },
   "attachmentImportResult": "Imported {imported}, Skipped {skipped}, Overwritten {overwritten}, Failed {failed}",
   "@attachmentImportResult": {
     "placeholders": {
-      "imported": {
-        "type": "int"
-      },
-      "skipped": {
-        "type": "int"
-      },
-      "overwritten": {
-        "type": "int"
-      },
-      "failed": {
-        "type": "int"
-      }
+      "imported": {},
+      "skipped": {},
+      "overwritten": {},
+      "failed": {}
     }
   },
   "attachmentImportFailed": "Failed to import attachments",
   "attachmentArchiveInfo": "{count} attachments, exported on {date}",
   "@attachmentArchiveInfo": {
     "placeholders": {
-      "count": {
-        "type": "int"
-      },
-      "date": {
-        "type": "String"
-      }
+      "count": {},
+      "date": {}
     }
   },
   "attachmentStartImport": "Start Import",
@@ -2356,9 +2152,7 @@
   "attachmentPreviewSubtitle": "{count} images in total",
   "@attachmentPreviewSubtitle": {
     "placeholders": {
-      "count": {
-        "type": "int"
-      }
+      "count": {}
     }
   },
   "attachmentPreviewEmpty": "No attachments",
@@ -2426,9 +2220,7 @@
   "aiProviderDeleteConfirm": "Delete provider \"{name}\"? Capabilities using this provider will switch to default.",
   "@aiProviderDeleteConfirm": {
     "placeholders": {
-      "name": {
-        "type": "String"
-      }
+      "name": {}
     }
   },
   "aiProviderDeleted": "Provider deleted",
@@ -2468,33 +2260,25 @@
   "syncPreviewAddedCount": "{count} added",
   "@syncPreviewAddedCount": {
     "placeholders": {
-      "count": {
-        "type": "int"
-      }
+      "count": {}
     }
   },
   "syncPreviewModifiedCount": "{count} modified",
   "@syncPreviewModifiedCount": {
     "placeholders": {
-      "count": {
-        "type": "int"
-      }
+      "count": {}
     }
   },
   "syncPreviewDeletedCount": "{count} deleted",
   "@syncPreviewDeletedCount": {
     "placeholders": {
-      "count": {
-        "type": "int"
-      }
+      "count": {}
     }
   },
   "syncPreviewApply": "Apply {count} items",
   "@syncPreviewApply": {
     "placeholders": {
-      "count": {
-        "type": "int"
-      }
+      "count": {}
     }
   },
   "syncPreviewEmpty": "Cloud data matches local, no sync needed",
@@ -2503,31 +2287,29 @@
   "syncPreviewApplied": "Applied {count} changes",
   "@syncPreviewApplied": {
     "placeholders": {
-      "count": {
-        "type": "int"
-      }
+      "count": {}
     }
   },
   "cloudSyncGuideTitle": "Cloud Sync Guide",
   "cloudSyncGuideGotIt": "Got it",
   "cloudSyncGuideHowItWorks": "How it works",
   "cloudSyncGuideHowItem1": "Upload: packages all current ledger data and uploads to cloud, replacing old cloud data",
-  "cloudSyncGuideHowItem2": "Download: fetches cloud data and compares with local records one by one — you choose which changes to apply",
+  "cloudSyncGuideHowItem2": "Download: fetches cloud data and compares with local records one by one 鈥?you choose which changes to apply",
   "cloudSyncGuideHowItem3": "The cloud always stores only the last uploaded snapshot, no version history",
   "cloudSyncGuideCorrect": "Correct usage",
   "cloudSyncGuideCorrectItem1": "Edit on one device at a time, upload when done",
   "cloudSyncGuideCorrectItem2": "Download on the new device before starting to edit",
   "cloudSyncGuideCorrectItem3": "Review the preview carefully before applying changes",
-  "cloudSyncGuideCorrectItem4": "Follow the pattern: edit → upload → switch device → download → edit",
+  "cloudSyncGuideCorrectItem4": "Follow the pattern: edit 鈫?upload 鈫?switch device 鈫?download 鈫?edit",
   "cloudSyncGuideWrong": "What to avoid",
-  "cloudSyncGuideWrongItem1": "Editing the same ledger on two devices simultaneously — the later upload overwrites the earlier one",
-  "cloudSyncGuideWrongItem2": "Downloading immediately after upload — cloud services may have seconds to minutes of sync delay, wait a moment",
-  "cloudSyncGuideWrongItem3": "Going long periods without syncing then downloading many changes at once — easy to miss important differences",
+  "cloudSyncGuideWrongItem1": "Editing the same ledger on two devices simultaneously 鈥?the later upload overwrites the earlier one",
+  "cloudSyncGuideWrongItem2": "Downloading immediately after upload 鈥?cloud services may have seconds to minutes of sync delay, wait a moment",
+  "cloudSyncGuideWrongItem3": "Going long periods without syncing then downloading many changes at once 鈥?easy to miss important differences",
   "cloudSyncGuideLimitations": "Known limitations",
   "cloudSyncGuideLimitItem1": "Not real-time: requires manually tapping upload and download",
-  "cloudSyncGuideLimitItem2": "No conflict merging: does not auto-merge edits from both sides — last upload wins",
+  "cloudSyncGuideLimitItem2": "No conflict merging: does not auto-merge edits from both sides 鈥?last upload wins",
   "cloudSyncGuideLimitItem3": "Cloud service delay: uploaded files may take seconds to minutes before other devices can read them, depending on your cloud provider",
-  "cloudSyncGuideLimitItem4": "Excludes attachments: transaction image attachments are not synced — export separately via Data Management",
+  "cloudSyncGuideLimitItem4": "Excludes attachments: transaction image attachments are not synced 鈥?export separately via Data Management",
   "mineMultiDeviceSyncTitle": "Multi-device Sync",
   "mineMultiDeviceSyncSubtitle": "Auto-check cloud changes when entering page",
   "appLockTitle": "App Lock",
@@ -2562,9 +2344,7 @@
   "dayOfMonth": "{day}th of each month",
   "@dayOfMonth": {
     "placeholders": {
-      "day": {
-        "type": "int"
-      }
+      "day": {}
     }
   },
   "creditCardReminderTitle": "Payment Reminder",
@@ -2572,9 +2352,7 @@
   "creditCardReminderDaysBefore": "{days} days before",
   "@creditCardReminderDaysBefore": {
     "placeholders": {
-      "days": {
-        "type": "int"
-      }
+      "days": {}
     }
   },
   "creditCardInitialBalanceHint": "Current debt (negative number)",
@@ -2610,9 +2388,7 @@
   "valuationLastUpdated": "Last updated: {date}",
   "@valuationLastUpdated": {
     "placeholders": {
-      "date": {
-        "type": "String"
-      }
+      "date": {}
     }
   },
   "valuationAccountHint": "Enter current valuation",
@@ -2620,23 +2396,17 @@
   "accountGroupTradable": "Daily Accounts",
   "accountGroupValuation": "Assets/Liabilities",
   "adjustmentTransaction": "Valuation Adjustment",
-  "creditCardBillingInfo": "Bills on {billingDay}th · Due on {paymentDueDay}th",
+  "creditCardBillingInfo": "Bills on {billingDay}th 路 Due on {paymentDueDay}th",
   "@creditCardBillingInfo": {
     "placeholders": {
-      "billingDay": {
-        "type": "int"
-      },
-      "paymentDueDay": {
-        "type": "int"
-      }
+      "billingDay": {},
+      "paymentDueDay": {}
     }
   },
   "creditCardDaysUntilPayment": "{days} days until payment due",
   "@creditCardDaysUntilPayment": {
     "placeholders": {
-      "days": {
-        "type": "int"
-      }
+      "days": {}
     }
   },
   "creditCardPaymentDueToday": "Payment due today",
@@ -2645,7 +2415,6 @@
   "budgetManagementDesc": "Set monthly budget and control spending",
   "budgetSetupHint": "Set a budget to control monthly spending",
   "budgetSetupAction": "Set up",
-
   "cloudCollabDevicesPageTitle": "Device Sessions",
   "cloudCollabDevicesPageSubtitle": "Manage active devices",
   "cloudCollabDevicesViewAllSessions": "Show all sessions",
@@ -2657,70 +2426,69 @@
   "cloudCollabDeviceAppVersion": "App: {version}",
   "@cloudCollabDeviceAppVersion": {
     "placeholders": {
-      "version": { "type": "String" }
+      "version": {}
     }
   },
   "cloudCollabDeviceOsVersion": "OS: {version}",
   "@cloudCollabDeviceOsVersion": {
     "placeholders": {
-      "version": { "type": "String" }
+      "version": {}
     }
   },
   "cloudCollabDeviceModel": "Model: {model}",
   "@cloudCollabDeviceModel": {
     "placeholders": {
-      "model": { "type": "String" }
+      "model": {}
     }
   },
   "cloudCollabDeviceLastIp": "IP: {ip}",
   "@cloudCollabDeviceLastIp": {
     "placeholders": {
-      "ip": { "type": "String" }
+      "ip": {}
     }
   },
   "cloudCollabDeviceSessionCount": "Sessions: {count}",
   "@cloudCollabDeviceSessionCount": {
     "placeholders": {
-      "count": { "type": "String" }
+      "count": {}
     }
   },
   "cloudCollabDeviceLastSeen": "Last seen: {time}",
   "@cloudCollabDeviceLastSeen": {
     "placeholders": {
-      "time": { "type": "String" }
+      "time": {}
     }
   },
   "cloudCollabDeviceCreatedAt": "Created: {time}",
   "@cloudCollabDeviceCreatedAt": {
     "placeholders": {
-      "time": { "type": "String" }
+      "time": {}
     }
   },
   "cloudCollabDeviceRevokeTitle": "Revoke Device",
   "cloudCollabDeviceRevokeMessage": "Revoke device {name} ({id})?",
   "@cloudCollabDeviceRevokeMessage": {
     "placeholders": {
-      "name": { "type": "String" },
-      "id": { "type": "String" }
+      "name": {},
+      "id": {}
     }
   },
   "cloudCollabDeviceRevokeMultipleMessage": "Revoke {count} sessions for device {name}?",
   "@cloudCollabDeviceRevokeMultipleMessage": {
     "placeholders": {
-      "name": { "type": "String" },
-      "count": { "type": "String" }
+      "name": {},
+      "count": {}
     }
   },
   "cloudCollabDeviceRevoked": "Device revoked",
   "cloudCollabUnavailableMessage": "Cloud sync is unavailable.",
   "cloudCollabScopeDeniedHint": "Server has not enabled ALLOW_APP_RW_SCOPES, so device sessions are unavailable.",
   "cloudCollabScopeDeniedAction": "Set ALLOW_APP_RW_SCOPES=true in server .env, restart the service, then sign in again.",
-
   "syncHealthTitle": "Sync status",
   "syncHealthCheckFailed": "Check failed: {msg}",
   "@syncHealthCheckFailed": {
     "placeholders": {
-      "msg": { "type": "String" }
+      "msg": {}
     }
   },
   "syncHealthHasDiff": "Diff detected; auto-synced",
@@ -2735,20 +2503,19 @@
   "syncHealthRowCategory": "Categories",
   "syncHealthRowTag": "Tags",
   "syncHealthRowUnpushed": "Pending pushes",
-  "syncHealthValue": "Local {local} · Cloud {remote}",
+  "syncHealthValue": "Local {local} 路 Cloud {remote}",
   "@syncHealthValue": {
     "placeholders": {
-      "local": { "type": "int" },
-      "remote": { "type": "int" }
+      "local": {},
+      "remote": {}
     }
   },
-  "syncHealthValueRemoteMissing": "Local {local} · Cloud —",
+  "syncHealthValueRemoteMissing": "Local {local} 路 Cloud 鈥?,
   "@syncHealthValueRemoteMissing": {
     "placeholders": {
-      "local": { "type": "int" }
+      "local": {}
     }
   },
-
   "twofaChallengeTitle": "Two-factor authentication",
   "twofaMethodTotp": "Code",
   "twofaMethodRecovery": "Recovery code",
@@ -2759,19 +2526,19 @@
   "twofaCountdown": "Time remaining {time}",
   "@twofaCountdown": {
     "placeholders": {
-      "time": { "type": "String" }
+      "time": {}
     }
   },
   "twofaVerifyButton": "Verify",
   "twofaStatusTitle": "Two-factor authentication",
-  "twofaStatusEnabled": "Enabled ✓",
+  "twofaStatusEnabled": "Enabled 鉁?,
   "twofaStatusDisabled": "Not enabled",
   "twofaStatusEnabledAt": "Enabled on {date}",
   "@twofaStatusEnabledAt": {
     "placeholders": {
-      "date": { "type": "String" }
+      "date": {}
     }
   },
   "twofaStatusManageHint": "Manage from the Web app (enable / disable / regenerate recovery codes)",
-  "twofaStatusOpenWeb": "Enable on the Web app →"
+  "twofaStatusOpenWeb": "Enable on the Web app 鈫?
 }
