@@ -76,6 +76,7 @@ dependencies:
   quick_actions: ^1.1.0
   table_calendar: ^3.1.0
   local_auth: ^2.3.0
+  shelf: ^1.4.2
 
 dev_dependencies:
   flutter_test:
@@ -109,7 +110,7 @@ flutter:
     - assets/logo2.png
     - assets/icons/
     - assets/images/
-  # 字体已移动到可选依赖，使用系统字体以减少应用体积
+  # 瀛椾綋宸茬Щ鍔ㄥ埌鍙€変緷璧栵紝浣跨敤绯荤粺瀛椾綋浠ュ噺灏戝簲鐢ㄤ綋绉?
   # fonts:
   #   - family: Inter
   #     fonts:
