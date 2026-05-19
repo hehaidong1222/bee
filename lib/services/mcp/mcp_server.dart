@@ -47,7 +47,7 @@ class MCPServer {
     logger.info('MCP', 'MCP 服务器已停止');
   }
 
-  Response _router(Request request) {
+  FutureOr<Response> _router(Request request) {
     final uri = request.url;
     final path = uri.path;
 
@@ -74,7 +74,8 @@ class MCPServer {
   }
 
   Response _handleSSE(Request request) {
-    final responseStream = StreamController<String>(onCancel: () {
+    late final StreamController<String> responseStream;
+    responseStream = StreamController<String>(onCancel: () {
       final client = _clients.where((c) => c.stream == responseStream).firstOrNull;
       if (client != null) {
         _clients.remove(client);
