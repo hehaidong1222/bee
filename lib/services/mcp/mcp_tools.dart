@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import '../../data/db.dart';
 import '../../data/repositories/base_repository.dart';
 
@@ -7,13 +7,13 @@ Map<String, dynamic> getToolDefinitions() {
     "tools": [
       {
         "name": "get_daily_expenses",
-        "description": "鑾峰彇鎸囧畾鏃ユ湡鐨勬墍鏈夋敹鏀褰?,
+        "description": "获取指定日期的所有收支记录",
         "inputSchema": {
           "type": "object",
           "properties": {
             "date": {
               "type": "string",
-              "description": "鏃ユ湡锛屾牸寮?YYYY-MM-DD锛屽 2026-05-19锛屾垨浼犲叆 today 琛ㄧず浠婂ぉ"
+              "description": "日期，格式 YYYY-MM-DD，如 2026-05-19，或传入 today 表示今天"
             }
           },
           "required": ["date"]
@@ -21,17 +21,17 @@ Map<String, dynamic> getToolDefinitions() {
       },
       {
         "name": "get_monthly_summary",
-        "description": "鑾峰彇鎸囧畾鏈堜唤鐨勬敹鏀眹鎬?,
+        "description": "获取指定月份的收支汇总",
         "inputSchema": {
           "type": "object",
           "properties": {
             "year": {
               "type": "integer",
-              "description": "骞翠唤锛屽 2026"
+              "description": "年份，如 2026"
             },
             "month": {
               "type": "integer",
-              "description": "鏈堜唤 1-12"
+              "description": "月份 1-12"
             }
           },
           "required": ["year", "month"]
@@ -39,17 +39,17 @@ Map<String, dynamic> getToolDefinitions() {
       },
       {
         "name": "get_transactions_by_date_range",
-        "description": "鑾峰彇鎸囧畾鏃ユ湡鑼冨洿鍐呯殑鎵€鏈夋敹鏀褰?,
+        "description": "获取指定日期范围内的所有收支记录",
         "inputSchema": {
           "type": "object",
           "properties": {
             "start_date": {
               "type": "string",
-              "description": "寮€濮嬫棩鏈燂紝鏍煎紡 YYYY-MM-DD"
+              "description": "开始日期，格式 YYYY-MM-DD"
             },
             "end_date": {
               "type": "string",
-              "description": "缁撴潫鏃ユ湡锛屾牸寮?YYYY-MM-DD"
+              "description": "结束日期，格式 YYYY-MM-DD"
             }
           },
           "required": ["start_date", "end_date"]
@@ -57,17 +57,17 @@ Map<String, dynamic> getToolDefinitions() {
       },
       {
         "name": "get_category_totals",
-        "description": "鑾峰彇鎸囧畾鏈堜唤鐨勫垎绫绘敮鍑虹粺璁?,
+        "description": "获取指定月份的分类支出统计",
         "inputSchema": {
           "type": "object",
           "properties": {
             "year": {
               "type": "integer",
-              "description": "骞翠唤锛屽 2026"
+              "description": "年份，如 2026"
             },
             "month": {
               "type": "integer",
-              "description": "鏈堜唤 1-12"
+              "description": "月份 1-12"
             }
           },
           "required": ["year", "month"]
@@ -92,7 +92,7 @@ Future<dynamic> handleToolCall(
     case 'get_category_totals':
       return _handleCategoryTotals(arguments, repo);
     default:
-      throw Exception('鏈煡宸ュ叿: $toolName');
+      throw Exception('未知工具: $toolName');
   }
 }
 
@@ -105,7 +105,7 @@ Future<Map<String, dynamic>> _handleDailyExpenses(
       ? DateTime.now()
       : DateTime.tryParse(dateStr);
   if (date == null) {
-    return {"error": "鏃犳晥鏃ユ湡鏍煎紡: $dateStr"};
+    return {"error": "无效日期格式: $dateStr"};
   }
 
   final dayStart = DateTime(date.year, date.month, date.day);
@@ -181,7 +181,7 @@ Future<Map<String, dynamic>> _handleDateRange(
   final startDate = DateTime.tryParse(args['start_date'] as String);
   final endDate = DateTime.tryParse(args['end_date'] as String);
   if (startDate == null || endDate == null) {
-    return {"error": "鏃犳晥鏃ユ湡鏍煎紡"};
+    return {"error": "无效日期格式"};
   }
 
   final endOfDay = DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59);
@@ -225,7 +225,7 @@ Future<Map<String, dynamic>> _handleCategoryTotals(
   final expenseByCategory = <String, double>{};
   for (final t in txWithCats) {
     if (t.t.type == 'expense') {
-      final catName = t.category?.name ?? '鏈垎绫?;
+      final catName = t.category?.name ?? '未分类';
       expenseByCategory[catName] =
           (expenseByCategory[catName] ?? 0) + t.t.amount;
     }
@@ -246,6 +246,6 @@ Future<Map<String, dynamic>> _handleCategoryTotals(
 
 Future<int> _getDefaultLedgerId(BaseRepository repo) async {
   final ledgers = await repo.getAllLedgers();
-  if (ledgers.isEmpty) throw Exception('娌℃湁璐︽湰');
+  if (ledgers.isEmpty) throw Exception('没有账本');
   return ledgers.first.id;
 }
