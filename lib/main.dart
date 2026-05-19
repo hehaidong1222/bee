@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_cloud_sync/flutter_cloud_sync.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -35,112 +35,112 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 
-/// 鍏ㄥ眬 navigator key 鈥?缁?service 灞?娌℃湁 BuildContext)push 璺敱浣跨敤銆?
-/// 褰撳墠鐢ㄩ€?BeeCount Cloud 鐧诲綍鎷垮埌 requires_2fa 鏃跺脊鍑?[Login2FAChallengeView]銆?
+/// 全局 navigator key — 给 service 层(没有 BuildContext)push 路由使用。
+/// 当前用途:BeeCount Cloud 登录拿到 requires_2fa 时弹出 [Login2FAChallengeView]。
 final GlobalKey<NavigatorState> globalNavigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 鍒濆鍖栨棩蹇楃郴缁燂紙纭繚鍘熺敓鏃ュ織妗ユ帴灏辩华锛?
-  logger.info('App', '搴旂敤鍚姩锛屾棩蹇楃郴缁熷凡鍒濆鍖?);
-  print('馃摫 LoggerService 宸插垵濮嬪寲');
+  // 初始化日志系统（确保原生日志桥接就绪）
+  logger.info('App', '应用启动，日志系统已初始化');
+  print('📱 LoggerService 已初始化');
 
-  // 鍒濆鍖栨椂鍖猴紙蹇呴』鍦ㄩ€氱煡鏈嶅姟涔嬪墠锛屼慨澶峣OS閫氱煡闂锛?
+  // 初始化时区（必须在通知服务之前，修复iOS通知问题）
   try {
     NotificationFactory.initializeTimeZone();
   } catch (e) {
-    print('鈿狅笍  鏃跺尯鍒濆鍖栧け璐ワ紙鍙兘鍦ㄤ笉鏀寔鐨勫钩鍙颁笂杩愯锛? $e');
+    print('⚠️  时区初始化失败（可能在不支持的平台上运行）: $e');
   }
 
-  // 閰嶇疆iOS App Group锛坵idget鍜屼富app鍏变韩鏁版嵁蹇呴渶锛?
+  // 配置iOS App Group（widget和主app共享数据必需）
   try {
     if (Platform.isIOS) {
       await HomeWidget.setAppGroupId('group.com.tntlikely.beecount');
     }
   } catch (e) {
-    print('鈿狅笍  HomeWidget 鎻掍欢鍒濆鍖栧け璐ワ紙鍙兘鍦ㄤ笉鏀寔鐨勫钩鍙颁笂杩愯锛? $e');
+    print('⚠️  HomeWidget 插件初始化失败（可能在不支持的平台上运行）: $e');
   }
 
-  // 鍒濆鍖栭€氱煡鏈嶅姟
+  // 初始化通知服务
   try {
     final notificationUtil = NotificationFactory.getInstance();
     await notificationUtil.initialize();
   } catch (e) {
-    print('鈿狅笍  閫氱煡鏈嶅姟鍒濆鍖栧け璐ワ紙鍙兘鍦ㄤ笉鏀寔鐨勫钩鍙颁笂杩愯锛? $e');
+    print('⚠️  通知服务初始化失败（可能在不支持的平台上运行）: $e');
   }
 
-  // 鎭㈠鐢ㄦ埛鐨勮璐︽彁閱掕缃紙鍏抽敭淇锛氬簲鐢ㄩ噸鍚悗鑷姩鎭㈠鎻愰啋锛?
+  // 恢复用户的记账提醒设置（关键修复：应用重启后自动恢复提醒）
   await _restoreUserReminder();
 
-  // 鍚姩鎻愰啋鐩戞帶鏈嶅姟锛堢洃鍚簲鐢ㄧ敓鍛藉懆鏈燂紝鑷姩鎭㈠涓㈠け鐨勬彁閱掞級
+  // 启动提醒监控服务（监听应用生命周期，自动恢复丢失的提醒）
   try {
     ReminderMonitorService().startMonitoring();
   } catch (e) {
-    print('鈿狅笍  鎻愰啋鐩戞帶鏈嶅姟鍚姩澶辫触锛堝彲鑳藉湪涓嶆敮鎸佺殑骞冲彴涓婅繍琛岋級: $e');
+    print('⚠️  提醒监控服务启动失败（可能在不支持的平台上运行）: $e');
   }
 
-  // 鍒涘缓鍏ㄥ眬ProviderContainer锛堥渶瑕佸湪鍛ㄦ湡浜ゆ槗鐢熸垚涔嬪墠鍒涘缓锛屽洜涓洪渶瑕佷娇鐢?repositoryProvider锛?
+  // 创建全局ProviderContainer（需要在周期交易生成之前创建，因为需要使用 repositoryProvider）
   final container = ProviderContainer();
 
-  // 鍒濆鍖栧簲鐢ㄦā寮忥紙闇€瑕佸湪鐢熸垚閲嶅浜ゆ槗涔嬪墠锛岀‘淇濇ā寮忔纭級
-  // 鐩存帴浠?SharedPreferences 璇诲彇骞惰缃埌 appModeProvider
+  // 初始化应用模式（需要在生成重复交易之前，确保模式正确）
+  // 直接从 SharedPreferences 读取并设置到 appModeProvider
   await _initializeAppMode(container);
 
-  // 娉ㄦ剰锛氫笉鍐嶅湪鍚姩鏃剁敓鎴愰噸澶嶄氦鏄?
-  // 鍛ㄦ湡浜ゆ槗鐢熸垚宸茬Щ鑷?appSplashInitProvider 涓紙绛夊緟鏁版嵁搴撳畬鍏ㄥ垵濮嬪寲鍚庢墽琛岋級
+  // 注意：不再在启动时生成重复交易
+  // 周期交易生成已移至 appSplashInitProvider 中（等待数据库完全初始化后执行）
   // await _generatePendingRecurringTransactions(container);
 
-  // 鎭㈠淇＄敤鍗¤繕娆炬彁閱?
+  // 恢复信用卡还款提醒
   try {
     final repo = container.read(repositoryProvider);
     await CreditCardReminderService.restoreAllReminders(
       getCreditCardAccounts: () => repo.getCreditCardAccounts(),
     );
   } catch (e) {
-    // 闈欓粯澶辫触锛屼笉褰卞搷鍚姩
+    // 静默失败，不影响启动
   }
 
-  // [宸插垹闄 v1.15.0 璐︽埛鐙珛杩佺Щ & v2.7.1 杞处鍒嗙被杩佺Щ
-  // 鎵€鏈夋椿璺冪敤鎴峰凡瀹屾垚锛孌rift onUpgrade 宸茶鐩栫浉鍏?schema 鍙樻洿
-  // 纭紪鐮?SQL 閲嶅缓琛ㄤ細瀵艰嚧鏂板瀛楁涓㈠け锛堝 sort_order锛夛紝鏁呯Щ闄?
+  // [已删除] v1.15.0 账户独立迁移 & v2.7.1 转账分类迁移
+  // 所有活跃用户已完成，Drift onUpgrade 已覆盖相关 schema 变更
+  // 硬编码 SQL 重建表会导致新增字段丢失（如 sort_order），故移除
 
-  // 娉ㄥ唽灏忕粍浠朵氦浜掑洖璋?
+  // 注册小组件交互回调
   try {
     await WidgetManager.registerCallback();
   } catch (e) {
-    print('鈿狅笍  灏忕粍浠跺洖璋冩敞鍐屽け璐ワ紙鍙兘鍦ㄤ笉鏀寔鐨勫钩鍙颁笂杩愯锛? $e');
+    print('⚠️  小组件回调注册失败（可能在不支持的平台上运行）: $e');
   }
 
-  // 鎭㈠鎴浘鑷姩璇嗗埆璁剧疆锛圓ndroid涓撳睘锛夛紝浼犲叆container
+  // 恢复截图自动识别设置（Android专属），传入container
   await _restoreScreenshotMonitor(container);
 
-  // 鍒濆鍖栧浘鐗囧垎浜鐞嗘湇鍔★紙Android涓撳睘锛?
+  // 初始化图片分享处理服务（Android专属）
   if (Platform.isAndroid) {
     _setupImageShareHandler(container);
   }
 
-  // 鍚姩 URL 鐩戝惉锛堢敤浜庡揩鎹锋寚浠?AppLink 鑷姩璁拌处锛?
+  // 启动 URL 监听（用于快捷指令/AppLink 自动记账）
   _setupUrlListener(container);
 
-  // 鍚姩鏈湴 MCP 鏈嶅姟鍣紙渚涘皬绫?MiClip 绛?MCP 瀹㈡埛绔煡璇㈣处鍗曪級
+  // 启动本地 MCP 服务器（供小米 MiClip 等 MCP 客户端查询账单）
   _setupMCPServer(container);
 
-  // 娉ㄥ唽 BeeCount Cloud 2FA challenge handler銆傚綋 server 杩斿洖 requires_2fa=true,
-  // service 灞備細璋冭繖涓?handler 寮瑰嚭 Login2FAChallengeDialog 璁╃敤鎴疯緭鐮併€?
-  // 楠岃瘉澶辫触鐣欏湪瀵硅瘽妗嗗氨鍦板睍绀洪敊璇?楠岃瘉閫氳繃 / 鐢ㄦ埛鍙栨秷鎵嶅叧闂€傝瑙?.docs/2fa-design.md
+  // 注册 BeeCount Cloud 2FA challenge handler。当 server 返回 requires_2fa=true,
+  // service 层会调这个 handler 弹出 Login2FAChallengeDialog 让用户输码。
+  // 验证失败留在对话框就地展示错误,验证通过 / 用户取消才关闭。详见 .docs/2fa-design.md
   BeeCountCloudProvider.globalTwoFactorHandler = (request) async {
     final ctx = globalNavigatorKey.currentContext;
     if (ctx == null) {
-      // 鏋佺鍦烘櫙:cloud auth 鍦?navigator 杩樻病 attach 涔嬪墠瑙﹀彂,鍙兘瑙嗕负鍙栨秷
+      // 极端场景:cloud auth 在 navigator 还没 attach 之前触发,只能视为取消
       return false;
     }
     return await Login2FAChallengeDialog.show(ctx, request);
   };
 
-  // 鍚姩涓€娆℃€х鐩樺绔嬫枃浠?GC(attachments / attachment_thumbs / custom_icons),
-  // 娓呯悊鍘嗗彶鐗堟湰閬楃暀鐨勬枃浠躲€傛爣蹇椾綅 SharedPreferences 淇濊瘉鍙窇涓€娆°€傚悗鍙板紓姝?
-  // 鎵ц,澶辫触涓嶈嚧鍛姐€?
+  // 启动一次性磁盘孤立文件 GC(attachments / attachment_thumbs / custom_icons),
+  // 清理历史版本遗留的文件。标志位 SharedPreferences 保证只跑一次。后台异步
+  // 执行,失败不致命。
   unawaited(_runOrphanFileGcOnce(container));
 
   runApp(ProviderScope(
@@ -181,189 +181,189 @@ class _WidgetUpdateObserver extends ProviderObserver {
         redForIncome: redForIncome,
       );
 
-      print('鉁?灏忕粍浠舵暟鎹凡鏇存柊');
+      print('✅ 小组件数据已更新');
     } catch (e) {
-      print('鉂?鏇存柊灏忕粍浠跺け璐ワ紙鍙兘鍦ㄤ笉鏀寔鐨勫钩鍙颁笂杩愯锛? $e');
+      print('❌ 更新小组件失败（可能在不支持的平台上运行）: $e');
     }
   }
 }
 
-/// 鎭㈠鐢ㄦ埛涔嬪墠璁剧疆鐨勮璐︽彁閱?
+/// 恢复用户之前设置的记账提醒
 ///
-/// 闂鍦烘櫙锛?
-/// - 搴旂敤琚郴缁熸潃姝诲悗锛岄€氱煡浠诲姟浼氫涪澶?
-/// - 搴旂敤鏇存柊鍚庯紝閫氱煡浠诲姟浼氳娓呴櫎
-/// - 鎵嬫満閲嶅惎鍚庯紝閫氱煡浠诲姟闇€瑕侀噸鏂拌缃?
+/// 问题场景：
+/// - 应用被系统杀死后，通知任务会丢失
+/// - 应用更新后，通知任务会被清除
+/// - 手机重启后，通知任务需要重新设置
 ///
-/// 瑙ｅ喅鏂规锛?
-/// - 鍦ㄥ簲鐢ㄥ惎鍔ㄦ椂妫€鏌ョ敤鎴锋槸鍚﹀紑鍚簡鎻愰啋
-/// - 濡傛灉寮€鍚簡锛岄噸鏂拌缃€氱煡浠诲姟
+/// 解决方案：
+/// - 在应用启动时检查用户是否开启了提醒
+/// - 如果开启了，重新设置通知任务
 Future<void> _restoreUserReminder() async {
   try {
-    print('馃攧 妫€鏌ュ苟鎭㈠璁拌处鎻愰啋...');
+    print('🔄 检查并恢复记账提醒...');
     final prefs = await SharedPreferences.getInstance();
     final isEnabled = prefs.getBool('reminder_enabled') ?? false;
 
     if (isEnabled) {
       final hour = prefs.getInt('reminder_hour') ?? 21;
       final minute = prefs.getInt('reminder_minute') ?? 0;
-      print('鉁?鍙戠幇鐢ㄦ埛宸插惎鐢ㄨ璐︽彁閱? ${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}');
-      print('馃敂 姝ｅ湪閲嶆柊璁剧疆鎻愰啋浠诲姟...');
+      print('✅ 发现用户已启用记账提醒: ${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}');
+      print('🔔 正在重新设置提醒任务...');
 
       try {
         final notificationUtil = NotificationFactory.getInstance();
         await notificationUtil.scheduleDailyReminder(
           id: 1001,
-          title: '璁拌处鎻愰啋',
-          body: '鍒繕浜嗚褰曚粖澶╃殑鏀舵敮鍝?馃挵',
+          title: '记账提醒',
+          body: '别忘了记录今天的收支哦 💰',
           hour: hour,
           minute: minute,
         );
-        print('鉁?璁拌处鎻愰啋宸叉垚鍔熸仮澶?);
+        print('✅ 记账提醒已成功恢复');
       } catch (e) {
-        print('鉂?璁拌处鎻愰啋璁剧疆澶辫触锛堝彲鑳藉湪涓嶆敮鎸佺殑骞冲彴涓婅繍琛岋級: $e');
+        print('❌ 记账提醒设置失败（可能在不支持的平台上运行）: $e');
       }
     } else {
-      print('鈩癸笍  鐢ㄦ埛鏈惎鐢ㄨ璐︽彁閱掞紝璺宠繃鎭㈠');
+      print('ℹ️  用户未启用记账提醒，跳过恢复');
     }
   } catch (e) {
-    print('鉂?鎭㈠璁拌处鎻愰啋澶辫触: $e');
-    // 涓嶆姏鍑哄紓甯革紝閬垮厤褰卞搷搴旂敤鍚姩
+    print('❌ 恢复记账提醒失败: $e');
+    // 不抛出异常，避免影响应用启动
   }
 }
 
-/// 鎭㈠鎴浘鑷姩璇嗗埆璁剧疆锛堜粎Android锛?
+/// 恢复截图自动识别设置（仅Android）
 ///
-/// 闂鍦烘櫙锛?
-/// - 搴旂敤閲嶅惎鍚庯紝鎴浘鐩戝惉鏈嶅姟浼氫涪澶?
-/// - 闇€瑕佽嚜鍔ㄦ仮澶嶇敤鎴蜂箣鍓嶇殑璁剧疆
+/// 问题场景：
+/// - 应用重启后，截图监听服务会丢失
+/// - 需要自动恢复用户之前的设置
 ///
-/// 瑙ｅ喅鏂规锛?
-/// - 鍦ㄥ簲鐢ㄥ惎鍔ㄦ椂妫€鏌ョ敤鎴锋槸鍚﹀紑鍚簡鎴浘鐩戝惉
-/// - 濡傛灉寮€鍚簡锛岄噸鏂板惎鍔ㄧ洃鍚湇鍔?
+/// 解决方案：
+/// - 在应用启动时检查用户是否开启了截图监听
+/// - 如果开启了，重新启动监听服务
 Future<void> _restoreScreenshotMonitor(ProviderContainer container) async {
   if (!Platform.isAndroid) return;
 
   try {
-    print('馃摳 妫€鏌ュ苟鎭㈠鎴浘鑷姩璇嗗埆...');
+    print('📸 检查并恢复截图自动识别...');
     final screenshotMonitor = ScreenshotMonitorService(container);
     final isEnabled = await screenshotMonitor.isEnabled();
 
     if (isEnabled) {
-      print('鉁?鍙戠幇鐢ㄦ埛宸插惎鐢ㄦ埅鍥捐嚜鍔ㄨ瘑鍒?);
-      print('馃攧 姝ｅ湪閲嶆柊鍚姩鐩戝惉鏈嶅姟...');
+      print('✅ 发现用户已启用截图自动识别');
+      print('🔄 正在重新启动监听服务...');
       await screenshotMonitor.enable();
-      print('鉁?鎴浘鐩戝惉鏈嶅姟宸叉垚鍔熸仮澶?);
+      print('✅ 截图监听服务已成功恢复');
     } else {
-      print('鈩癸笍  鐢ㄦ埛鏈惎鐢ㄦ埅鍥捐嚜鍔ㄨ瘑鍒紝璺宠繃鎭㈠');
+      print('ℹ️  用户未启用截图自动识别，跳过恢复');
     }
   } catch (e) {
-    print('鉂?鎭㈠鎴浘鐩戝惉澶辫触: $e');
-    // 涓嶆姏鍑哄紓甯革紝閬垮厤褰卞搷搴旂敤鍚姩
+    print('❌ 恢复截图监听失败: $e');
+    // 不抛出异常，避免影响应用启动
   }
 }
 
-/// 鍒濆鍖栧簲鐢ㄦā寮?
+/// 初始化应用模式
 ///
-/// 鍦ㄥ簲鐢ㄥ惎鍔ㄦ椂浠?SharedPreferences 璇诲彇妯″紡骞惰缃埌 appModeProvider
-/// 杩欐牱鍙互纭繚鍚庣画浣跨敤 repositoryProvider 鏃惰兘鑾峰彇鍒版纭殑妯″紡
-/// [container] Provider瀹瑰櫒
+/// 在应用启动时从 SharedPreferences 读取模式并设置到 appModeProvider
+/// 这样可以确保后续使用 repositoryProvider 时能获取到正确的模式
+/// [container] Provider容器
 Future<void> _initializeAppMode(ProviderContainer container) async {
   try {
-    print('鈴?鍒濆鍖栧簲鐢ㄦā寮?..');
+    print('⏳ 初始化应用模式...');
 
-    // 浠?SharedPreferences 鐩存帴璇诲彇妯″紡
+    // 从 SharedPreferences 直接读取模式
     final prefs = await SharedPreferences.getInstance();
     final modeStr = prefs.getString('app_mode');
     final mode = modeStr != null ? AppMode.fromString(modeStr) : AppMode.local;
 
-    // 浣跨敤 switchMode 鏂规硶璁剧疆妯″紡锛岀‘淇?repositoryProvider 鑳界珛鍗宠幏鍙栧埌姝ｇ‘鐨勬ā寮?
-    // switchMode 涓嶄細閲嶅鍐欏叆 SharedPreferences锛屽洜涓哄€煎凡缁忓瓨鍦?
+    // 使用 switchMode 方法设置模式，确保 repositoryProvider 能立即获取到正确的模式
+    // switchMode 不会重复写入 SharedPreferences，因为值已经存在
     await container.read(appModeProvider.notifier).switchMode(mode);
 
-    print('鉁?搴旂敤妯″紡宸插垵濮嬪寲: ${mode.label}');
+    print('✅ 应用模式已初始化: ${mode.label}');
   } catch (e, stackTrace) {
-    print('鈿狅笍  搴旂敤妯″紡鍒濆鍖栧け璐? $e');
-    logger.error('Main', '搴旂敤妯″紡鍒濆鍖栧け璐?, e, stackTrace);
+    print('⚠️  应用模式初始化失败: $e');
+    logger.error('Main', '应用模式初始化失败', e, stackTrace);
   }
 }
 
 
-/// 璁剧疆鍥剧墖鍒嗕韩澶勭悊锛圓ndroid涓撳睘锛?
+/// 设置图片分享处理（Android专属）
 ///
-/// 鍒濆鍖?ImageShareHandlerService 浠ユ帴鏀朵粠鐩稿唽鎴栧叾浠栧簲鐢ㄥ垎浜殑鍥剧墖
-/// 鍒嗕韩鐨勫浘鐗囦細鑷姩瑙﹀彂璁拌处娴佺▼
+/// 初始化 ImageShareHandlerService 以接收从相册或其他应用分享的图片
+/// 分享的图片会自动触发记账流程
 void _setupImageShareHandler(ProviderContainer container) {
   try {
-    logger.info('App', '馃柤锔? [Android] 鍒濆鍖栧浘鐗囧垎浜鐞嗘湇鍔?..');
+    logger.info('App', '🖼️  [Android] 初始化图片分享处理服务...');
 
-    // 鍒濆鍖栨湇鍔★紙浼氳嚜鍔ㄨ缃甅ethodChannel鐩戝惉鍣級
+    // 初始化服务（会自动设置MethodChannel监听器）
     ImageShareHandlerService(container);
 
-    logger.info('App', '鉁?[Android] 鍥剧墖鍒嗕韩澶勭悊鏈嶅姟宸插惎鍔?);
+    logger.info('App', '✅ [Android] 图片分享处理服务已启动');
   } catch (e) {
-    logger.error('App', '鉂?[Android] 鍥剧墖鍒嗕韩澶勭悊鏈嶅姟鍒濆鍖栧け璐?, e);
-    // 涓嶆姏鍑哄紓甯革紝閬垮厤褰卞搷搴旂敤鍚姩
+    logger.error('App', '❌ [Android] 图片分享处理服务初始化失败', e);
+    // 不抛出异常，避免影响应用启动
   }
 }
 
-/// 璁剧疆 URL 鐩戝惉锛堢敤浜?AppLink锛?
+/// 设置 URL 监听（用于 AppLink）
 ///
-/// 鐩戝惉 beecount:// URL Scheme 璋冪敤
-/// 鏀寔鐨刄RL鏍煎紡:
-/// - beecount://voice - 璇煶璁拌处
-/// - beecount://image - 鍥剧墖璁拌处锛堜粠鐩稿唽锛?
-/// - beecount://camera - 鎷嶇収璁拌处
-/// - beecount://ai-chat - AI 灏忓姪鎵?
-/// - beecount://add?amount=100&type=expense - 鑷姩璁拌处
-/// - beecount://auto-billing?text=... - 鏂囨湰鑷姩璁拌处锛堝吋瀹规棫鐗堬級
-/// - beecount://quick-billing - 蹇€熻璐︼紙鍏煎鏃х増锛?
+/// 监听 beecount:// URL Scheme 调用
+/// 支持的URL格式:
+/// - beecount://voice - 语音记账
+/// - beecount://image - 图片记账（从相册）
+/// - beecount://camera - 拍照记账
+/// - beecount://ai-chat - AI 小助手
+/// - beecount://add?amount=100&type=expense - 自动记账
+/// - beecount://auto-billing?text=... - 文本自动记账（兼容旧版）
+/// - beecount://quick-billing - 快速记账（兼容旧版）
 void _setupUrlListener(ProviderContainer container) {
   try {
-    logger.info('AppLink', '鍒濆鍖朥RL鐩戝惉...');
+    logger.info('AppLink', '初始化URL监听...');
 
     final appLinks = AppLinks();
     final appLinkService = AppLinkService(container);
 
-    // 璁剧疆瀵艰埅鍥炶皟
+    // 设置导航回调
     appLinkService.onNavigate = (action, {params}) {
-      logger.info('AppLink', '瑙﹀彂瀵艰埅: $action');
+      logger.info('AppLink', '触发导航: $action');
       if (action == AppLinkAction.newTransaction && params != null) {
         container.read(pendingNewTransactionTypeProvider.notifier).state = params.type;
       }
       container.read(pendingAppLinkActionProvider.notifier).state = action;
     };
 
-    // 鐩戝惉URL锛堝簲鐢ㄥ湪鍚庡彴鏃讹級
+    // 监听URL（应用在后台时）
     appLinks.uriLinkStream.listen((uri) {
-      logger.info('AppLink', '鏀跺埌URL: $uri');
+      logger.info('AppLink', '收到URL: $uri');
       appLinkService.handleUrl(uri);
     }, onError: (err) {
-      logger.error('AppLink', 'URL鐩戝惉閿欒', err);
+      logger.error('AppLink', 'URL监听错误', err);
     });
 
-    // 娉ㄦ剰锛氫笉浣跨敤 getInitialLink/getLatestLink锛屽洜涓哄畠浠細缂撳瓨鏃ч摼鎺?
-    // 鍙緷璧?uriLinkStream锛屽畠浼氬湪搴旂敤閫氳繃 URL 鍚姩鏃剁珛鍗宠Е鍙?
+    // 注意：不使用 getInitialLink/getLatestLink，因为它们会缓存旧链接
+    // 只依赖 uriLinkStream，它会在应用通过 URL 启动时立即触发
 
-    logger.info('AppLink', 'URL鐩戝惉宸插惎鍔?);
+    logger.info('AppLink', 'URL监听已启动');
   } catch (e) {
-    logger.error('AppLink', 'URL鐩戝惉鍒濆鍖栧け璐?, e);
-    // 涓嶆姏鍑哄紓甯革紝閬垮厤褰卞搷搴旂敤鍚姩
+    logger.error('AppLink', 'URL监听初始化失败', e);
+    // 不抛出异常，避免影响应用启动
   }
 }
 
-/// 鍏ㄥ眬 MCP 鏈嶅姟鍣ㄥ疄渚?
+/// 全局 MCP 服务器实例
 final MCPServer globalMCPServer = MCPServer();
 
-/// 璁剧疆 MCP 鏈嶅姟鍣紙鏈湴 HTTP 鏈嶅姟锛屼緵 MiClip 绛?AI 鍔╂墜鏌ヨ璐﹀崟锛?
+/// 设置 MCP 服务器（本地 HTTP 服务，供 MiClip 等 AI 助手查询账单）
 void _setupMCPServer(ProviderContainer container) {
   try {
-    logger.info('MCP', '姝ｅ湪鍚姩 MCP 鏈嶅姟鍣?..');
+    logger.info('MCP', '正在启动 MCP 服务器...');
     final repo = container.read(repositoryProvider);
     unawaited(globalMCPServer.start(repo: repo));
-    logger.info('MCP', 'MCP 鏈嶅姟鍣ㄥ凡鍔犲叆鍚姩闃熷垪');
+    logger.info('MCP', 'MCP 服务器已加入启动队列');
   } catch (e) {
-    logger.error('MCP', 'MCP 鏈嶅姟鍣ㄥ惎鍔ㄥけ璐?, e);
+    logger.error('MCP', 'MCP 服务器启动失败', e);
   }
 }
 
@@ -372,27 +372,27 @@ class NoGlowScrollBehavior extends MaterialScrollBehavior {
   @override
   Widget buildOverscrollIndicator(
       BuildContext context, Widget child, ScrollableDetails details) {
-    return child; // 鍘婚櫎 Android 涓婄殑鍙戝厜鏁堟灉锛岄伩鍏嶉《閮ㄥ嚭鐜颁竴鎶圭孩
+    return child; // 去除 Android 上的发光效果，避免顶部出现一抹红
   }
 }
 
 class MainApp extends ConsumerWidget {
   const MainApp({super.key});
 
-  // 鏍规嵁鍒濆鍖栫姸鎬佸拰娆㈣繋椤甸潰鐘舵€佸喅瀹氭樉绀哄摢涓〉闈?
+  // 根据初始化状态和欢迎页面状态决定显示哪个页面
   Widget _getHomePage(AppInitState initState, WidgetRef ref) {
-    // 棣栧厛妫€鏌ユ槸鍚﹂渶瑕佹樉绀烘杩庨〉闈?
+    // 首先检查是否需要显示欢迎页面
     final shouldShowWelcome = ref.watch(shouldShowWelcomeProvider);
     if (shouldShowWelcome) {
       return const WelcomePage();
     }
 
-    // 娆㈣繋椤甸潰瀹屾垚鍚庯紝鏍规嵁鍒濆鍖栫姸鎬佹樉绀哄搴旈〉闈?
+    // 欢迎页面完成后，根据初始化状态显示对应页面
     if (initState != AppInitState.ready) {
       return const SplashPage();
     }
 
-    // 妫€鏌ユ槸鍚﹂渶瑕佹樉绀洪攣灞?
+    // 检查是否需要显示锁屏
     final isLocked = ref.watch(isAppLockedProvider);
     if (isLocked) {
       return const AppLockScreen();
@@ -403,26 +403,26 @@ class MainApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 棣栧厛妫€鏌ユ槸鍚﹂渶瑕佹樉绀烘杩庨〉闈?
+    // 首先检查是否需要显示欢迎页面
     ref.watch(welcomeCheckProvider);
 
-    // 妫€鏌ュ簲鐢ㄥ垵濮嬪寲鐘舵€?
+    // 检查应用初始化状态
     final initState = ref.watch(appInitStateProvider);
     final selectedLanguage = ref.watch(languageProvider);
 
-    // 濡傛灉鏄惎灞忕姸鎬侊紝鍚姩鍒濆鍖?
+    // 如果是启屏状态，启动初始化
     if (initState == AppInitState.splash) {
       ref.watch(appSplashInitProvider);
     }
 
-    // 鍛ㄦ湡浜ゆ槗鐢熸垚宸茬粺涓€鍦?appSplashInitProvider 涓鐞?
+    // 周期交易生成已统一在 appSplashInitProvider 中处理
 
     final primary = ref.watch(primaryColorProvider);
-    final platform = Theme.of(context).platform; // 褰撳墠骞冲彴
+    final platform = Theme.of(context).platform; // 当前平台
     final base = BeeTheme.lightTheme(platform: platform);
     final baseTextTheme = base.textTheme;
 
-    // 猸?浜壊涓婚
+    // ⭐ 亮色主题
     final theme = base.copyWith(
       textTheme: baseTextTheme,
       colorScheme: base.colorScheme.copyWith(primary: primary),
@@ -471,7 +471,7 @@ class MainApp extends ConsumerWidget {
         margin: EdgeInsets.zero,
       ),
     );
-    // Clamp 绯荤粺瀛椾綋缂╂斁锛岄伩鍏嶉儴鍒嗚澶囪缃?1.5+ 閫犳垚 UI 婧㈠嚭
+    // Clamp 系统字体缩放，避免部分设备设置 1.5+ 造成 UI 溢出
     final media = MediaQuery.of(context);
     // init font scale persistence
     ref.watch(fontScaleInitProvider);
@@ -493,8 +493,8 @@ class MainApp extends ConsumerWidget {
         darkTheme: BeeTheme.darkTheme(platform: platform).copyWith(
           colorScheme: BeeTheme.darkTheme(platform: platform).colorScheme.copyWith(primary: primary),
           primaryColor: primary,
-        ),                                                // 猸?鏆楅粦涓婚锛堜娇鐢ㄥ姩鎬佷富棰樿壊锛?
-        themeMode: ref.watch(themeModeProvider),         // 猸?浣跨敤 provider 鏀寔鎵嬪姩鍒囨崲
+        ),                                                // ⭐ 暗黑主题（使用动态主题色）
+        themeMode: ref.watch(themeModeProvider),         // ⭐ 使用 provider 支持手动切换
         localizationsDelegates: const [
           AppLocalizations.delegate,
           GlobalMaterialLocalizations.delegate,
@@ -530,7 +530,7 @@ class MainApp extends ConsumerWidget {
             ],
           );
         },
-        // 鏄惧紡鍛藉悕鏍硅矾鐢憋紝渚夸簬璺敱鏃ュ織涓?popUntil 绮剧‘璇嗗埆
+        // 显式命名根路由，便于路由日志与 popUntil 精确识别
         home: _getHomePage(initState, ref),
         onGenerateRoute: (settings) {
           if (settings.name == Navigator.defaultRouteName ||
@@ -546,14 +546,14 @@ class MainApp extends ConsumerWidget {
   }
 }
 
-/// 涓€娆℃€х鐩樺绔嬫枃浠舵竻鐞?鈥斺€?娓呭巻鍙茬増鏈仐鐣欑殑:
-///   - `attachments/*.jpg` + `attachment_thumbs/*.jpg`:鍘嗗彶 sync pull 鍒犱氦鏄撴椂
-///     鍙垹琛ㄨ涓嶆竻纾佺洏,鎴栬€呯敤鎴风鍦ㄦ煇鐗堟湰涔嬪墠娌℃湁瀹屾暣娓呯悊鐨勯檮浠?
-///   - `custom_icons/*.png`:鏃х増 deleteCategory 鍙垹鍒嗙被琛?customIconPath 鎸囧悜
-///     鐨勬湰鍦板浘鏍囨枃浠堕仐鐣?
+/// 一次性磁盘孤立文件清理 —— 清历史版本遗留的:
+///   - `attachments/*.jpg` + `attachment_thumbs/*.jpg`:历史 sync pull 删交易时
+///     只删表行不清磁盘,或者用户端在某版本之前没有完整清理的附件
+///   - `custom_icons/*.png`:旧版 deleteCategory 只删分类行,customIconPath 指向
+///     的本地图标文件遗留
 ///
-/// SharedPreferences 鏍囧織浣?`orphan_file_gc_v1_done` 淇濊瘉鍙窇涓€娆°€傚け璐ュ叏閮?
-/// try/catch 鍚炴帀 鈥斺€?杩欐槸 nice-to-have,涓嶅簲 block app 鍚姩銆?
+/// SharedPreferences 标志位 `orphan_file_gc_v1_done` 保证只跑一次。失败全部
+/// try/catch 吞掉 —— 这是 nice-to-have,不应 block app 启动。
 Future<void> _runOrphanFileGcOnce(ProviderContainer container) async {
   try {
     final prefs = await SharedPreferences.getInstance();
@@ -562,7 +562,7 @@ Future<void> _runOrphanFileGcOnce(ProviderContainer container) async {
 
     final db = container.read(databaseProvider);
 
-    // 缁欎富绾跨▼璁╄矾,鍚姩鍏抽敭璺緞鍏堣窇瀹?
+    // 给主线程让路,启动关键路径先跑完
     await Future.delayed(const Duration(seconds: 3));
 
     var attCleaned = 0;
@@ -595,7 +595,7 @@ Future<void> _runOrphanFileGcOnce(ProviderContainer container) async {
       final cacheDir = await getTemporaryDirectory();
       final thumbDir = Directory('${cacheDir.path}/attachment_thumbs');
       if (await thumbDir.exists()) {
-        // 缂╃暐鍥惧懡鍚嶈鍒?`<basename(fileName)>_thumb.jpg`
+        // 缩略图命名规则:`<basename(fileName)>_thumb.jpg`
         final usedThumbNames = <String>{
           for (final row in await db.select(db.transactionAttachments).get())
             '${p.basenameWithoutExtension(row.fileName)}_thumb.jpg',
@@ -650,10 +650,10 @@ Future<void> _runOrphanFileGcOnce(ProviderContainer container) async {
     await prefs.setBool(flagKey, true);
     logger.info(
       'OrphanGC',
-      '涓€娆℃€ф竻鐞嗗畬鎴?attachments=$attCleaned thumbs=$thumbCleaned icons=$iconCleaned',
+      '一次性清理完成 attachments=$attCleaned thumbs=$thumbCleaned icons=$iconCleaned',
     );
   } catch (e, st) {
-    // 浠讳綍寮傚父閮戒笉璇ュ奖鍝?app 鍚姩銆備笅娆″惎鍔ㄨ繕浼氶噸璇?鍥犱负娌¤ flag)銆?
-    logger.warning('OrphanGC', '涓€娆℃€ф竻鐞嗗紓甯?浼氬湪涓嬫鍚姩閲嶈瘯): $e\n$st');
+    // 任何异常都不该影响 app 启动。下次启动还会重试(因为没设 flag)。
+    logger.warning('OrphanGC', '一次性清理异常(会在下次启动重试): $e\n$st');
   }
 }
