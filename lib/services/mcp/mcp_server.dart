@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -34,7 +34,7 @@ class MCPServer {
         .addHandler(_router);
 
     _server = await serve(handler, InternetAddress.loopbackIPv4, port);
-    logger.info('MCP', 'MCP 鏈嶅姟鍣ㄥ凡鍚姩: http://127.0.0.1:${_server!.port}');
+    logger.info('MCP', 'MCP 服务器已启动: http://127.0.0.1:${_server!.port}');
   }
 
   Future<void> stop() async {
@@ -44,11 +44,11 @@ class MCPServer {
     _clients.clear();
     await _server?.close(force: true);
     _server = null;
-    logger.info('MCP', 'MCP 鏈嶅姟鍣ㄥ凡鍋滄');
+    logger.info('MCP', 'MCP 服务器已停止');
   }
 
   Response _router(Request request) {
-    final uri = request.requestUri;
+    final uri = request.url;
     final path = uri.path;
 
     if (path == '/health') {
@@ -74,15 +74,16 @@ class MCPServer {
   }
 
   Response _handleSSE(Request request) {
-    final responseStream = StreamController<String>();
+    final responseStream = StreamController<String>(onCancel: () {
+      final client = _clients.where((c) => c.stream == responseStream).firstOrNull;
+      if (client != null) {
+        _clients.remove(client);
+        client.close();
+      }
+    });
 
     final client = _SSEClient(responseStream);
     _clients.add(client);
-
-    request.onCancel = () {
-      _clients.remove(client);
-      client.close();
-    };
 
     responseStream.add('event: endpoint\ndata: /messages\n\n');
     responseStream.add('event: initialized\ndata: {}\n\n');
@@ -98,7 +99,7 @@ class MCPServer {
     );
   }
 
-  Response _handleMessage(Request request) async {
+  Future<Response> _handleMessage(Request request) async {
     try {
       final body = await request.readAsString();
       final json = jsonDecode(body) as Map<String, dynamic>;
@@ -130,7 +131,7 @@ class MCPServer {
         final arguments = params?['arguments'] as Map<String, dynamic>? ?? {};
 
         if (toolName == null) {
-          return _jsonRpcError(id, -32602, '缂哄皯宸ュ叿鍚嶇О');
+          return _jsonRpcError(id, -32602, '缺少工具名称');
         }
 
         final result = await handleToolCall(toolName, arguments, _repo!);
@@ -143,9 +144,9 @@ class MCPServer {
         return Response.ok('', headers: {'access-control-allow-origin': '*'});
       }
 
-      return _jsonRpcError(id, -32601, '涓嶆敮鎸佺殑鏂规硶: $method');
+      return _jsonRpcError(id, -32601, '不支持的方法: $method');
     } catch (e) {
-      return _jsonRpcError(null, -32603, '鍐呴儴閿欒: $e');
+      return _jsonRpcError(null, -32603, '内部错误: $e');
     }
   }
 
