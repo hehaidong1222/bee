@@ -1101,7 +1101,18 @@ Future<List<({int? id, String name, db.Category? category, double total, List<({
   }
 
   // 3. 查询缺失的父分类信息
+  // §7 共享账本:负 id 是 SharedLedger* 的 synthetic id,主表 getCategoryById
+  // 查不到 — fallback 到 sharedSynthetic map(已含所有 SharedLedger 分类)。
+  // 顺便补 topLevelNames / topLevelIcons,让结果阶段(line 1146+)能正确
+  // fallback 渲染 L1 分类名字 / 图标。
   for (final parentId in parentIdsToQuery) {
+    if (parentId < 0 && sharedSynthetic.containsKey(parentId)) {
+      final synthetic = sharedSynthetic[parentId]!;
+      topLevelInfo[parentId] = synthetic;
+      topLevelNames[parentId] = synthetic.name;
+      topLevelIcons[parentId] = synthetic.icon;
+      continue;
+    }
     final category = await repo.getCategoryById(parentId);
     if (category != null) {
       topLevelInfo[parentId] = category;
@@ -1121,9 +1132,16 @@ Future<List<({int? id, String name, db.Category? category, double total, List<({
       // 二级分类：累加到父分类
       topLevelMap.update(item.parentId, (v) => v + item.total,
           ifAbsent: () => item.total);
-      // 收集子分类明细
+      // 收集子分类明细 — §7 共享账本:负 id 的 L2 走 sharedSynthetic
+      // fallback,主表 getCategoryById 查不到。这样点击一级分类才能展开
+      // SharedLedger* 的子分类,点击子分类才能进 CategoryDetailPage。
       if (item.id != null) {
-        final subCategory = await repo.getCategoryById(item.id!);
+        db.Category? subCategory;
+        if (item.id! < 0) {
+          subCategory = sharedSynthetic[item.id!];
+        } else {
+          subCategory = await repo.getCategoryById(item.id!);
+        }
         if (subCategory != null) {
           subCategoriesMap.putIfAbsent(item.parentId, () => []);
           subCategoriesMap[item.parentId]!.add((

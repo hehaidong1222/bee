@@ -87,7 +87,11 @@ class LocalStatisticsRepository implements StatisticsRepository {
           kind: s.kind,
           icon: s.icon,
           sortOrder: s.sortOrder,
-          parentId: null,
+          // §7 二级分类 hierarchy:转 synthetic 父 id,让 analytics 的
+          // L2→L1 rollup 找到 SharedLedger* 父分类(主表查不到这些 negative id)。
+          parentId: (s.parentSyncId != null && s.parentSyncId!.isNotEmpty)
+              ? syntheticIdForSyncId(s.parentSyncId!)
+              : null,
           level: s.level,
           iconType: s.iconType,
           customIconPath: s.iconType == 'custom' && s.iconCloudSha256 != null
@@ -139,12 +143,19 @@ class LocalStatisticsRepository implements StatisticsRepository {
         // §7 共享账本:Editor 写的 tx 用 categorySyncIdOverride 指向 Owner
         // 的分类,主表 join 不到,查 SharedLedger* 兜底。用 synthetic 负 id
         // 做聚合 key,跟 picker filter 保持一致。
+        // §7 二级分类 hierarchy:Phase 2 加了 parent_sync_id 后,L2 SharedLedger*
+        // 行有父分类 syncId — 转 synthetic 负 id 写入 parentId,让 analytics
+        // 的 L2→L1 rollup 正确累加,而不是把 L2 当 orphan 丢掉。
         final s = shared[t.categorySyncIdOverride!]!;
         id = syntheticIdForSyncId(s.syncId);
+        final pSyncId = s.parentSyncId;
+        final parentSyntheticId = (pSyncId != null && pSyncId.isNotEmpty)
+            ? syntheticIdForSyncId(pSyncId)
+            : null;
         categoryInfo[id] = (
           name: s.name,
           icon: s.icon,
-          parentId: null, // SharedLedger* 只有 parentName,不参与 hierarchy
+          parentId: parentSyntheticId,
           level: s.level,
         );
       } else {

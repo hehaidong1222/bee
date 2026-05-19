@@ -296,6 +296,9 @@ class SharedLedgerCategories extends Table {
   IntColumn get sortOrder => integer().withDefault(const Constant(0))();
   IntColumn get level => integer().withDefault(const Constant(1))();
   TextColumn get parentName => text().nullable()();
+  // v25 共享账本二级分类:parent 的 syncId,用于 picker 建稳定父子链
+  // (parent_name 兜底/显示,parent_sync_id 主)。
+  TextColumn get parentSyncId => text().nullable()();
   DateTimeColumn get updatedAt => dateTime()();
 
   @override
@@ -363,7 +366,7 @@ class BeeDatabase extends _$BeeDatabase {
   BeeDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 24; // v24: 共享账本完整 schema(合并自原 v24/v25/v26/v27)
+  int get schemaVersion => 25; // v25: SharedLedgerCategories.parent_sync_id — 共享账本二级分类父子关系
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -983,6 +986,34 @@ class BeeDatabase extends _$BeeDatabase {
             await customStatement('UPDATE sync_state SET server_cursor = 0');
 
             print('[DB Migration] v24 迁移完成');
+          }
+          if (from < 25) {
+            // v25: SharedLedgerCategories 加 parent_sync_id 列,共享账本二级
+            // 分类用稳定 FK(syncId)而非 parent_name 建父子关系。
+            // 数据回填:对每个 level=2 行,在同 ledger_sync_id + kind 内按
+            // parent_name 反查 level=1 行的 syncId,填进 parent_sync_id。
+            print('[DB Migration] 开始迁移到 v25: SharedLedgerCategories.parent_sync_id');
+            await customStatement(
+                'ALTER TABLE shared_ledger_categories ADD COLUMN parent_sync_id TEXT;');
+            await customStatement('''
+              UPDATE shared_ledger_categories AS child
+              SET parent_sync_id = (
+                SELECT parent.sync_id
+                FROM shared_ledger_categories AS parent
+                WHERE parent.ledger_sync_id = child.ledger_sync_id
+                  AND parent.name = child.parent_name
+                  AND parent.kind = child.kind
+                  AND COALESCE(parent.level, 1) = 1
+                LIMIT 1
+              )
+              WHERE COALESCE(child.level, 1) >= 2
+                AND child.parent_name IS NOT NULL
+            ''');
+            // reset server_cursor 让后续 pull 重拉 user-global category change,
+            // server 端 0013 alembic 已经在 projection 回填 parent_sync_id,
+            // mobile 后续 fetchAndStoreSharedResources 会重新覆盖一遍。
+            await customStatement('UPDATE sync_state SET server_cursor = 0');
+            print('[DB Migration] v25 迁移完成');
           }
         },
       );

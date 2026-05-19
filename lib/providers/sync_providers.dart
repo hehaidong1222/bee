@@ -180,6 +180,11 @@ final syncServiceProvider = Provider<SyncService>((ref) {
       // syncGenerationProvider 作为总 bump，覆盖后续新增但没有单独 tick 的。
       ref.read(syncStatusRefreshProvider.notifier).state++;
       ref.read(ledgerListRefreshProvider.notifier).state++;
+      // currentLedgerProvider 是 FutureProvider，不会因为 Drift 写入而重算；
+      // 远端 sync_change(entity_type='ledger',改名 / 改币种)落库后必须显
+      // 式 invalidate 否则首页 header / 设置 / 预算等 watch 它的 widget 永远
+      // 显示旧的账本名 — 用户 A 在 web 改名,A/B 移动端 header 不刷新的根因。
+      ref.invalidate(currentLedgerProvider);
       ref.read(syncGenerationProvider.notifier).state++;
       ref.read(statsRefreshProvider.notifier).state++;
       ref.read(budgetRefreshProvider.notifier).state++;
@@ -260,6 +265,17 @@ final syncServiceProvider = Provider<SyncService>((ref) {
     };
 
     engine.startListeningRealtime();
+
+    // §7 共享账本兜底:切账本时(尤其是切回共享账本时)触发一次 sync。
+    // 用户报告"切到自己账本再切回来 WS 不同步" — 实际可能 WS 还在但
+    // pull 漏了或某次 ws 推送漏了。这里 ref.listen 切账本就主动同步,
+    // 跟 _scheduleAutoSync 的 2 秒防抖叠加可以兜住绝大多数边界。
+    ref.listen<int>(currentLedgerIdProvider, (prev, next) {
+      if (prev == next || next <= 0) return;
+      logger.info('SyncProvider',
+          'ledger switched $prev → $next, schedule auto sync as fallback');
+      engine.triggerAutoSync(reason: 'ledger_switched');
+    });
 
     // 反应式同步触发器:监听 local_changes 表,任何 mutation 写进未推送
     // 行都会自动调度 sync。把"是否触发同步"的责任完全转移到"是否记录

@@ -519,6 +519,19 @@ class LocalRepository extends BaseRepository {
   Future<void> updateTransactionLedger({required int id, required int ledgerId}) =>
       _transactionRepo.updateTransactionLedger(id: id, ledgerId: ledgerId);
 
+  /// 共享账本:本地 tx 写完后回填 createdByUserId / lastEditedByUserId。
+  /// 详见 [LocalTransactionRepository.markTxAuthor]。
+  Future<void> markTxAuthor({
+    required int txId,
+    required String userId,
+    required bool isCreate,
+  }) =>
+      _transactionRepo.markTxAuthor(
+        txId: txId,
+        userId: userId,
+        isCreate: isCreate,
+      );
+
   // ==================== 日历功能相关 ====================
 
   @override

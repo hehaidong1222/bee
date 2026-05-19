@@ -3959,7 +3959,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cloudTutorialFeature3 => '👥 Multi-user isolation: multiple users on one server, data fully separated';
 
   @override
-  String get cloudTutorialFeature4 => '🔜 Planned: shared ledgers (invite family / team to a common ledger)';
+  String get cloudTutorialFeature4 => '🤝 Shared ledgers: invite family / team into one book with seconds-level sync';
 
   @override
   String get cloudTutorialGotIt => 'Got it';
@@ -6309,5 +6309,40 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String sharedTxRecordedBy(String name) {
     return 'recorded by $name';
+  }
+
+  @override
+  String sharedTxCreatedBy(String name) {
+    return 'Created by $name';
+  }
+
+  @override
+  String sharedTxEditedBy(String name) {
+    return 'Last edited by $name';
+  }
+
+  @override
+  String sharedTxCreatedAndEditedBy(String name) {
+    return 'Created and edited by $name';
+  }
+
+  @override
+  String get sharedMembersStatsTitle => 'Member balances';
+
+  @override
+  String get sharedMembersStatsEmpty => 'No transactions yet';
+
+  @override
+  String get sharedMembersStatsLoading => 'Loading…';
+
+  @override
+  String get sharedMembersStatsIncome => 'Income';
+
+  @override
+  String get sharedMembersStatsExpense => 'Expense';
+
+  @override
+  String sharedMembersStatsTxCount(int count) {
+    return '$count tx';
   }
 }

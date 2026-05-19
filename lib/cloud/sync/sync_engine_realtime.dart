@@ -99,6 +99,18 @@ extension SyncEngineRealtime on SyncEngine {
                 'auto sync 内的 syncLedgersFromServer 失败,继续 sync', st);
             logger.warning('SyncEngine', 'error: $e');
           }
+          // Sprint 5.1 边界:WS server 不持久化离线事件 — 用户在 Editor 视角
+          // 离线期间 Owner 改了分类 / 账户 / 标签,shared_resource_change 直接
+          // 被丢弃。重连时不主动对账,SharedLedger* 镜像表会一直 stale 到下一
+          // 次 owner 再次改动才触发更新。reconciliation 走这里,对每个本人为
+          // Editor 角色的本地共享账本拉一次 /shared-resources 覆盖镜像表。
+          try {
+            await _refreshAllSharedResourcesAfterReconnect();
+          } catch (e, st) {
+            logger.warning('SyncEngine',
+                '重连共享资源对账失败,继续 sync', st);
+            logger.warning('SyncEngine', 'error: $e');
+          }
         }
         final result = await sync(ledgerId: ledgerId);
         if (result.hasError) {
@@ -142,7 +154,24 @@ extension SyncEngineRealtime on SyncEngine {
         return;
       }
 
-      // 其他场景:重拉 ledgers list(memberCount / isShared 可能变),不阻塞
+      // §7 共享账本:自己在 web 端 accept invite → server 广播 member_change.
+      // joined 给所有 member 包括自己。mobile 端不是 caller,onInviteAccepted
+      // 不会跑,但需要跟 mobile-side accept 等价的完整初始化流程:
+      //   1. syncLedgersFromServer 拉新 ledger 行(内部自动调
+      //      fetchAndStoreSharedResources 拉 SharedLedger* 资源)
+      //   2. replayAllChanges 把 sync_changes 表所有历史 tx 重新 apply 到本地
+      //      (单跑 _pull 拉不回历史 — 设备 cursor 已经在最新位置)
+      if (changeType == 'joined' && affectedUserId != null && affectedUserId == myUserId) {
+        logger.info('SyncEngine',
+            '自己加入 ledger=$ledgerExternalId(可能 web 端 accept),触发完整初始化');
+        await syncLedgersFromServer();
+        await replayAllChanges();
+        onAutoPullCompleted?.call(ledgerExternalId);
+        return;
+      }
+
+      // 其他场景(别人 joined / 角色变):重拉 ledgers list(memberCount / isShared
+      // 可能变),不阻塞
       await syncLedgersFromServer();
       onAutoPullCompleted?.call(ledgerExternalId);
     } catch (e, st) {
@@ -199,6 +228,7 @@ extension SyncEngineRealtime on SyncEngine {
                     level:
                         d.Value((payload['level'] as num?)?.toInt() ?? 1),
                     parentName: d.Value(payload['parentName'] as String?),
+                    parentSyncId: d.Value(payload['parentSyncId'] as String?),
                     updatedAt: now,
                   ),
                 );
@@ -276,6 +306,46 @@ extension SyncEngineRealtime on SyncEngine {
     }
   }
 
+  /// Sprint 5.1 边界:WS 重连后对账所有 Editor 角色的共享账本。WS server
+  /// 不持久化离线事件(websocket_manager.broadcast_to_user 找不到 socket 就
+  /// 丢弃),Editor 离线期间 Owner 改的分类 / 账户 / 标签全部丢失 →
+  /// SharedLedger* 镜像表 stale。
+  ///
+  /// 本方法在 _scheduleAutoSync(reason='ws_connected'/'network_restored')
+  /// 里调,对每个本地 ledger 行 isShared=true && myRole='editor' 的共享账本
+  /// 单独 await 拉 /shared-resources。Owner 角色不需要 — 他自己的资源在主表
+  /// (categories/accounts/tags),走正常 sync_change 路径。
+  ///
+  /// 每个账本独立 try/catch,单个失败不影响其它账本。结束后 bump tick 让
+  /// picker / 反查 widget reactive 刷新。
+  Future<void> _refreshAllSharedResourcesAfterReconnect() async {
+    final rows = await (db.select(db.ledgers)
+          ..where((l) => l.isShared.equals(true) & l.myRole.equals('editor')))
+        .get();
+    if (rows.isEmpty) return;
+    logger.info('SyncEngine',
+        '重连共享资源对账:Editor 角色账本 ${rows.length} 个');
+    int ok = 0;
+    int fail = 0;
+    for (final l in rows) {
+      final sid = l.syncId;
+      if (sid == null || sid.isEmpty) continue;
+      try {
+        await fetchAndStoreSharedResources(sid);
+        ok++;
+      } catch (e, st) {
+        fail++;
+        logger.warning('SyncEngine',
+            '重连共享资源对账失败 ledger=$sid: $e', st);
+      }
+    }
+    logger.info('SyncEngine',
+        '重连共享资源对账完成 ok=$ok fail=$fail');
+    if (ok > 0) {
+      onAutoPullCompleted?.call('');
+    }
+  }
+
   /// Editor 接受邀请成功后调用:
   /// 1. 触发一次 syncLedgersFromServer 把新 ledger 拉到本地
   /// 2. 拉 Owner user-global 资源快照 → 写本地 SharedLedger* 镜像表
@@ -312,6 +382,7 @@ extension SyncEngineRealtime on SyncEngine {
                 sortOrder: d.Value(c.sortOrder ?? 0),
                 level: d.Value(c.level ?? 1),
                 parentName: d.Value(c.parentName),
+                parentSyncId: d.Value(c.parentSyncId),
                 updatedAt: now,
               ),
             );

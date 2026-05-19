@@ -7237,6 +7237,12 @@ class $SharedLedgerCategoriesTable extends SharedLedgerCategories
   late final GeneratedColumn<String> parentName = GeneratedColumn<String>(
       'parent_name', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _parentSyncIdMeta =
+      const VerificationMeta('parentSyncId');
+  @override
+  late final GeneratedColumn<String> parentSyncId = GeneratedColumn<String>(
+      'parent_sync_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _updatedAtMeta =
       const VerificationMeta('updatedAt');
   @override
@@ -7257,6 +7263,7 @@ class $SharedLedgerCategoriesTable extends SharedLedgerCategories
         sortOrder,
         level,
         parentName,
+        parentSyncId,
         updatedAt
       ];
   @override
@@ -7334,6 +7341,12 @@ class $SharedLedgerCategoriesTable extends SharedLedgerCategories
           parentName.isAcceptableOrUnknown(
               data['parent_name']!, _parentNameMeta));
     }
+    if (data.containsKey('parent_sync_id')) {
+      context.handle(
+          _parentSyncIdMeta,
+          parentSyncId.isAcceptableOrUnknown(
+              data['parent_sync_id']!, _parentSyncIdMeta));
+    }
     if (data.containsKey('updated_at')) {
       context.handle(_updatedAtMeta,
           updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
@@ -7373,6 +7386,8 @@ class $SharedLedgerCategoriesTable extends SharedLedgerCategories
           .read(DriftSqlType.int, data['${effectivePrefix}level'])!,
       parentName: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}parent_name']),
+      parentSyncId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}parent_sync_id']),
       updatedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
     );
@@ -7398,6 +7413,7 @@ class SharedLedgerCategory extends DataClass
   final int sortOrder;
   final int level;
   final String? parentName;
+  final String? parentSyncId;
   final DateTime updatedAt;
   const SharedLedgerCategory(
       {required this.ledgerSyncId,
@@ -7412,6 +7428,7 @@ class SharedLedgerCategory extends DataClass
       required this.sortOrder,
       required this.level,
       this.parentName,
+      this.parentSyncId,
       required this.updatedAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -7438,6 +7455,9 @@ class SharedLedgerCategory extends DataClass
     if (!nullToAbsent || parentName != null) {
       map['parent_name'] = Variable<String>(parentName);
     }
+    if (!nullToAbsent || parentSyncId != null) {
+      map['parent_sync_id'] = Variable<String>(parentSyncId);
+    }
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
@@ -7463,6 +7483,9 @@ class SharedLedgerCategory extends DataClass
       parentName: parentName == null && nullToAbsent
           ? const Value.absent()
           : Value(parentName),
+      parentSyncId: parentSyncId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentSyncId),
       updatedAt: Value(updatedAt),
     );
   }
@@ -7483,6 +7506,7 @@ class SharedLedgerCategory extends DataClass
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
       level: serializer.fromJson<int>(json['level']),
       parentName: serializer.fromJson<String?>(json['parentName']),
+      parentSyncId: serializer.fromJson<String?>(json['parentSyncId']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -7502,6 +7526,7 @@ class SharedLedgerCategory extends DataClass
       'sortOrder': serializer.toJson<int>(sortOrder),
       'level': serializer.toJson<int>(level),
       'parentName': serializer.toJson<String?>(parentName),
+      'parentSyncId': serializer.toJson<String?>(parentSyncId),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -7519,6 +7544,7 @@ class SharedLedgerCategory extends DataClass
           int? sortOrder,
           int? level,
           Value<String?> parentName = const Value.absent(),
+          Value<String?> parentSyncId = const Value.absent(),
           DateTime? updatedAt}) =>
       SharedLedgerCategory(
         ledgerSyncId: ledgerSyncId ?? this.ledgerSyncId,
@@ -7537,6 +7563,8 @@ class SharedLedgerCategory extends DataClass
         sortOrder: sortOrder ?? this.sortOrder,
         level: level ?? this.level,
         parentName: parentName.present ? parentName.value : this.parentName,
+        parentSyncId:
+            parentSyncId.present ? parentSyncId.value : this.parentSyncId,
         updatedAt: updatedAt ?? this.updatedAt,
       );
   SharedLedgerCategory copyWithCompanion(SharedLedgerCategoriesCompanion data) {
@@ -7560,6 +7588,9 @@ class SharedLedgerCategory extends DataClass
       level: data.level.present ? data.level.value : this.level,
       parentName:
           data.parentName.present ? data.parentName.value : this.parentName,
+      parentSyncId: data.parentSyncId.present
+          ? data.parentSyncId.value
+          : this.parentSyncId,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -7579,6 +7610,7 @@ class SharedLedgerCategory extends DataClass
           ..write('sortOrder: $sortOrder, ')
           ..write('level: $level, ')
           ..write('parentName: $parentName, ')
+          ..write('parentSyncId: $parentSyncId, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
@@ -7598,6 +7630,7 @@ class SharedLedgerCategory extends DataClass
       sortOrder,
       level,
       parentName,
+      parentSyncId,
       updatedAt);
   @override
   bool operator ==(Object other) =>
@@ -7615,6 +7648,7 @@ class SharedLedgerCategory extends DataClass
           other.sortOrder == this.sortOrder &&
           other.level == this.level &&
           other.parentName == this.parentName &&
+          other.parentSyncId == this.parentSyncId &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -7632,6 +7666,7 @@ class SharedLedgerCategoriesCompanion
   final Value<int> sortOrder;
   final Value<int> level;
   final Value<String?> parentName;
+  final Value<String?> parentSyncId;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const SharedLedgerCategoriesCompanion({
@@ -7647,6 +7682,7 @@ class SharedLedgerCategoriesCompanion
     this.sortOrder = const Value.absent(),
     this.level = const Value.absent(),
     this.parentName = const Value.absent(),
+    this.parentSyncId = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -7663,6 +7699,7 @@ class SharedLedgerCategoriesCompanion
     this.sortOrder = const Value.absent(),
     this.level = const Value.absent(),
     this.parentName = const Value.absent(),
+    this.parentSyncId = const Value.absent(),
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
   })  : ledgerSyncId = Value(ledgerSyncId),
@@ -7683,6 +7720,7 @@ class SharedLedgerCategoriesCompanion
     Expression<int>? sortOrder,
     Expression<int>? level,
     Expression<String>? parentName,
+    Expression<String>? parentSyncId,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
@@ -7699,6 +7737,7 @@ class SharedLedgerCategoriesCompanion
       if (sortOrder != null) 'sort_order': sortOrder,
       if (level != null) 'level': level,
       if (parentName != null) 'parent_name': parentName,
+      if (parentSyncId != null) 'parent_sync_id': parentSyncId,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -7717,6 +7756,7 @@ class SharedLedgerCategoriesCompanion
       Value<int>? sortOrder,
       Value<int>? level,
       Value<String?>? parentName,
+      Value<String?>? parentSyncId,
       Value<DateTime>? updatedAt,
       Value<int>? rowid}) {
     return SharedLedgerCategoriesCompanion(
@@ -7732,6 +7772,7 @@ class SharedLedgerCategoriesCompanion
       sortOrder: sortOrder ?? this.sortOrder,
       level: level ?? this.level,
       parentName: parentName ?? this.parentName,
+      parentSyncId: parentSyncId ?? this.parentSyncId,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -7776,6 +7817,9 @@ class SharedLedgerCategoriesCompanion
     if (parentName.present) {
       map['parent_name'] = Variable<String>(parentName.value);
     }
+    if (parentSyncId.present) {
+      map['parent_sync_id'] = Variable<String>(parentSyncId.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -7800,6 +7844,7 @@ class SharedLedgerCategoriesCompanion
           ..write('sortOrder: $sortOrder, ')
           ..write('level: $level, ')
           ..write('parentName: $parentName, ')
+          ..write('parentSyncId: $parentSyncId, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -12487,6 +12532,7 @@ typedef $$SharedLedgerCategoriesTableCreateCompanionBuilder
   Value<int> sortOrder,
   Value<int> level,
   Value<String?> parentName,
+  Value<String?> parentSyncId,
   required DateTime updatedAt,
   Value<int> rowid,
 });
@@ -12504,6 +12550,7 @@ typedef $$SharedLedgerCategoriesTableUpdateCompanionBuilder
   Value<int> sortOrder,
   Value<int> level,
   Value<String?> parentName,
+  Value<String?> parentSyncId,
   Value<DateTime> updatedAt,
   Value<int> rowid,
 });
@@ -12554,6 +12601,9 @@ class $$SharedLedgerCategoriesTableFilterComposer
 
   ColumnFilters<String> get parentName => $composableBuilder(
       column: $table.parentName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get parentSyncId => $composableBuilder(
+      column: $table.parentSyncId, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnFilters(column));
@@ -12607,6 +12657,10 @@ class $$SharedLedgerCategoriesTableOrderingComposer
   ColumnOrderings<String> get parentName => $composableBuilder(
       column: $table.parentName, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get parentSyncId => $composableBuilder(
+      column: $table.parentSyncId,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
 }
@@ -12656,6 +12710,9 @@ class $$SharedLedgerCategoriesTableAnnotationComposer
   GeneratedColumn<String> get parentName => $composableBuilder(
       column: $table.parentName, builder: (column) => column);
 
+  GeneratedColumn<String> get parentSyncId => $composableBuilder(
+      column: $table.parentSyncId, builder: (column) => column);
+
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 }
@@ -12703,6 +12760,7 @@ class $$SharedLedgerCategoriesTableTableManager extends RootTableManager<
             Value<int> sortOrder = const Value.absent(),
             Value<int> level = const Value.absent(),
             Value<String?> parentName = const Value.absent(),
+            Value<String?> parentSyncId = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -12719,6 +12777,7 @@ class $$SharedLedgerCategoriesTableTableManager extends RootTableManager<
             sortOrder: sortOrder,
             level: level,
             parentName: parentName,
+            parentSyncId: parentSyncId,
             updatedAt: updatedAt,
             rowid: rowid,
           ),
@@ -12735,6 +12794,7 @@ class $$SharedLedgerCategoriesTableTableManager extends RootTableManager<
             Value<int> sortOrder = const Value.absent(),
             Value<int> level = const Value.absent(),
             Value<String?> parentName = const Value.absent(),
+            Value<String?> parentSyncId = const Value.absent(),
             required DateTime updatedAt,
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -12751,6 +12811,7 @@ class $$SharedLedgerCategoriesTableTableManager extends RootTableManager<
             sortOrder: sortOrder,
             level: level,
             parentName: parentName,
+            parentSyncId: parentSyncId,
             updatedAt: updatedAt,
             rowid: rowid,
           ),

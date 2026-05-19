@@ -26,11 +26,53 @@ import 'sync_providers.dart';
 final sharedResourceRefreshProvider = StateProvider<int>((ref) => 0);
 
 /// 列出某账本的成员(任何 member 可读)。
+/// Sprint 5.1 边界:watch sharedResourceRefreshProvider 让 WS 重连后(server
+/// 不持久化离线 member_change 事件)自动重拉,避免被踢 / 新成员加入但本地
+/// 列表 stale 的窗口。
 final ledgerMembersProvider = FutureProvider.autoDispose
     .family<List<BeeCountCloudLedgerMember>, String>((ref, ledgerId) async {
+  ref.watch(sharedResourceRefreshProvider);
   final cloud = await ref.watch(beecountCloudProviderInstance.future);
   if (cloud == null) return const [];
   return cloud.listMembers(ledgerId: ledgerId);
+});
+
+/// 共享账本成员收支统计 query key — (ledgerId, scope)。
+/// scope 限 'month' / 'year' / 'all',period 暂用默认(当月/当年/全部)。
+class MemberStatsKey {
+  const MemberStatsKey({required this.ledgerId, this.scope = 'month'});
+
+  final String ledgerId;
+  final String scope;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MemberStatsKey &&
+          other.ledgerId == ledgerId &&
+          other.scope == scope);
+
+  @override
+  int get hashCode => Object.hash(ledgerId, scope);
+}
+
+/// 共享账本成员收支统计 provider。watch sharedResourceRefreshProvider 实现
+/// 实时跟随:当 WS sync_change / member_change 来时,bump tick → refetch。
+final memberStatsProvider = FutureProvider.autoDispose
+    .family<BeeCountCloudMemberStats?, MemberStatsKey>((ref, key) async {
+  ref.watch(sharedResourceRefreshProvider);
+  final cloud = await ref.watch(beecountCloudProviderInstance.future);
+  if (cloud == null) return null;
+  try {
+    return await cloud.fetchMemberStats(
+      ledgerId: key.ledgerId,
+      scope: key.scope,
+      tzOffsetMinutes: DateTime.now().timeZoneOffset.inMinutes,
+    );
+  } catch (_) {
+    // 非 member / server 404 等异常一律返 null,UI 自动降级隐藏。
+    return null;
+  }
 });
 
 /// 列出某账本"当前 active"邀请(仅 owner)。

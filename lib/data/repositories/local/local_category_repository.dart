@@ -547,13 +547,19 @@ class LocalCategoryRepository implements CategoryRepository {
       for (final s in rows) {
         if (syntheticIdForSyncId(s.syncId) == syntheticId) {
           if (!ctrl.isClosed) {
+            // 跟 statistics / picker / synthetic builder 保持一致:有 parentSyncId
+            // 就转 synthetic 父 id 写入 parentId,L2 → L1 链路可正确导航。
+            final pSyncId = s.parentSyncId;
+            final parentSyntheticId = (pSyncId != null && pSyncId.isNotEmpty)
+                ? syntheticIdForSyncId(pSyncId)
+                : null;
             ctrl.add(Category(
               id: syntheticId,
               name: s.name,
               kind: s.kind,
               icon: s.icon,
               sortOrder: s.sortOrder,
-              parentId: null,
+              parentId: parentSyntheticId,
               level: s.level,
               iconType: s.iconType,
               customIconPath:

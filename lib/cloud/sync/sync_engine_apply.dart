@@ -166,7 +166,13 @@ extension _SyncEngineApply on SyncEngine {
     final lastEditedByUserId = (payload['updatedByUserId'] as String?) ?? createdByUserId;
 
     if (existing != null) {
-      // 更新
+      // 更新 — createdByUserId 走"本地为 null 就回填,否则保持"的策略:
+      //   - 本地已有值:trust local(server first-write-wins 已保证 payload
+      //     的 createdByUserId 跟本地一致,跳过避免冗余写)
+      //   - 本地为 null + payload 非 null:从 server 兜底补一次。覆盖
+      //     mobile EntitySerializer 历史缺字段 + server 未补全期产生的脏数据
+      final shouldBackfillCreator =
+          existing.createdByUserId == null && createdByUserId != null;
       await (db.update(db.transactions)
             ..where((t) => t.id.equals(existing.id)))
           .write(TransactionsCompanion(
@@ -180,7 +186,9 @@ extension _SyncEngineApply on SyncEngine {
         categorySyncIdOverride: d.Value(categorySyncIdOverride),
         accountSyncIdOverride: d.Value(accountSyncIdOverride),
         toAccountSyncIdOverride: d.Value(toAccountSyncIdOverride),
-        // createdByUserId 不在 update 路径动(只有 insert 时初始化)
+        createdByUserId: shouldBackfillCreator
+            ? d.Value(createdByUserId)
+            : const d.Value.absent(),
         lastEditedByUserId: d.Value(lastEditedByUserId),
       ));
       // 更新标签和附件

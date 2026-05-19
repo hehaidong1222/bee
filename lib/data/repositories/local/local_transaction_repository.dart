@@ -339,6 +339,27 @@ class LocalTransactionRepository implements TransactionRepository {
     );
   }
 
+  /// 共享账本:在本地标记 tx 的创建人 / 编辑人,让 UI 能立即展示头像。
+  /// 服务端 push.py 已经会兜底注入 userId,但本地写入路径(addTransaction /
+  /// updateTransaction)不知道 currentUser 是谁,需要 UI 层在写完后调一下这个
+  /// 方法。
+  ///   - isCreate=true:同时写 createdByUserId + lastEditedByUserId(新建场景)
+  ///   - isCreate=false:只写 lastEditedByUserId(编辑场景,createdByUserId
+  ///     维持 first-write-wins)
+  Future<void> markTxAuthor({
+    required int txId,
+    required String userId,
+    required bool isCreate,
+  }) async {
+    await (db.update(db.transactions)..where((t) => t.id.equals(txId))).write(
+      TransactionsCompanion(
+        createdByUserId:
+            isCreate ? d.Value(userId) : const d.Value.absent(),
+        lastEditedByUserId: d.Value(userId),
+      ),
+    );
+  }
+
   @override
   Future<void> deleteTransaction(int id) async {
     // 先删除关联的标签

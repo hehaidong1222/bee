@@ -7563,7 +7563,7 @@ abstract class AppLocalizations {
   /// No description provided for @cloudTutorialFeature4.
   ///
   /// In en, this message translates to:
-  /// **'🔜 Planned: shared ledgers (invite family / team to a common ledger)'**
+  /// **'🤝 Shared ledgers: invite family / team into one book with seconds-level sync'**
   String get cloudTutorialFeature4;
 
   /// No description provided for @cloudTutorialGotIt.
@@ -11981,6 +11981,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'recorded by {name}'**
   String sharedTxRecordedBy(String name);
+
+  /// No description provided for @sharedTxCreatedBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Created by {name}'**
+  String sharedTxCreatedBy(String name);
+
+  /// No description provided for @sharedTxEditedBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Last edited by {name}'**
+  String sharedTxEditedBy(String name);
+
+  /// No description provided for @sharedTxCreatedAndEditedBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Created and edited by {name}'**
+  String sharedTxCreatedAndEditedBy(String name);
+
+  /// No description provided for @sharedMembersStatsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Member balances'**
+  String get sharedMembersStatsTitle;
+
+  /// No description provided for @sharedMembersStatsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No transactions yet'**
+  String get sharedMembersStatsEmpty;
+
+  /// No description provided for @sharedMembersStatsLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading…'**
+  String get sharedMembersStatsLoading;
+
+  /// No description provided for @sharedMembersStatsIncome.
+  ///
+  /// In en, this message translates to:
+  /// **'Income'**
+  String get sharedMembersStatsIncome;
+
+  /// No description provided for @sharedMembersStatsExpense.
+  ///
+  /// In en, this message translates to:
+  /// **'Expense'**
+  String get sharedMembersStatsExpense;
+
+  /// No description provided for @sharedMembersStatsTxCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} tx'**
+  String sharedMembersStatsTxCount(int count);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

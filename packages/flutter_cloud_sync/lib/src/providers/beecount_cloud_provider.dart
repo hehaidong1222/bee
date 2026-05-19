@@ -543,6 +543,24 @@ class BeeCountCloudProvider implements CloudProvider {
     return storage.fetchSharedResources(ledgerId: ledgerId);
   }
 
+  Future<BeeCountCloudMemberStats> fetchMemberStats({
+    required String ledgerId,
+    String scope = 'month',
+    String? period,
+    int? tzOffsetMinutes,
+  }) async {
+    final storage = _storage;
+    if (storage == null) {
+      throw CloudConfigurationException('BeeCount Cloud storage is not initialized.');
+    }
+    return storage.fetchMemberStats(
+      ledgerId: ledgerId,
+      scope: scope,
+      period: period,
+      tzOffsetMinutes: tzOffsetMinutes,
+    );
+  }
+
   Future<List<BeeCountCloudReadTransaction>> readTransactions({
     required String ledgerId,
     String? txType,
@@ -2596,6 +2614,31 @@ class BeeCountCloudStorageService implements CloudStorageService {
     return BeeCountCloudSharedResources.fromJson(_decodeJsonObject(response.body));
   }
 
+  /// 共享账本成员收支统计:server `/ledgers/{id}/member-stats`。
+  /// scope: month / year / all;period 可选(YYYY-MM 或 YYYY)。
+  Future<BeeCountCloudMemberStats> fetchMemberStats({
+    required String ledgerId,
+    String scope = 'month',
+    String? period,
+    int? tzOffsetMinutes,
+  }) async {
+    final qp = <String, String>{
+      'scope': scope,
+      if (period != null && period.isNotEmpty) 'period': period,
+      if (tzOffsetMinutes != null) 'tz_offset_minutes': '$tzOffsetMinutes',
+    };
+    final response = await _authedRequest(
+      method: 'GET',
+      path: '/ledgers/$ledgerId/member-stats',
+      query: qp,
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CloudStorageException(
+          'Fetch member stats failed: ${_extractErrorMessage(response)}');
+    }
+    return BeeCountCloudMemberStats.fromJson(_decodeJsonObject(response.body));
+  }
+
   Future<List<BeeCountCloudReadTransaction>> readTransactions({
     required String ledgerId,
     String? txType,
@@ -4406,6 +4449,7 @@ class BeeCountCloudSharedCategory {
     this.sortOrder,
     this.level,
     this.parentName,
+    this.parentSyncId,
   });
 
   final String syncId;
@@ -4418,6 +4462,8 @@ class BeeCountCloudSharedCategory {
   final int? sortOrder;
   final int? level;
   final String? parentName;
+  // 共享账本二级分类:parent 的 syncId,client 端用它建稳定父子链。
+  final String? parentSyncId;
 
   factory BeeCountCloudSharedCategory.fromJson(Map<String, dynamic> json) {
     return BeeCountCloudSharedCategory(
@@ -4431,6 +4477,7 @@ class BeeCountCloudSharedCategory {
       sortOrder: (json['sort_order'] as num?)?.toInt(),
       level: (json['level'] as num?)?.toInt(),
       parentName: json['parent_name'] as String?,
+      parentSyncId: json['parent_sync_id'] as String?,
     );
   }
 }
@@ -4495,6 +4542,104 @@ class BeeCountCloudSharedTag {
       syncId: (json['sync_id'] as String?)?.trim() ?? '',
       name: (json['name'] as String?)?.trim() ?? '',
       color: json['color'] as String?,
+    );
+  }
+}
+
+/// 共享账本成员收支统计单行(对应 server MemberStatItem)。
+class BeeCountCloudMemberStatItem {
+  const BeeCountCloudMemberStatItem({
+    required this.userId,
+    required this.role,
+    required this.incomeTotal,
+    required this.expenseTotal,
+    required this.txCount,
+    this.email,
+    this.displayName,
+    this.avatarUrl,
+    this.avatarVersion = 0,
+  });
+
+  final String userId;
+  final String? email;
+  final String? displayName;
+  /// server-side relative path,例 "/api/v1/profile/avatar/{uid}?v=N"。null = 用户未上传头像。
+  final String? avatarUrl;
+  final int avatarVersion;
+  /// 'owner' / 'editor' / 'removed'(被踢成员但 tx 仍有归属)。
+  final String role;
+  final double incomeTotal;
+  final double expenseTotal;
+  final int txCount;
+
+  factory BeeCountCloudMemberStatItem.fromJson(Map<String, dynamic> json) {
+    final avatar = (json['avatar_url'] as String?)?.trim();
+    return BeeCountCloudMemberStatItem(
+      userId: (json['user_id'] as String?)?.trim() ?? '',
+      email: (json['email'] as String?)?.trim().isEmpty == true
+          ? null
+          : json['email'] as String?,
+      displayName: json['display_name'] as String?,
+      avatarUrl: (avatar == null || avatar.isEmpty) ? null : avatar,
+      avatarVersion: (json['avatar_version'] as num?)?.toInt() ?? 0,
+      role: (json['role'] as String?)?.trim() ?? 'editor',
+      incomeTotal: (json['income_total'] as num?)?.toDouble() ?? 0.0,
+      expenseTotal: (json['expense_total'] as num?)?.toDouble() ?? 0.0,
+      txCount: (json['tx_count'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+/// 共享账本成员收支统计响应(对应 server MemberStatsResponse)。
+class BeeCountCloudMemberStats {
+  const BeeCountCloudMemberStats({
+    required this.ledgerId,
+    required this.ledgerCurrency,
+    required this.scope,
+    required this.items,
+    this.period,
+    this.startAt,
+    this.endAt,
+  });
+
+  final String ledgerId;
+  final String ledgerCurrency;
+  /// 'month' / 'year' / 'all'。
+  final String scope;
+  /// month → "YYYY-MM";year → "YYYY";all → null。
+  final String? period;
+  final DateTime? startAt;
+  final DateTime? endAt;
+  final List<BeeCountCloudMemberStatItem> items;
+
+  factory BeeCountCloudMemberStats.fromJson(Map<String, dynamic> json) {
+    final rawItems = json['items'];
+    final items = <BeeCountCloudMemberStatItem>[];
+    if (rawItems is List) {
+      for (final entry in rawItems) {
+        if (entry is Map<String, dynamic>) {
+          items.add(BeeCountCloudMemberStatItem.fromJson(entry));
+        }
+      }
+    }
+    DateTime? parseDate(String key) {
+      final raw = json[key];
+      if (raw is String && raw.isNotEmpty) {
+        return DateTime.tryParse(raw)?.toUtc();
+      }
+      return null;
+    }
+
+    return BeeCountCloudMemberStats(
+      ledgerId: (json['ledger_id'] as String?)?.trim() ?? '',
+      ledgerCurrency: (json['ledger_currency'] as String?)?.trim() ?? 'CNY',
+      scope: (json['scope'] as String?)?.trim() ?? 'month',
+      period: (json['period'] as String?)?.trim().isEmpty == true
+          ? null
+          : json['period'] as String?,
+      startAt: parseDate('start_at'),
+      endAt: parseDate('end_at'),
+      items: items,
     );
   }
 }

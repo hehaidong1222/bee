@@ -891,7 +891,7 @@
   "cloudTutorialFeature1": "📱 多裝置即時協同:手機 A + 手機 B + Web 三端同帳號,資料秒級同步",
   "cloudTutorialFeature2": "🌐 內建 Web 管理端:一個 Docker 映像檔含 server + web,瀏覽器即可使用",
   "cloudTutorialFeature3": "👥 多用戶獨立:一個伺服器可多人註冊,各自資料完全隔離",
-  "cloudTutorialFeature4": "🔜 規劃中:共享帳本(邀請家人 / 團隊一起記同一本)",
+  "cloudTutorialFeature4": "🤝 共享帳本:邀請家人 / 團隊一起記同一本,即時秒級同步",
   "cloudTutorialGotIt": "我知道了",
   "cloudTest": "測試",
   "cloudTestConnection": "測試連線",
@@ -2507,5 +2507,18 @@
   "sharedMembersTransferConfirmCta": "確認轉讓",
   "sharedMembersTransferDone": "已轉讓所有權",
   "sharedTxRecordedBy": "{name} 記的",
-  "@sharedTxRecordedBy": { "placeholders": { "name": { "type": "String" } } }
+  "@sharedTxRecordedBy": { "placeholders": { "name": { "type": "String" } } },
+  "sharedTxCreatedBy": "{name} 建立",
+  "@sharedTxCreatedBy": { "placeholders": { "name": { "type": "String" } } },
+  "sharedTxEditedBy": "{name} 最後編輯",
+  "@sharedTxEditedBy": { "placeholders": { "name": { "type": "String" } } },
+  "sharedTxCreatedAndEditedBy": "{name} 建立並編輯",
+  "@sharedTxCreatedAndEditedBy": { "placeholders": { "name": { "type": "String" } } },
+  "sharedMembersStatsTitle": "成員收支",
+  "sharedMembersStatsEmpty": "本期暫無記帳",
+  "sharedMembersStatsLoading": "載入中…",
+  "sharedMembersStatsIncome": "總收入",
+  "sharedMembersStatsExpense": "總支出",
+  "sharedMembersStatsTxCount": "{count}筆",
+  "@sharedMembersStatsTxCount": { "placeholders": { "count": { "type": "int" } } }
 }

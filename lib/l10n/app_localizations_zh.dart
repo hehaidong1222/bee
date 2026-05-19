@@ -3959,7 +3959,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cloudTutorialFeature3 => '👥 多用户独立:一个服务器可以多人注册,各自数据完全隔离';
 
   @override
-  String get cloudTutorialFeature4 => '🔜 规划中:共享账本(邀请家人 / 团队一起记同一本)';
+  String get cloudTutorialFeature4 => '🤝 共享账本:邀请家人 / 团队一起记同一本,实时秒级同步';
 
   @override
   String get cloudTutorialGotIt => '我知道了';
@@ -6309,6 +6309,41 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String sharedTxRecordedBy(String name) {
     return '$name 记的';
+  }
+
+  @override
+  String sharedTxCreatedBy(String name) {
+    return '$name 创建';
+  }
+
+  @override
+  String sharedTxEditedBy(String name) {
+    return '$name 最后编辑';
+  }
+
+  @override
+  String sharedTxCreatedAndEditedBy(String name) {
+    return '$name 创建并编辑';
+  }
+
+  @override
+  String get sharedMembersStatsTitle => '成员收支';
+
+  @override
+  String get sharedMembersStatsEmpty => '本期暂无记账';
+
+  @override
+  String get sharedMembersStatsLoading => '加载中…';
+
+  @override
+  String get sharedMembersStatsIncome => '总收入';
+
+  @override
+  String get sharedMembersStatsExpense => '总支出';
+
+  @override
+  String sharedMembersStatsTxCount(int count) {
+    return '$count笔';
   }
 }
 
@@ -10266,7 +10301,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get cloudTutorialFeature3 => '👥 多用戶獨立:一個伺服器可多人註冊,各自資料完全隔離';
 
   @override
-  String get cloudTutorialFeature4 => '🔜 規劃中:共享帳本(邀請家人 / 團隊一起記同一本)';
+  String get cloudTutorialFeature4 => '🤝 共享帳本:邀請家人 / 團隊一起記同一本,即時秒級同步';
 
   @override
   String get cloudTutorialGotIt => '我知道了';
@@ -12589,5 +12624,40 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   @override
   String sharedTxRecordedBy(String name) {
     return '$name 記的';
+  }
+
+  @override
+  String sharedTxCreatedBy(String name) {
+    return '$name 建立';
+  }
+
+  @override
+  String sharedTxEditedBy(String name) {
+    return '$name 最後編輯';
+  }
+
+  @override
+  String sharedTxCreatedAndEditedBy(String name) {
+    return '$name 建立並編輯';
+  }
+
+  @override
+  String get sharedMembersStatsTitle => '成員收支';
+
+  @override
+  String get sharedMembersStatsEmpty => '本期暫無記帳';
+
+  @override
+  String get sharedMembersStatsLoading => '載入中…';
+
+  @override
+  String get sharedMembersStatsIncome => '總收入';
+
+  @override
+  String get sharedMembersStatsExpense => '總支出';
+
+  @override
+  String sharedMembersStatsTxCount(int count) {
+    return '$count筆';
   }
 }

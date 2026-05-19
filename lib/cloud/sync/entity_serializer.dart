@@ -86,6 +86,7 @@ class EntitySerializer {
   static Map<String, dynamic> serializeCategory(
     Category category, {
     String? parentName,
+    String? parentSyncId,
     String? iconCloudFileId,
     String? iconCloudSha256,
   }) {
@@ -103,6 +104,9 @@ class EntitySerializer {
       if (iconCloudFileId != null) 'iconCloudFileId': iconCloudFileId,
       if (iconCloudSha256 != null) 'iconCloudSha256': iconCloudSha256,
       if (parentName != null) 'parentName': parentName,
+      // 共享账本二级分类:parent 的稳定 syncId,server 端 projection.upsert_category
+      // 直接用,不再依赖 parent_name 反查(同名 + 重命名场景更稳)。
+      if (parentSyncId != null) 'parentSyncId': parentSyncId,
     };
   }
 

@@ -1581,7 +1581,7 @@
   "cloudTutorialFeature1": "📱 多设备实时协同:手机 A + 手机 B + Web 三端同账号,数据秒级同步",
   "cloudTutorialFeature2": "🌐 自带 Web 管理端:一个 Docker 镜像包含 server + web,浏览器即可使用",
   "cloudTutorialFeature3": "👥 多用户独立:一个服务器可以多人注册,各自数据完全隔离",
-  "cloudTutorialFeature4": "🔜 规划中:共享账本(邀请家人 / 团队一起记同一本)",
+  "cloudTutorialFeature4": "🤝 共享账本:邀请家人 / 团队一起记同一本,实时秒级同步",
   "cloudTutorialGotIt": "我知道了",
   "cloudSyncHint": "下载时可自动对比差异并逐条预览。非实时同步，请避免多设备同时编辑同一账本。同步范围为账本数据（含关联的账户、分类、标签），不含附件。",
   "cloudSyncNow": "立即同步",
@@ -2805,5 +2805,18 @@
   "sharedMembersTransferConfirmCta": "确认转让",
   "sharedMembersTransferDone": "已转让所有权",
   "sharedTxRecordedBy": "{name} 记的",
-  "@sharedTxRecordedBy": { "placeholders": { "name": { "type": "String" } } }
+  "@sharedTxRecordedBy": { "placeholders": { "name": { "type": "String" } } },
+  "sharedTxCreatedBy": "{name} 创建",
+  "@sharedTxCreatedBy": { "placeholders": { "name": { "type": "String" } } },
+  "sharedTxEditedBy": "{name} 最后编辑",
+  "@sharedTxEditedBy": { "placeholders": { "name": { "type": "String" } } },
+  "sharedTxCreatedAndEditedBy": "{name} 创建并编辑",
+  "@sharedTxCreatedAndEditedBy": { "placeholders": { "name": { "type": "String" } } },
+  "sharedMembersStatsTitle": "成员收支",
+  "sharedMembersStatsEmpty": "本期暂无记账",
+  "sharedMembersStatsLoading": "加载中…",
+  "sharedMembersStatsIncome": "总收入",
+  "sharedMembersStatsExpense": "总支出",
+  "sharedMembersStatsTxCount": "{count}笔",
+  "@sharedMembersStatsTxCount": { "placeholders": { "count": { "type": "int" } } }
 }

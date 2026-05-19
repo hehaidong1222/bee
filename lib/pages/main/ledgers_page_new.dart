@@ -16,6 +16,7 @@ import '../../data/repositories/local/local_repository.dart';
 import '../../widgets/ui/ui.dart';
 import '../../widgets/biz/biz.dart';
 import '../cloud/member_list_page.dart';
+import '../cloud/member_stats_page.dart';
 import '../cloud/join_shared_ledger_page.dart';
 import '../../styles/tokens.dart';
 import '../../utils/currencies.dart';
@@ -65,19 +66,6 @@ class _LedgersPageNewState extends ConsumerState<LedgersPageNew> {
                 tooltip: AppLocalizations.of(context).ledgersCreate,
                 onPressed: () => _showCreateLedgerDialog(context),
                 icon: Icon(Icons.add, color: BeeTokens.textPrimary(context)),
-              ),
-              // 加入共享账本(§7 共享账本入口,放在账本管理页统一管理"账本"概念)
-              IconButton(
-                tooltip: AppLocalizations.of(context).sharedJoinPageTitle,
-                onPressed: () async {
-                  await Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const JoinSharedLedgerPage(),
-                    ),
-                  );
-                },
-                icon: Icon(Icons.handshake_outlined,
-                    color: BeeTokens.textPrimary(context)),
               ),
               // 刷新
               IconButton(
@@ -165,6 +153,33 @@ class _LedgersPageNewState extends ConsumerState<LedgersPageNew> {
         vertical: 8.0.scaled(context, ref),
       ),
       children: [
+        // §7 共享账本入口 — 跟 web 端 LedgersSection 顶部"加入共享账本"
+        // 按钮一致,放在列表顶部,比 header 角落 icon 显眼。
+        Padding(
+          padding: EdgeInsets.fromLTRB(
+            16.0.scaled(context, ref),
+            4.0.scaled(context, ref),
+            16.0.scaled(context, ref),
+            8.0.scaled(context, ref),
+          ),
+          child: OutlinedButton.icon(
+            icon: const Icon(Icons.group_add_outlined, size: 18),
+            label: Text(AppLocalizations.of(context).sharedJoinPageTitle),
+            onPressed: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const JoinSharedLedgerPage(),
+                ),
+              );
+            },
+            style: OutlinedButton.styleFrom(
+              minimumSize: Size(double.infinity, 40.0.scaled(context, ref)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        ),
         // 本地账本区域
         if (localLedgers.isNotEmpty) ...[
           _SectionHeader(
@@ -419,6 +434,18 @@ class _LedgersPageNewState extends ConsumerState<LedgersPageNew> {
                 ],
               ),
             ),
+            // 共享账本成员收支统计(简版)— 只对已同步的共享账本展示。
+            if (ledger.isShared)
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(dctx, 'memberStats'),
+                child: Row(
+                  children: [
+                    Icon(Icons.insert_chart_outlined, color: primary),
+                    const SizedBox(width: 8),
+                    Text(AppLocalizations.of(context).sharedMembersStatsTitle),
+                  ],
+                ),
+              ),
             if (isOwner) ...[
               SimpleDialogOption(
                 onPressed: () => Navigator.pop(dctx, 'clear'),
@@ -490,6 +517,33 @@ class _LedgersPageNewState extends ConsumerState<LedgersPageNew> {
       if (mounted) {
         await Navigator.of(context).push(MaterialPageRoute(
           builder: (_) => MemberListPage(
+            ledgerExternalId: extId,
+            ledgerName: ledger.name,
+          ),
+        ));
+      }
+    } else if (action == 'memberStats') {
+      // 跟成员管理同源:取 ledger.syncId 再跳 MemberStatsPage。
+      final localRepo = ref.read(repositoryProvider);
+      String? syncId;
+      if (localRepo is LocalRepository) {
+        final raw = await localRepo.db.select(localRepo.db.ledgers)
+            .map((l) => (id: l.id, syncId: l.syncId))
+            .get();
+        final entry = raw.firstWhere(
+          (e) => e.id == ledger.id,
+          orElse: () => (id: 0, syncId: null),
+        );
+        syncId = entry.syncId;
+      }
+      if (syncId == null || syncId.isEmpty) {
+        if (mounted) showToast(context, '请先启用云同步');
+        return;
+      }
+      final extId = syncId;
+      if (mounted) {
+        await Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => MemberStatsPage(
             ledgerExternalId: extId,
             ledgerName: ledger.name,
           ),

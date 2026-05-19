@@ -190,11 +190,13 @@ extension _SyncEngineSerialization on SyncEngine {
             .getSingleOrNull();
         if (category == null) return <String, dynamic>{};
         String? parentName;
+        String? parentSyncId;
         if (category.parentId != null) {
           final parent = await (db.select(db.categories)
                 ..where((c) => c.id.equals(category.parentId!)))
               .getSingleOrNull();
           parentName = parent?.name;
+          parentSyncId = parent?.syncId;
         }
         // 如果分类是自定义图标，先把图标文件上传到云端拿到 fileId/sha256，
         // 否则增量 push 的 payload 里不会带 iconCloudFileId，web 端永远没图。
@@ -226,6 +228,7 @@ extension _SyncEngineSerialization on SyncEngine {
         return EntitySerializer.serializeCategory(
           category,
           parentName: parentName,
+          parentSyncId: parentSyncId,
           iconCloudFileId: iconCloudFileId,
           iconCloudSha256: iconCloudSha256,
         );
@@ -430,11 +433,13 @@ extension _SyncEngineSerialization on SyncEngine {
             .write(CategoriesCompanion(syncId: d.Value(syncId)));
       }
       String? parentName;
+      String? parentSyncId;
       if (category.parentId != null) {
-        parentName = categories
+        final parent = categories
             .cast<Category?>()
-            .firstWhere((p) => p?.id == category.parentId, orElse: () => null)
-            ?.name;
+            .firstWhere((p) => p?.id == category.parentId, orElse: () => null);
+        parentName = parent?.name;
+        parentSyncId = parent?.syncId;
       }
       final iconRef = categoryIconCloudRefs[category.id];
       syncChanges.add({
@@ -445,6 +450,7 @@ extension _SyncEngineSerialization on SyncEngine {
         'payload': EntitySerializer.serializeCategory(
           category,
           parentName: parentName,
+          parentSyncId: parentSyncId,
           iconCloudFileId: iconRef?.fileId,
           iconCloudSha256: iconRef?.sha256,
         ),
@@ -703,13 +709,16 @@ extension _SyncEngineSerialization on SyncEngine {
           accounts.map((a) => EntitySerializer.serializeAccount(a)).toList(),
       'categories': categories.map((c) {
         String? parentName;
+        String? parentSyncId;
         if (c.parentId != null) {
-          parentName = categories
+          final parent = categories
               .cast<Category?>()
-              .firstWhere((p) => p?.id == c.parentId, orElse: () => null)
-              ?.name;
+              .firstWhere((p) => p?.id == c.parentId, orElse: () => null);
+          parentName = parent?.name;
+          parentSyncId = parent?.syncId;
         }
-        return EntitySerializer.serializeCategory(c, parentName: parentName);
+        return EntitySerializer.serializeCategory(c,
+            parentName: parentName, parentSyncId: parentSyncId);
       }).toList(),
       'tags': tags.map((t) => EntitySerializer.serializeTag(t)).toList(),
       'items': items,

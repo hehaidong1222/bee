@@ -1,4 +1,5 @@
 // 成员管理页 — 列出账本成员,Owner 可踢人,任意 member 可退出。
+// 成员收支统计独立到 MemberStatsPage,从账本动作菜单单独入口。
 // (MVP 不实现转让 owner,留 Phase 3)
 import 'package:flutter/material.dart';
 import 'package:flutter_cloud_sync/flutter_cloud_sync.dart';

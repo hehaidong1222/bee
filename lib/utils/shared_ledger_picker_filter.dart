@@ -65,10 +65,14 @@ extension SharedLedgerPickerFilter on BeeDatabase {
   /// 调用方传入主表 raw `all`(`repo.getTopLevelCategories(...)` 拉的),
   /// 本方法决定保留 / 替换。`kind` 传非空时,SharedLedger* 数据按 kind 过滤
   /// (income/expense/transfer),跟 raw 调用 getTopLevelCategories(kind) 对齐。
+  ///
+  /// `topLevelOnly`:true 时(默认)只返 level=1,跟 mobile 主表 getTopLevel
+  /// Categories 语义一致;false 时返所有,给二级分类反查用。
   Future<List<Category>> filterCategoriesForLedger(
     List<Category> all,
     LedgerPickerContext? ctx, {
     String? kind,
+    bool topLevelOnly = true,
   }) async {
     if (ctx == null || !ctx.isEditorInShared || ctx.ledgerSyncId == null) {
       return all;
@@ -80,8 +84,36 @@ extension SharedLedgerPickerFilter on BeeDatabase {
     if (kind != null && kind.isNotEmpty) {
       q.where((t) => t.kind.equals(kind));
     }
+    if (topLevelOnly) {
+      q.where((t) => t.level.equals(1));
+    }
     final shared = await q.get();
     return shared.map(_sharedCategoryAsMain).toList();
+  }
+
+  /// 共享账本下,根据 synthetic 父分类 id 反查 level=2 子分类。
+  /// `parentSyntheticId` 是 picker 上呈现的负 int(syntheticIdForSyncId 派生)。
+  ///
+  /// 实现:扫 SharedLedgerCategories,先找到 syntheticIdForSyncId(syncId) ==
+  /// parentSyntheticId 的父行拿到 parent syncId,再按 parent_sync_id 反查子行。
+  Future<List<Category>> getSharedSubCategoriesBySyntheticParentId(
+      int parentSyntheticId, String ledgerSyncId) async {
+    final all = await (select(sharedLedgerCategories)
+          ..where((t) => t.ledgerSyncId.equals(ledgerSyncId))
+          ..orderBy([(t) => OrderingTerm.asc(t.sortOrder)]))
+        .get();
+    String? parentSyncId;
+    for (final s in all) {
+      if (syntheticIdForSyncId(s.syncId) == parentSyntheticId) {
+        parentSyncId = s.syncId;
+        break;
+      }
+    }
+    if (parentSyncId == null) return const [];
+    return all
+        .where((c) => c.parentSyncId == parentSyncId)
+        .map(_sharedCategoryAsMain)
+        .toList();
   }
 
   /// 拿 picker 用的 accounts。规则同 categories。
@@ -113,6 +145,8 @@ extension SharedLedgerPickerFilter on BeeDatabase {
   }
 
   /// 把 SharedLedgerCategory 转成 Category(synthetic id < 0,syncId 来自 Owner)。
+  /// parent_sync_id 非空时,parentId = syntheticIdForSyncId(parent_sync_id),让
+  /// picker 能识别 level=2 子分类的父级。
   Category _sharedCategoryAsMain(SharedLedgerCategory c) {
     return Category(
       id: syntheticIdForSyncId(c.syncId),
@@ -120,7 +154,9 @@ extension SharedLedgerPickerFilter on BeeDatabase {
       kind: c.kind,
       icon: c.icon,
       sortOrder: c.sortOrder,
-      parentId: null,  // 共享账本暂不支持二级分类穿透,留 null
+      parentId: (c.parentSyncId != null && c.parentSyncId!.isNotEmpty)
+          ? syntheticIdForSyncId(c.parentSyncId!)
+          : null,
       level: c.level,
       iconType: c.iconType,
       customIconPath: c.iconType == 'custom' && c.iconCloudSha256 != null

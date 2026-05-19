@@ -131,7 +131,7 @@ class _CategorySelectorDialogState extends ConsumerState<CategorySelectorDialog>
 
     // 如果只显示一级分类，不加载子分类
     if (!widget.onlyTopLevel) {
-      // 为每个一级分类获取子分类
+      // 为每个一级分类获取子分类(主表路径,共享账本场景下面 filter 会替换)
       for (final category in [...incomeCategories, ...expenseCategories]) {
         final subs = await repo.getSubCategories(category.id);
         allCategories.addAll(subs);
@@ -139,11 +139,12 @@ class _CategorySelectorDialogState extends ConsumerState<CategorySelectorDialog>
     }
 
     // §7 共享账本 picker 过滤:Editor + 共享账本 → 走 SharedLedger* 表(下游
-    // _buildCategoryGroups 仍按 widget.type 二次过滤,所以这里返完整集合)。
+    // _buildCategoryGroups 仍按 widget.type 二次过滤,所以这里 topLevelOnly=
+    // false 返完整集合,父子关系靠 parent_sync_id 派生 synthetic parent_id)。
     if (repo is LocalRepository) {
       final ctx = await repo.db.loadLedgerPickerContext(widget.ledgerId);
-      allCategories =
-          await repo.db.filterCategoriesForLedger(allCategories, ctx);
+      allCategories = await repo.db
+          .filterCategoriesForLedger(allCategories, ctx, topLevelOnly: false);
     }
 
     // 如果有过滤器，计算每个分类的可选状态

@@ -7,6 +7,7 @@ import '../../l10n/app_localizations.dart';
 import '../../styles/tokens.dart';
 import '../../services/billing/post_processor.dart';
 import '../../services/attachment_service.dart';
+import '../../services/data/tx_author_service.dart';
 import '../biz/amount_editor_sheet.dart';
 import '../../utils/account_type_utils.dart';
 import '../ui/ui.dart';
@@ -146,6 +147,9 @@ class _TransferFormState extends ConsumerState<TransferForm> {
                 id: widget.editingTransactionId!,
                 toAccountId: _toAccountId,
               );
+              // 共享账本:回填编辑人,UI 头像组立即展示
+              await TxAuthorService.markEdited(
+                  ref, widget.editingTransactionId!);
               // 更新标签
               if (result.tagIds.isNotEmpty) {
                 await repo.updateTransactionTags(
@@ -193,6 +197,8 @@ class _TransferFormState extends ConsumerState<TransferForm> {
                 note: result.note,
                 happenedAt: result.date,
               );
+              // 共享账本:本地立即标记创建人 + 编辑人
+              await TxAuthorService.markCreated(ref, txId);
 
               // 关联标签
               if (result.tagIds.isNotEmpty) {
