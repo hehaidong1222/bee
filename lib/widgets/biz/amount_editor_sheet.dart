@@ -664,8 +664,10 @@ class _AmountEditorSheetState extends ConsumerState<AmountEditorSheet> {
 
   /// 构建标签和附件选择行（一行显示）
   Widget _buildTagAndAttachmentRow() {
-    final allTagsAsync = ref.watch(allTagsProvider);
-    // 使用 valueOrNull 保留上一次数据，避免 loading 时显示空列表导致闪烁
+    // §7 共享账本:用按当前 ledger 过滤后的 tags(Editor 视角下走 SharedLedgerTags,
+    // synthetic id 跟 tag picker 一致),否则编辑模式 tx 已选的 synthetic id 在
+    // 主表里找不到,显示"无标签"。
+    final allTagsAsync = ref.watch(tagsForCurrentLedgerProvider);
     final allTags = allTagsAsync.valueOrNull ?? [];
 
     // 获取已选中的标签详情

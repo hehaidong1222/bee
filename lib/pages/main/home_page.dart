@@ -23,6 +23,7 @@ import '../report/annual_report_page.dart';
 import '../calendar/calendar_page.dart';
 import '../../widgets/biz/ledger_picker_sheet.dart';
 import '../../widgets/biz/home_budget_summary.dart';
+import '../../providers/shared_ledger_providers.dart';
 
 // 优化版首页 - 使用FlutterListView实现精准定位和丝滑跳转
 class HomePage extends ConsumerStatefulWidget {
@@ -633,6 +634,27 @@ class _HomePageState extends ConsumerState<HomePage> {
       }
     });
 
+    // §7 共享账本:WS shared_resource_change 推送时,bump _streamBuilderKey
+    // 强制 StreamBuilder 重订阅 → 新 stream 启动会拉一遍最新 SharedLedger*
+    // 数据 hydrate。否则 Drift watch 不监听 SharedLedger* 表,UI 显示旧分类
+    // 名/图标。
+    // 同时 invalidate accountForTxProvider 整个 family — Riverpod 的
+    // ref.watch(sharedResourceRefreshProvider) 应该自动让 family 实例 rebuild,
+    // 但实测某些 family 实例没刷新,brute-force invalidate 保兜底。
+    ref.listen<int>(sharedResourceRefreshProvider, (previous, next) {
+      logger.info('HomePage',
+          'sharedResourceRefreshProvider tick: $previous → $next, txListState=${_transactionListKey.currentState != null}');
+      if (previous != next) {
+        setState(() {
+          _streamBuilderKey++;
+        });
+        ref.invalidate(accountForTxProvider);
+        // 立刻切 stream 模式 — 跟 homeSwitchToStreamProvider 路径的 100ms
+        // 延迟不同,这里没动画顾虑,WS 来了就该立即丢掉 preloaded 旧值。
+        _transactionListKey.currentState?.forceStreamModeImmediate();
+      }
+    });
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor, // ⭐ 自适应背景色
       body: Column(
@@ -728,6 +750,31 @@ class _HomePageState extends ConsumerState<HomePage> {
                                                   ),
                                                 ),
                                               ),
+                                              // v24 共享账本:header 也显示 🤝 角标 + 成员数
+                                              if (ledger != null && ledger.isShared) ...[
+                                                const SizedBox(width: 4),
+                                                Icon(
+                                                  Icons.handshake,
+                                                  size: 12,
+                                                  color: Theme.of(context)
+                                                      .textTheme
+                                                      .bodyMedium
+                                                      ?.color
+                                                      ?.withOpacity(0.7),
+                                                ),
+                                                const SizedBox(width: 1),
+                                                Text(
+                                                  '${ledger.memberCount}',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Theme.of(context)
+                                                        .textTheme
+                                                        .bodyMedium
+                                                        ?.color
+                                                        ?.withOpacity(0.7),
+                                                  ),
+                                                ),
+                                              ],
                                               const SizedBox(width: 2),
                                               Icon(
                                                 Icons.keyboard_arrow_down,

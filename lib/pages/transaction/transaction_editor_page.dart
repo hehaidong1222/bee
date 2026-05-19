@@ -6,6 +6,8 @@ import '../../l10n/app_localizations.dart';
 import '../../providers.dart';
 import '../../providers/budget_providers.dart';
 import '../../data/db.dart';
+import '../../data/repositories/local/local_repository.dart';
+import '../../utils/shared_ledger_picker_filter.dart';
 import '../../widgets/ui/ui.dart';
 import '../../widgets/biz/amount_editor_sheet.dart';
 import '../../widgets/category/category_selector.dart';
@@ -71,7 +73,14 @@ class _TransactionEditorPageState extends ConsumerState<TransactionEditorPage>
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted || _autoOpened) return;
         final repo = ref.read(repositoryProvider);
-        final c = await repo.getCategoryById(widget.initialCategoryId!);
+        // §7 共享账本:initialCategoryId 可能是 synthetic(< 0)— Editor 编辑
+        // 共享账本下记的 tx,反查走 SharedLedger* 表。
+        Category? c;
+        if (widget.initialCategoryId! < 0 && repo is LocalRepository) {
+          c = await repo.db.findCategoryBySyntheticId(widget.initialCategoryId!);
+        } else {
+          c = await repo.getCategoryById(widget.initialCategoryId!);
+        }
         if (c != null && mounted) {
           // 切换到对应的 tab
           final idx = c.kind == 'income' ? 1 : 0;
@@ -230,16 +239,30 @@ class _TransactionEditorPageState extends ConsumerState<TransactionEditorPage>
           final repo = ref.read(repositoryProvider);
           final attachmentService = ref.read(attachmentServiceProvider);
           int transactionId;
+          // §7 v25:Category 是来自 SharedLedger* 的 synthetic (id<0)时,
+          // categoryId 留 null,override 走 syncId。同理对 account/toAccount。
+          // res.accountId 可能也是 synthetic(Account picker 用同一规则)。
+          final isSyntheticCategory = c.id < 0;
+          final isSyntheticAccount =
+              res.accountId != null && res.accountId! < 0;
+          final categoryIdForWrite = isSyntheticCategory ? null : c.id;
+          final accountIdForWrite =
+              isSyntheticAccount ? null : res.accountId;
+          final categoryOverride = isSyntheticCategory ? c.syncId : null;
+          final accountOverride =
+              isSyntheticAccount ? await _resolveSyncIdByAccountId(res.accountId!, ledgerId) : null;
           if (widget.editingTransactionId != null) {
             // 编辑模式：使用repository更新交易
             await repo.updateTransaction(
               id: widget.editingTransactionId!,
               type: kind,
               amount: res.amount,
-              categoryId: c.id,
+              categoryId: categoryIdForWrite,
               note: res.note,
               happenedAt: res.date,
-              accountId: res.accountId,
+              accountId: accountIdForWrite,
+              categorySyncIdOverride: categoryOverride,
+              accountSyncIdOverride: accountOverride,
             );
             transactionId = widget.editingTransactionId!;
           } else {
@@ -247,10 +270,12 @@ class _TransactionEditorPageState extends ConsumerState<TransactionEditorPage>
               ledgerId: ledgerId,
               type: kind,
               amount: res.amount,
-              categoryId: c.id,
+              categoryId: categoryIdForWrite,
               happenedAt: res.date,
               note: res.note,
-              accountId: res.accountId,
+              accountId: accountIdForWrite,
+              categorySyncIdOverride: categoryOverride,
+              accountSyncIdOverride: accountOverride,
             );
           }
           // 保存待上传的附件
@@ -264,18 +289,73 @@ class _TransactionEditorPageState extends ConsumerState<TransactionEditorPage>
             ref.read(attachmentListRefreshProvider.notifier).state++;
           }
           // 更新标签关联
-          if (res.tagIds.isNotEmpty) {
+          // §7 共享账本:tag.id < 0 是 synthetic(Owner tag from SharedLedger*),
+          // 主表 Tags 没该行,不能直接写 transaction_tags.tag_id。分两类:
+          // - 正数 id → 写 transaction_tags 主表(老路径)
+          // - 负数 id → 走 SharedLedgerTags 反查 syncId → 写 transaction_tag_overrides
+          final normalTagIds = res.tagIds.where((id) => id >= 0).toList();
+          final syntheticTagIds = res.tagIds.where((id) => id < 0).toList();
+
+          if (normalTagIds.isNotEmpty) {
             await repo.updateTransactionTags(
               transactionId: transactionId,
-              tagIds: res.tagIds,
+              tagIds: normalTagIds,
             );
-            // 刷新标签列表缓存
             ref.read(tagListRefreshProvider.notifier).state++;
           } else if (widget.editingTransactionId != null) {
-            // 编辑模式：如果没有选择标签，清除原有标签
+            // 编辑模式没主表 tag → 清掉旧主表关联
             await repo.removeAllTagsFromTransaction(transactionId);
-            // 刷新标签列表缓存
             ref.read(tagListRefreshProvider.notifier).state++;
+          }
+
+          // §7 写 override:先反查 tx.syncId + 把 synthetic tag_id 翻译成
+          // Owner tag syncId,再 upsert 进 TransactionTagOverrides
+          if (repo is LocalRepository) {
+            final txRow = await (repo.db.select(repo.db.transactions)
+                  ..where((t) => t.id.equals(transactionId)))
+                .getSingleOrNull();
+            final txSyncId = txRow?.syncId;
+            if (txSyncId != null) {
+              await (repo.db.delete(repo.db.transactionTagOverrides)
+                    ..where((t) => t.transactionSyncId.equals(txSyncId)))
+                  .go();
+              if (syntheticTagIds.isNotEmpty) {
+                final allShared =
+                    await repo.db.select(repo.db.sharedLedgerTags).get();
+                final now = DateTime.now().toUtc();
+                for (final sid in syntheticTagIds) {
+                  for (final s in allShared) {
+                    if (syntheticIdForSyncId(s.syncId) == sid) {
+                      await repo.db
+                          .into(repo.db.transactionTagOverrides)
+                          .insert(
+                        TransactionTagOverridesCompanion.insert(
+                          transactionSyncId: txSyncId,
+                          tagSyncId: s.syncId,
+                          createdAt: now,
+                        ),
+                      );
+                      break;
+                    }
+                  }
+                }
+                ref.read(tagListRefreshProvider.notifier).state++;
+              }
+              // override 变化也算 tx update,登记 change 让 sync push 推走
+              // (insertOnConflictUpdate 防重复)
+              final ledgerRow = await (repo.db.select(repo.db.ledgers)
+                    ..where((l) => l.id.equals(ledgerId)))
+                  .getSingleOrNull();
+              if (ledgerRow != null) {
+                await repo.changeTracker?.recordLedgerChange(
+                  entityType: 'transaction',
+                  entityId: transactionId,
+                  entitySyncId: txSyncId,
+                  ledgerId: ledgerId,
+                  action: 'update',
+                );
+              }
+            }
           }
           // 统一处理：自动/手动同步与状态刷新（后台静默）
           PostProcessor.sync(ref, ledgerId: ledgerId);
@@ -297,5 +377,26 @@ class _TransactionEditorPageState extends ConsumerState<TransactionEditorPage>
         },
       ),
     );
+  }
+
+  /// §7 v25:account picker 返 synthetic Account(id<0)时,把 id 反查
+  /// SharedLedgerAccounts 拿 syncId,写到 tx.accountSyncIdOverride。
+  /// 失败返 null,调用方应回到 accountId int 路径(synthetic 不一致时的兜底)。
+  Future<String?> _resolveSyncIdByAccountId(int accountId, int ledgerId) async {
+    if (accountId >= 0) return null;
+    final repo = ref.read(repositoryProvider);
+    if (repo is! LocalRepository) return null;
+    // 反查:本地 ledger.syncId → SharedLedgerAccounts ledgerSyncId 范围
+    final ledger = await (repo.db.select(repo.db.ledgers)
+          ..where((l) => l.id.equals(ledgerId)))
+        .getSingleOrNull();
+    if (ledger?.syncId == null) return null;
+    final rows = await (repo.db.select(repo.db.sharedLedgerAccounts)
+          ..where((t) => t.ledgerSyncId.equals(ledger!.syncId!)))
+        .get();
+    for (final r in rows) {
+      if (syntheticIdForSyncId(r.syncId) == accountId) return r.syncId;
+    }
+    return null;
   }
 }

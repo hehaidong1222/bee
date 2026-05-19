@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_cloud_sync/flutter_cloud_sync.dart' hide SyncStatus;
 import '../cloud/sync_service.dart';
+import 'shared_ledger_providers.dart';
 import '../cloud/sync/sync_coordinator.dart';
 import '../cloud/sync/sync_engine.dart';
 import '../cloud/sync/sync_providers.dart' as sync_p;
@@ -184,6 +185,9 @@ final syncServiceProvider = Provider<SyncService>((ref) {
       ref.read(budgetRefreshProvider.notifier).state++;
       ref.read(tagListRefreshProvider.notifier).state++;
       ref.read(calendarRefreshProvider.notifier).state++;
+      // 共享账本资源 tick:Owner 改 / WS shared_resource_change / accept 等
+      // 触发后 picker / 反查 widget watch 它 reactive 刷新
+      ref.read(sharedResourceRefreshProvider.notifier).state++;
       // 附件计数 / 列表的 tick：TransactionList 用它重新 _loadAttachmentCounts，
       // 另一端删除 / 新增的附件就能在对端实时反映，不需要重启 app。
       ref.read(attachmentListRefreshProvider.notifier).state++;
@@ -729,6 +733,9 @@ final localLedgersProvider =
         createdAt: ledger.createdAt,
         transactionCount: stats.transactionCount,
         balance: stats.balance,
+        isShared: ledger.isShared,
+        memberCount: ledger.memberCount,
+        myRole: ledger.myRole,
       ));
     }
 
@@ -788,6 +795,11 @@ final remoteLedgersProvider =
     for (final r in remote) {
       if (r.ledgerId.isEmpty) continue;
       if (localSyncIds.contains(r.ledgerId)) continue;
+      // 共享账本不出现在"远端账本"列表 — 远端账本是单人账本的备份恢复
+      // 概念,共享账本是动态成员关系,只能通过"加入共享账本"流程进入。
+      // Editor "仅删除本地"等同于退出账本(走 DELETE /members/self),
+      // 不应再显示让用户重复"恢复",会绕开 server 的 membership 校验。
+      if (r.isShared) continue;
       out.add(LedgerDisplayItem.fromRemote(
         remoteSyncId: r.ledgerId,
         name: r.ledgerName.isEmpty ? '(unnamed)' : r.ledgerName,
@@ -827,6 +839,9 @@ final allLedgersProvider = FutureProvider<List<LedgerDisplayItem>>((ref) async {
         createdAt: ledger.createdAt,
         transactionCount: stats.transactionCount,
         balance: stats.balance,
+        isShared: ledger.isShared,
+        memberCount: ledger.memberCount,
+        myRole: ledger.myRole,
       ));
     }
 

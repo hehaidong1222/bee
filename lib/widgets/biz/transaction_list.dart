@@ -4,8 +4,10 @@ import 'package:intl/intl.dart';
 import 'package:flutter_list_view/flutter_list_view.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 import '../../data/db.dart';
+import '../../data/repositories/local/local_repository.dart';
 import '../../providers.dart';
 import '../../providers/budget_providers.dart';
+import '../../providers/shared_ledger_providers.dart';
 import '../../services/system/logger_service.dart';
 import '../../widgets/ui/ui.dart';
 import '../../widgets/biz/biz.dart';
@@ -74,6 +76,14 @@ class TransactionListState extends ConsumerState<TransactionList> {
   Map<int, int> _cachedAttachmentCounts = {};
   int _lastAttachmentRefreshVersion = 0;
 
+  // §7 共享账本:tx → account 名字缓存(命令式,跟 _cachedTagsMap 同模式)。
+  // 响应式 ref.watch(accountForTxProvider(...)) 在 FlutterListView 嵌套
+  // builder 里实测不可靠 — WS shared_resource_change → invalidate 后
+  // 部分 family 实例不重算。改用命令式 setState 强制刷新。
+  Map<int, String?> _cachedAccountNames = {};
+  Map<int, String?> _cachedToAccountNames = {};
+  int _lastSharedResourceRefreshVersion = 0;
+
   // 标记是否应使用预加载数据（当 Stream 数据与预加载数据不同时切换）
   bool _usePreloadedData = true;
 
@@ -99,6 +109,7 @@ class TransactionListState extends ConsumerState<TransactionList> {
     // 始终加载标签和附件（用于非预加载范围的交易）
     _loadTags();
     _loadAttachmentCounts();
+    _loadAccountNames();
   }
 
   @override
@@ -119,6 +130,7 @@ class TransactionListState extends ConsumerState<TransactionList> {
       if (!_listEquals(newIds, _cachedTransactionIds)) {
         _loadTags();
         _loadAttachmentCounts();
+        _loadAccountNames();
       }
     }
   }
@@ -148,6 +160,85 @@ class TransactionListState extends ConsumerState<TransactionList> {
       setState(() {
         _cachedTagsMap = tagsMap;
         _cachedTransactionIds = transactionIds;
+      });
+    }
+  }
+
+  /// §7 共享账本:批量预热 tx → account 名字。
+  /// 主表 join 不到时(Editor 看到 Owner 的 tx,accountId=null) 走
+  /// SharedLedgerAccounts by syncId 反查,跟 accountForTxProvider 逻辑一致
+  /// 但走命令式 + setState,跨 FlutterListView 嵌套 builder 不丢更新。
+  Future<void> _loadAccountNames() async {
+    final transactions = _transactionsList;
+    if (transactions.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _cachedAccountNames = {};
+          _cachedToAccountNames = {};
+        });
+      }
+      return;
+    }
+
+    final repo = ref.read(repositoryProvider);
+    if (repo is! LocalRepository) return;
+    final db = repo.db;
+
+    // 一次查所有用到的 account 主表 row + SharedLedgerAccounts row,
+    // 在 dart 端 join,避免 N+1。
+    final accIds = <int>{};
+    final accSyncIds = <String>{};
+    for (final r in transactions) {
+      final t = r.t;
+      if (t.accountId != null) accIds.add(t.accountId!);
+      if (t.toAccountId != null) accIds.add(t.toAccountId!);
+      final ov1 = t.accountSyncIdOverride;
+      final ov2 = t.toAccountSyncIdOverride;
+      if (ov1 != null && ov1.isNotEmpty) accSyncIds.add(ov1);
+      if (ov2 != null && ov2.isNotEmpty) accSyncIds.add(ov2);
+    }
+
+    final accById = <int, String>{};
+    if (accIds.isNotEmpty) {
+      final rows = await (db.select(db.accounts)
+            ..where((a) => a.id.isIn(accIds.toList())))
+          .get();
+      for (final a in rows) accById[a.id] = a.name;
+    }
+    final sharedBySyncId = <String, String>{};
+    if (accSyncIds.isNotEmpty) {
+      final rows = await (db.select(db.sharedLedgerAccounts)
+            ..where((t) => t.syncId.isIn(accSyncIds.toList())))
+          .get();
+      for (final s in rows) sharedBySyncId[s.syncId] = s.name;
+    }
+
+    final names = <int, String?>{};
+    final toNames = <int, String?>{};
+    for (final r in transactions) {
+      final t = r.t;
+      // accountName
+      String? name;
+      if (t.accountId != null) name = accById[t.accountId!];
+      if (name == null) {
+        final ov = t.accountSyncIdOverride;
+        if (ov != null && ov.isNotEmpty) name = sharedBySyncId[ov];
+      }
+      names[t.id] = name;
+      // toAccountName(仅 transfer)
+      String? toName;
+      if (t.toAccountId != null) toName = accById[t.toAccountId!];
+      if (toName == null) {
+        final ov = t.toAccountSyncIdOverride;
+        if (ov != null && ov.isNotEmpty) toName = sharedBySyncId[ov];
+      }
+      toNames[t.id] = toName;
+    }
+
+    if (mounted) {
+      setState(() {
+        _cachedAccountNames = names;
+        _cachedToAccountNames = toNames;
       });
     }
   }
@@ -245,13 +336,33 @@ class TransactionListState extends ConsumerState<TransactionList> {
       Future.delayed(const Duration(milliseconds: 100), () {
         if (mounted && _usePreloadedData) {
           logger.info('TransactionList', '用户交互，切换到Stream模式');
-          _usePreloadedData = false;
+          // 用 setState 改 _usePreloadedData,否则后续 build 还在跑
+          // preloaded 路径,共享账本 WS 推送下来的新账户名永远不会显示
+          // (preloaded.accountName 是 Splash 阶段的快照)。
+          setState(() {
+            _usePreloadedData = false;
+          });
           // 开始加载标签和附件（异步，不阻塞）
           _loadTags();
           _loadAttachmentCounts();
         }
       });
     }
+  }
+
+  /// 共享账本 WS 推送强制切到 Stream 模式 — 没有导航动画顾虑,立即切。
+  /// 用于 sharedResourceRefreshProvider tick 触发的场景:Owner 改 tx 引用的
+  /// account/category/tag,Editor 这边需要立即丢掉 preloaded(里面挂的是
+  /// Splash 阶段的旧 accountName)走 provider 拉新值。
+  void forceStreamModeImmediate() {
+    if (!mounted) return;
+    if (!_usePreloadedData) return;
+    logger.info('TransactionList', 'WS 推送强制切 Stream 模式 (immediate)');
+    setState(() {
+      _usePreloadedData = false;
+    });
+    _loadTags();
+    _loadAttachmentCounts();
   }
 
   /// 跳转到指定月份
@@ -326,6 +437,17 @@ class TransactionListState extends ConsumerState<TransactionList> {
     if (attachmentRefreshVersion != _lastAttachmentRefreshVersion) {
       _lastAttachmentRefreshVersion = attachmentRefreshVersion;
       Future.microtask(() => _loadAttachmentCounts());
+    }
+
+    // §7 共享账本:Owner 改分类/账户/标签 → server WS push → 本地
+    // SharedLedger* + 主 Categories/Accounts/Tags 主表更新 → 这里 watch
+    // 触发 rebuild,让 tx tile 显示最新分类名 / 自定义图标。
+    final sharedResourceVersion = ref.watch(sharedResourceRefreshProvider);
+    // account 名 reactive ref.watch(accountForTxProvider) 在 FlutterListView
+    // 嵌套 builder 里有时不可靠,改命令式 _loadAccountNames + setState 兜底。
+    if (sharedResourceVersion != _lastSharedResourceRefreshVersion) {
+      _lastSharedResourceRefreshVersion = sharedResourceVersion;
+      Future.microtask(() => _loadAccountNames());
     }
 
     _buildFlatItems();
@@ -422,20 +544,39 @@ class TransactionListState extends ConsumerState<TransactionList> {
             String? accountName;
             String? toAccountName; // 转账目标账户名称
 
-            if (accountFeatureEnabled && it.t.accountId != null) {
-              // 优先使用预加载的账户名称
-              accountName = _getAccountNameForTransaction(it.t.id);
-              if (isTransfer && it.t.toAccountId != null) {
-                toAccountName = _getToAccountNameForTransaction(it.t.id);
+            // §7 v25:tx 可能 accountId=null + accountSyncIdOverride 非空
+            // (Editor 在共享账本下记的)。优先用 _cachedAccountNames(命令式,
+            // WS 推送后强制刷新),preloaded 兜底,最后 fallback 到 provider。
+            if (accountFeatureEnabled &&
+                (it.t.accountId != null || it.t.accountSyncIdOverride != null)) {
+              // 1. 命令式缓存(WS 后最新)
+              if (_cachedAccountNames.containsKey(it.t.id)) {
+                accountName = _cachedAccountNames[it.t.id];
+              }
+              // 2. preloaded 兜底(Splash 阶段快照,跟 _cachedAccountNames 一致时用)
+              accountName ??= _getAccountNameForTransaction(it.t.id);
+              if (isTransfer &&
+                  (it.t.toAccountId != null ||
+                      it.t.toAccountSyncIdOverride != null)) {
+                if (_cachedToAccountNames.containsKey(it.t.id)) {
+                  toAccountName = _cachedToAccountNames[it.t.id];
+                }
+                toAccountName ??= _getToAccountNameForTransaction(it.t.id);
               }
 
-              // 预加载数据中找不到时，通过 Provider 获取（新记录的交易不在预加载缓存中）
+              // 3. 全部 miss 再走 provider(新建交易未进 _loadAccountNames 缓存)
               if (accountName == null) {
-                final accountAsync = ref.watch(accountByIdProvider(it.t.accountId!));
+                final accountAsync = ref.watch(accountForTxProvider((
+                  accountId: it.t.accountId,
+                  syncIdOverride: it.t.accountSyncIdOverride,
+                )));
                 accountName = accountAsync.valueOrNull?.name;
               }
-              if (isTransfer && toAccountName == null && it.t.toAccountId != null) {
-                final toAccountAsync = ref.watch(accountByIdProvider(it.t.toAccountId!));
+              if (isTransfer && toAccountName == null) {
+                final toAccountAsync = ref.watch(accountForTxProvider((
+                  accountId: it.t.toAccountId,
+                  syncIdOverride: it.t.toAccountSyncIdOverride,
+                )));
                 toAccountName = toAccountAsync.valueOrNull?.name;
               }
             }

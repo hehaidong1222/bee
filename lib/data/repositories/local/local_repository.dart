@@ -297,6 +297,9 @@ class LocalRepository extends BaseRepository {
     required DateTime happenedAt,
     String? note,
     String? syncId,
+    String? categorySyncIdOverride,
+    String? accountSyncIdOverride,
+    String? toAccountSyncIdOverride,
   }) async {
     final id = await _transactionRepo.addTransaction(
       ledgerId: ledgerId,
@@ -308,6 +311,9 @@ class LocalRepository extends BaseRepository {
       happenedAt: happenedAt,
       note: note,
       syncId: syncId,
+      categorySyncIdOverride: categorySyncIdOverride,
+      accountSyncIdOverride: accountSyncIdOverride,
+      toAccountSyncIdOverride: toAccountSyncIdOverride,
     );
     if (changeTracker != null) {
       final tx = await _transactionRepo.getTransactionById(id);
@@ -369,6 +375,9 @@ class LocalRepository extends BaseRepository {
     String? note,
     DateTime? happenedAt,
     dynamic accountId,
+    String? categorySyncIdOverride,
+    String? accountSyncIdOverride,
+    String? toAccountSyncIdOverride,
   }) async {
     if (changeTracker != null) {
       final tx = await _transactionRepo.getTransactionById(id);
@@ -377,6 +386,9 @@ class LocalRepository extends BaseRepository {
           id: id, type: type, amount: amount,
           categoryId: categoryId, note: note,
           happenedAt: happenedAt, accountId: accountId,
+          categorySyncIdOverride: categorySyncIdOverride,
+          accountSyncIdOverride: accountSyncIdOverride,
+          toAccountSyncIdOverride: toAccountSyncIdOverride,
         );
         await changeTracker!.recordLedgerChange(
           entityType: 'transaction',
@@ -392,6 +404,9 @@ class LocalRepository extends BaseRepository {
       id: id, type: type, amount: amount,
       categoryId: categoryId, note: note,
       happenedAt: happenedAt, accountId: accountId,
+      categorySyncIdOverride: categorySyncIdOverride,
+      accountSyncIdOverride: accountSyncIdOverride,
+      toAccountSyncIdOverride: toAccountSyncIdOverride,
     );
   }
 
@@ -1455,6 +1470,11 @@ class LocalRepository extends BaseRepository {
         ledgerId: ledgerId,
         year: year,
       );
+
+  @override
+  Future<Map<int, Category>> getSharedSyntheticCategoriesForLedger(
+          int ledgerId) =>
+      _statisticsRepo.getSharedSyntheticCategoriesForLedger(ledgerId);
 
   // ============================================
   // RecurringTransactionRepository 接口实现 - 委托给 LocalRecurringTransactionRepository

@@ -58,6 +58,10 @@ abstract class TransactionRepository {
   });
 
   /// 添加交易
+  ///
+  /// §7 v25 共享账本:Editor 选 Owner 的 SharedLedger* 行时,categoryId /
+  /// accountId / toAccountId 留 null,改填 *SyncIdOverride 字符串。
+  /// Owner / 单人账本场景:走 categoryId int(老路径),override 留 null。
   Future<int> addTransaction({
     required int ledgerId,
     required String type,
@@ -68,6 +72,9 @@ abstract class TransactionRepository {
     required DateTime happenedAt,
     String? note,
     String? syncId,
+    String? categorySyncIdOverride,
+    String? accountSyncIdOverride,
+    String? toAccountSyncIdOverride,
   });
 
   /// 批量新增交易，单事务内插入，返回插入条数
@@ -85,6 +92,9 @@ abstract class TransactionRepository {
     String? note,
     DateTime? happenedAt,
     dynamic accountId,
+    String? categorySyncIdOverride,
+    String? accountSyncIdOverride,
+    String? toAccountSyncIdOverride,
   });
 
   /// 删除交易

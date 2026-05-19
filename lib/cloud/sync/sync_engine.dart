@@ -324,16 +324,24 @@ class SyncEngine implements app.SyncService {
         return SyncResult(pushed: pushed, pulled: 0);
       }
 
+      // §7 共享账本:Editor 在共享账本下,server 那边 ledger 是 Owner 的,
+      // **永远不该 fullPush**(会把 Editor 本地状态覆盖 Owner 的)。直接走
+      // 增量 push,跳过 exists 检查。
+      final isSharedAsEditor =
+          ledgerRow.isShared && ledgerRow.myRole != 'owner';
+
       final checkPath = ledgerRow.syncId ?? ledgerId.toString();
       bool hasRemote = true;
-      try {
-        hasRemote = await provider.storage.exists(path: checkPath);
-      } catch (e, st) {
-        // 检查失败时保守假设远端存在，走增量 push；fullPush 的风险更大。
-        logger.warning('SyncEngine', '远端存在性检查失败（按已存在处理）: $e', st);
+      if (!isSharedAsEditor) {
+        try {
+          hasRemote = await provider.storage.exists(path: checkPath);
+        } catch (e, st) {
+          // 检查失败时保守假设远端存在，走增量 push；fullPush 的风险更大。
+          logger.warning('SyncEngine', '远端存在性检查失败（按已存在处理）: $e', st);
+        }
       }
 
-      if (!hasRemote) {
+      if (!hasRemote && !isSharedAsEditor) {
         final localTxCount = (await (db.select(db.transactions)
               ..where((t) => t.ledgerId.equals(ledgerIdInt)))
             .get()).length;
@@ -399,25 +407,80 @@ class SyncEngine implements app.SyncService {
   /// 此时设备全局 cursor 可能已经前移、普通 `_pull` 再也拉不回历史。
   ///
   /// 返回新增（非已存在）的账本数，调用方可据此决定要不要 bump 刷新信号。
+  /// 并发互斥锁 — **static** 跨 SyncEngine 实例共享。
+  /// 关键 bug:join page 拿 syncEngineProvider(family) 的 engine,WS listener
+  /// 拿 cloudSyncServiceProvider 创建的 engine,两个不同 instance!instance-level
+  /// 字段互不知道,各跑各的。改 static 后整个进程同一时间只有一个 fetch-then-write
+  /// 在跑。
+  static Completer<int>? _syncLedgersInFlight;
+
   Future<int> syncLedgersFromServer() async {
+    final existing = _syncLedgersInFlight;
+    if (existing != null) {
+      logger.info('SyncEngine',
+          'syncLedgersFromServer 已在执行中,等待 in-flight 结果');
+      return existing.future;
+    }
+    final completer = Completer<int>();
+    _syncLedgersInFlight = completer;
+    try {
+      final n = await _syncLedgersFromServerLocked();
+      completer.complete(n);
+      return n;
+    } catch (e, st) {
+      completer.completeError(e, st);
+      rethrow;
+    } finally {
+      _syncLedgersInFlight = null;
+    }
+  }
+
+  Future<int> _syncLedgersFromServerLocked() async {
     logger.info('SyncEngine', 'syncLedgersFromServer start');
     try {
       final remote = await provider.readLedgers();
       int upserted = 0;
       int inserted = 0;
+      // 新设备登录场景:Editor 已是 server LedgerMember 但本地 ledgers 表为空。
+      // 检测到 isShared && myRole != owner 的新 insert 时,记下 syncId,本轮
+      // 结束后批量拉 /shared-resources 落 SharedLedger* 表。不放循环里直接
+      // await 是因为 fetchAndStoreSharedResources 走 HTTP,放循环里会串行慢,
+      // 也会让单个失败影响其它账本。
+      final newSharedLedgerSyncIds = <String>[];
       for (final r in remote) {
         final syncId = r.ledgerId;
         if (syncId.isEmpty) continue;
-        final existing = await (db.select(db.ledgers)
+        // 用 get() 不用 getSingleOrNull() — 历史可能已经产生过同 syncId 多行
+        // (并发 syncLedgersFromServer 串行化前的遗留 / 老版本残留)。这里取 list,
+        // 有就保第一行,GC 其余 dup。
+        final existingList = await (db.select(db.ledgers)
               ..where((l) => l.syncId.equals(syncId)))
-            .getSingleOrNull();
-        if (existing != null) {
-          // update meta（name / currency 可能在 server 被改过）
+            .get();
+        if (existingList.isNotEmpty) {
+          final existing = existingList.first;
+          // update meta（name / currency / 共享账本字段 server 可能改过）
           await (db.update(db.ledgers)..where((l) => l.id.equals(existing.id)))
               .write(LedgersCompanion(
             name: d.Value(r.ledgerName),
             currency: d.Value(r.currency),
+            myRole: d.Value(r.role),
+            isShared: d.Value(r.isShared),
+            memberCount: d.Value(r.memberCount),
           ));
+          // 删 dup 行(及其关联 tx/local_changes,虽然 dup 行还没有这些)
+          if (existingList.length > 1) {
+            final dupIds = existingList.skip(1).map((l) => l.id).toList();
+            logger.warning('SyncEngine',
+                '检测到 ledger.syncId=$syncId 重复 ${existingList.length} 行,清除 dup id=$dupIds');
+            await (db.delete(db.transactions)
+                  ..where((t) => t.ledgerId.isIn(dupIds)))
+                .go();
+            await (db.delete(db.localChanges)
+                  ..where((c) => c.ledgerId.isIn(dupIds)))
+                .go();
+            await (db.delete(db.ledgers)..where((l) => l.id.isIn(dupIds)))
+                .go();
+          }
           upserted++;
           continue;
         }
@@ -431,6 +494,9 @@ class SyncEngine implements app.SyncService {
               .write(LedgersCompanion(
             syncId: d.Value(syncId),
             currency: d.Value(r.currency),
+            myRole: d.Value(r.role),
+            isShared: d.Value(r.isShared),
+            memberCount: d.Value(r.memberCount),
           ));
           upserted++;
           continue;
@@ -440,12 +506,62 @@ class SyncEngine implements app.SyncService {
               name: r.ledgerName,
               currency: d.Value(r.currency),
               syncId: d.Value(syncId),
+              myRole: d.Value(r.role),
+              isShared: d.Value(r.isShared),
+              memberCount: d.Value(r.memberCount),
             ));
         inserted++;
+        // 新设备登录:Editor 的共享账本需要拉 /shared-resources 才能在
+        // picker / 详情页 / 洞察 等显示 Owner 的资源。fallback 给 byName
+        // 收编路径不记(那是同 ledger 的 syncId 收编,不算新 ledger)。
+        if (r.isShared && r.role != 'owner') {
+          newSharedLedgerSyncIds.add(syncId);
+        }
       }
       logger.info(
           'SyncEngine',
           'syncLedgersFromServer done: total=${remote.length} upserted=$upserted inserted=$inserted');
+
+      // GC 1:清掉本地 isShared=true 但 server 没返回的 ledger — Owner 删了
+      // 共享账本,Editor 应该自动清(WS member_change.removed 是主路径,这是
+      // 兜底,处理 WS 离线时没推到的情况)。
+      final remoteSyncIdSet = remote.map((r) => r.ledgerId).toSet();
+      final localShared = await (db.select(db.ledgers)
+            ..where((l) => l.isShared.equals(true)))
+          .get();
+      for (final localLedger in localShared) {
+        final sid = localLedger.syncId;
+        if (sid == null || sid.isEmpty) continue;
+        if (remoteSyncIdSet.contains(sid)) continue;
+        // server 不再返这个共享账本 = Owner 删了 / Editor 被踢 → 清本地
+        logger.info('SyncEngine',
+            'GC: server 不再返共享账本 syncId=$sid,清本地数据');
+        await _purgeLocalLedgerByExternalId(sid);
+      }
+
+      // GC 2:清掉 SharedLedger* 表里 ledger.syncId 在新拉的 ledgers 表里找不
+      // 到的孤儿行(测试残留 / 退出账本残留 / 老 invite 接受过又被 byName
+      // fallback 改 syncId 时遗弃的旧 ledger_sync_id 行)
+      await _gcOrphanSharedLedgerRows();
+
+      // 新设备登录场景的二次拉取:本轮 insert 的共享账本(Editor 角色)逐个
+      // 拉 /shared-resources 把 SharedLedger* 镜像表填上。每个独立 await
+      // 单一错误不影响其它账本;成功后 bump tick 让 UI 立即生效。
+      if (newSharedLedgerSyncIds.isNotEmpty) {
+        logger.info('SyncEngine',
+            '新 insert 的共享账本(Editor)$newSharedLedgerSyncIds — 拉 /shared-resources');
+        for (final sid in newSharedLedgerSyncIds) {
+          try {
+            await fetchAndStoreSharedResources(sid);
+          } catch (e, st) {
+            logger.warning('SyncEngine',
+                'fetchAndStoreSharedResources 失败 ledger=$sid: $e', st);
+          }
+        }
+        // 通知 UI 刷新(picker / 详情页 watch sharedResourceRefreshProvider)
+        onAutoPullCompleted?.call('');
+      }
+
       return inserted;
     } catch (e, st) {
       logger.warning('SyncEngine', 'syncLedgersFromServer failed: $e', st);
@@ -579,17 +695,24 @@ class SyncEngine implements app.SyncService {
     int? nextSince = sinceOverride;
     while (hasMore) {
       final result = await provider.pullChanges(since: nextSince, limit: 500);
+      logger.info('SyncEngine',
+          'pull: since=$nextSince got ${result.changes.length} changes hasMore=${result.hasMore}');
       if (result.changes.isEmpty) break;
 
-      // 用 transaction 把整页变更合成一次提交。Drift 内部是 SQLite 单 WAL，
-      // 每条独立 commit 会触发 fsync；合成一次可以把 N 次 fsync 降到 1 次。
-      // 即使某条 apply 内部抛错，transaction 会 rollback 整页 —— 比半同步
-      // 的状态好，下一次 sync 会再拉一次（server cursor 只在全部成功时 advance）。
       final pageApplied = await db.transaction<int>(() async {
         int pageCount = 0;
+        int skipped = 0;
         for (final change in result.changes) {
           final applied = await _applyRemoteChange(change);
-          if (applied) pageCount++;
+          if (applied) {
+            pageCount++;
+          } else {
+            skipped++;
+          }
+        }
+        if (skipped > 0) {
+          logger.info('SyncEngine',
+              'pull: 应用 $pageCount / 跳过 $skipped 条 (本页)');
         }
         return pageCount;
       });

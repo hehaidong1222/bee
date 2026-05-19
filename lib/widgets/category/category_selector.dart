@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/db.dart';
+import '../../data/repositories/local/local_repository.dart';
 import '../../providers.dart';
 import '../../l10n/app_localizations.dart';
+import '../../providers/shared_ledger_providers.dart';
 import '../../utils/category_utils.dart';
+import '../../utils/shared_ledger_picker_filter.dart';
 import '../../styles/tokens.dart';
 import '../category_icon.dart';
 import '../../pages/category/category_manage_page.dart';
@@ -62,12 +65,25 @@ class _CategorySelectorState extends ConsumerState<CategorySelector> {
     }
   }
 
+  /// §7 共享账本 picker 过滤 — Editor + 共享账本 只显示 Owner 的 SharedLedger
+  /// 行,按 kind 过滤;单人账本 / Owner 视角走主表 getTopLevelCategories。
+  Future<List<Category>> _loadFilteredTopLevel() async {
+    final repo = ref.read(repositoryProvider);
+    final cats = await repo.getTopLevelCategories(widget.kind);
+    if (repo is! LocalRepository) return cats;
+    final currentLedgerId = ref.read(currentLedgerIdProvider);
+    final ctx = await repo.db.loadLedgerPickerContext(currentLedgerId);
+    return repo.db.filterCategoriesForLedger(cats, ctx, kind: widget.kind);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final repo = ref.watch(repositoryProvider);
-
+    // §7 共享账本:WS shared_resource_change 推送后 tick bump,触发 rebuild
+    // → FutureBuilder 拿到新 Future → 重查 SharedLedgerCategories。否则 A
+    // 在 web/mobile 改分类名,B 这边 picker 永远显示旧名,要重启 app。
+    ref.watch(sharedResourceRefreshProvider);
     return FutureBuilder<List<Category>>(
-      future: repo.getTopLevelCategories(widget.kind),
+      future: _loadFilteredTopLevel(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
